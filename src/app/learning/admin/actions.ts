@@ -26,7 +26,10 @@ export async function createCourse(formData:FormData){
   let slug=base
   const {data:existing}=await supabase.from('courses').select('id').eq('church_id',churchId).eq('slug',slug).maybeSingle()
   if(existing)slug=`${base}-${Date.now().toString().slice(-6)}`
-  const {error}=await supabase.from('courses').insert({church_id:churchId,title,slug,description:text(formData,'description')||null,category:text(formData,'category')||'discipleship',estimated_minutes:num(formData,'estimated_minutes',0)||null,passing_score:Math.max(0,Math.min(100,num(formData,'passing_score',80))),badge_name:text(formData,'badge_name')||null,published:false,created_by:userId})
+  const languageCode=text(formData,'language_code')==='es'?'es':'en'
+  const audience=text(formData,'audience_level')||'general'
+  const translationKey=text(formData,'translation_key')||null
+  const {error}=await supabase.from('courses').insert({church_id:churchId,title,slug,description:text(formData,'description')||null,category:text(formData,'category')||'discipleship',estimated_minutes:num(formData,'estimated_minutes',0)||null,passing_score:Math.max(0,Math.min(100,num(formData,'passing_score',80))),badge_name:text(formData,'badge_name')||null,published:false,created_by:userId,language_code:languageCode,audience_level:audience,translation_key:translationKey})
   if(error)redirect('/learning/admin?error='+encodeURIComponent(error.message))
   revalidatePath('/learning/admin');redirect('/learning/admin?created=1')
 }
