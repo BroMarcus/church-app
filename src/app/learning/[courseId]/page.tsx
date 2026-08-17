@@ -3,7 +3,9 @@ import { redirect } from 'next/navigation'
 import { Award,CheckCircle2,Clock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { setModuleComplete,startCourse } from '../actions'
+import { AssessmentCard } from './assessment-card'
 import '../learning.css'
+import './assessment.css'
 
 export default async function CoursePage({params,searchParams}:{params:Promise<{courseId:string}>;searchParams:Promise<{saved?:string;error?:string}>}){
   const [{courseId},query]=await Promise.all([params,searchParams])
@@ -11,13 +13,30 @@ export default async function CoursePage({params,searchParams}:{params:Promise<{
   const {data:claimsData}=await supabase.auth.getClaims()
   const userId=claimsData?.claims?.sub
   if(!userId)redirect('/login')
-  const [{data:course},{data:modules},{data:enrollment},{data:moduleProgress}]=await Promise.all([
+  const [{data:course},{data:modules},{data:enrollment},{data:moduleProgress},{data:assessments}]=await Promise.all([
     supabase.from('courses').select('*').eq('id',courseId).eq('published',true).single(),
     supabase.from('course_modules').select('*').eq('course_id',courseId).order('position'),
     supabase.from('course_enrollments').select('*').eq('course_id',courseId).eq('user_id',userId).maybeSingle(),
-    supabase.from('course_module_progress').select('module_id,completed,completed_at').eq('course_id',courseId).eq('user_id',userId)
+    supabase.from('course_module_progress').select('module_id,completed,completed_at').eq('course_id',courseId).eq('user_id',userId),
+    supabase.from('course_assessments').select('id,title,assessment_type,passing_score,max_attempts,module_id').eq('course_id',courseId).eq('published',true).order('created_at')
   ])
   if(!course)redirect('/learning')
+
+  const assessmentIds=(assessments??[]).map((a:any)=>a.id)
+  let questions:any[]=[]
+  let attempts:any[]=[]
+  if(assessmentIds.length){
+    const [q,a]=await Promise.all([
+      supabase.from('assessment_questions').select('id,assessment_id,position,question_type,prompt,options,points').in('assessment_id',assessmentIds).order('position'),
+      supabase.from('assessment_attempts').select('assessment_id,attempt_number,percentage,passed,submitted_at').eq('user_id',userId).in('assessment_id',assessmentIds).order('attempt_number')
+    ])
+    questions=q.data??[]
+    attempts=a.data??[]
+  }
+  const qBy=new Map<string,any[]>();for(const q of questions){const list=qBy.get(q.assessment_id)??[];list.push(q);qBy.set(q.assessment_id,list)}
+  const aBy=new Map<string,any[]>();for(const a of attempts){const list=aBy.get(a.assessment_id)??[];list.push(a);aBy.set(a.assessment_id,list)}
+  const assessmentRows=(assessments??[]).map((a:any)=>({...a,questions:qBy.get(a.id)??[],attempts:aBy.get(a.id)??[]}))
+
   const completeIds=new Set((moduleProgress??[]).filter((p:any)=>p.completed).map((p:any)=>p.module_id))
   const progress=enrollment?.progress??0
   const credential=Boolean(enrollment?.credential_earned)
@@ -29,5 +48,6 @@ export default async function CoursePage({params,searchParams}:{params:Promise<{
     {credential&&<section className="course-complete card"><div className="pill">COMPLETED</div><h2>Credential earned: {course.badge_name||course.title}</h2><p>You completed every lesson in this course. Leadership can use this verified learning record in your discipleship and ministry pathway.</p></section>}
     {!enrollment&&<form action={startCourse} className="card" style={{padding:18,marginBottom:14}}><input type="hidden" name="course_id" value={courseId}/><p className="muted">Start the course to begin tracking lesson completion.</p><button className="btn">Start {course.title}</button></form>}
     <section className="course-list">{(modules??[]).map((module:any)=>{const done=completeIds.has(module.id);const summary=module.content?.summary||'Lesson content will be added by church leadership.';return <article className="card lesson-card" key={module.id}><div className="lesson-number">{module.position}</div><div className="lesson-copy"><h3>{module.title}</h3><p>{summary}</p></div><div className="lesson-status">{done&&<span className="complete-chip"><CheckCircle2 size={12}/> Complete</span>}<form action={setModuleComplete}><input type="hidden" name="course_id" value={courseId}/><input type="hidden" name="module_id" value={module.id}/><input type="hidden" name="complete" value={done?'0':'1'}/><button className={done?'ghost':'btn'} disabled={!enrollment}>{done?'Undo':'Mark complete'}</button></form></div></article>})}</section>
+    {assessmentRows.length>0&&<section className="assessment-section"><div className="pill">ASSESSMENTS</div><h2>Knowledge checks & exams</h2><p className="muted">Scores are calculated securely and stored with your learning record.</p>{assessmentRows.map((a:any)=><AssessmentCard assessment={a} key={a.id}/>)}</section>}
   </main>
 }
