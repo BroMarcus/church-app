@@ -4,6 +4,7 @@ import { Award,CheckCircle2,Clock,Languages } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { setModuleComplete,startCourse } from '../actions'
 import { AssessmentCard } from './assessment-card'
+import { SessionSchedule } from './session-schedule'
 import '../learning.css'
 import './assessment.css'
 
@@ -55,6 +56,7 @@ export default async function CoursePage({params,searchParams}:{params:Promise<{
     {credential&&<section className="course-complete card"><div className="pill">COMPLETED</div><h2>Credential earned: {course.badge_name||course.title}</h2><p>You completed every lesson in this course. Leadership can use this verified learning record in your discipleship and ministry pathway.</p></section>}
     {!enrollment&&<form action={startCourse} className="card" style={{padding:18,marginBottom:14}}><input type="hidden" name="course_id" value={courseId}/><p className="muted">{isEs?'Comienza el curso para registrar tu progreso.':'Start the course to begin tracking lesson completion.'}</p><button className="btn">{isEs?'Comenzar ':'Start '}{course.title}</button></form>}
     <section className="course-list">{(modules??[]).map((module:any)=>{const done=completeIds.has(module.id);const summary=module.content?.summary||'Lesson content will be added by church leadership.';return <article className="card lesson-card" key={module.id}><div className="lesson-number">{module.position}</div><div className="lesson-copy"><h3>{module.title}</h3><p>{summary}</p></div><div className="lesson-status">{done&&<span className="complete-chip"><CheckCircle2 size={12}/> Complete</span>}<form action={setModuleComplete}><input type="hidden" name="course_id" value={courseId}/><input type="hidden" name="module_id" value={module.id}/><input type="hidden" name="complete" value={done?'0':'1'}/><button className={done?'ghost':'btn'} disabled={!enrollment}>{done?'Undo':isEs?'Marcar completo':'Mark complete'}</button></form></div></article>})}</section>
+    <SessionSchedule courseId={courseId} userId={userId}/>
     {assessmentRows.length>0&&<section className="assessment-section"><div className="pill">ASSESSMENTS</div><h2>{isEs?'Evaluaciones y comprobaciones':'Knowledge checks & exams'}</h2><p className="muted">{isEs?'Las calificaciones se calculan de forma segura y se guardan con tu historial de aprendizaje.':'Scores are calculated securely and stored with your learning record.'}</p>{assessmentRows.map((a:any)=><AssessmentCard assessment={a} key={a.id}/>)}</section>}
   </main>
 }
