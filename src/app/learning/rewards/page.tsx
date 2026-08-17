@@ -16,7 +16,7 @@ export default async function RewardsPage({searchParams}:{searchParams:Promise<{
     supabase.from('learning_levels').select('*').order('level_number'),
     supabase.from('learning_xp_events').select('*').eq('user_id',userId).order('created_at',{ascending:false}),
     supabase.from('learning_games').select('*').eq('published',true).eq('language_code',lang).order('created_at'),
-    supabase.from('member_badges').select('earned_at,badges(name,description,category)').eq('user_id',userId).order('earned_at',{ascending:false})
+    supabase.from('member_badges').select('earned_at,badges(name,description,category,icon_key)').eq('user_id',userId).order('earned_at',{ascending:false})
   ])
   const gameIds=(games??[]).map((g:any)=>g.id)
   let questions:any[]=[]
@@ -36,6 +36,8 @@ export default async function RewardsPage({searchParams}:{searchParams:Promise<{
     <section className="card rewards-hero"><div><div className="pill">LEARNING REWARDS</div><h1>{lang==='es'?'Aprende. Practica. Crece.':'Learn. Practice. Grow.'}</h1><p className="muted">{lang==='es'?'Los niveles y trofeos celebran el estudio y la comprensión. No son una clasificación espiritual.':'Levels and trophies celebrate study and understanding. They are not a spiritual ranking.'}</p></div><div className="level-card"><span>{lang==='es'?'NIVEL ACTUAL':'CURRENT LEVEL'}</span><strong>{current?.name??'Starting Point'}</strong><div className="level-progress"><span style={{width:`${progress}%`}}/></div><div className="xp-total">{xp} XP {next?`• ${next.min_xp-xp} XP to ${next.name}`:'• Highest current level'}</div></div></section>
 
     <section className="reward-grid"><div className="card reward-stat"><Sparkles/><strong>{xp}</strong><span>Learning XP</span></div><div className="card reward-stat"><Award/><strong>{official.length}</strong><span>Official credentials</span></div><div className="card reward-stat"><Trophy/><strong>{learning.length}</strong><span>Learning trophies</span></div></section>
+
+    <section className="reward-section"><div className="pill"><Trophy size={12}/> TROPHY CASE</div><h2>{lang==='es'?'Trofeos de aprendizaje':'Learning trophies'}</h2><p className="muted">{lang==='es'?'Estos trofeos celebran estudio, práctica y comprensión.':'These trophies celebrate study, practice and understanding.'}</p><div className="level-list">{learning.map((row:any)=>{const b=Array.isArray(row.badges)?row.badges[0]:row.badges;return b?<div className="level-item current" key={`${b.name}-${row.earned_at}`}><strong>🏆 {b.name}</strong><span>{b.description}</span><span style={{display:'block',marginTop:5}}>Earned {new Date(row.earned_at).toLocaleDateString()}</span></div>:null})}{!learning.length&&<div className="level-item"><strong>Your first trophy is waiting.</strong><span>Complete a lesson, pass a quiz or earn a perfect game score to unlock one.</span></div>}</div></section>
 
     <section className="reward-section"><div className="pill"><Gamepad2 size={12}/> {lang==='es'?'JUEGOS DE APRENDIZAJE':'LEARNING GAMES'}</div><h2>{lang==='es'?'Practica jugando':'Practice by playing'}</h2><p className="muted">{lang==='es'?'Los juegos dan una pequeña recompensa diaria de XP y se pueden repetir para practicar.':'Games give a small daily XP reward and can be replayed anytime for practice.'}</p><div className="game-grid">{gameRows.map((g:any)=><GameCard game={g} key={g.id}/>)}{!gameRows.length&&<div className="card empty"><h3>No games yet.</h3><p className="muted">Course-specific games will appear here as curriculum is added.</p></div>}</div></section>
 
