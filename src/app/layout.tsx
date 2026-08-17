@@ -1,0 +1,4 @@
+import type { Metadata } from 'next'
+import './globals.css'
+export const metadata:Metadata={title:'Kingdom Network',description:'Church community, discipleship and ministry platform'}
+export default function RootLayout({children}:Readonly<{children:React.ReactNode}>){return <html lang="en"><body>{children}</body></html>}
