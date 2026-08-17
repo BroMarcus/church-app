@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { BookOpen,CheckCircle2,ShieldCheck,Sparkles,UserRound } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { updateMilestones } from '../../actions'
+import { LearningScorecard } from './learning-scorecard'
 import '../../church.css'
 
 const progress=[['not_started','Not started'],['in_progress','In progress'],['completed','Completed'],['waived','Waived']] as const
@@ -41,6 +42,8 @@ export default async function MemberRecordPage({params,searchParams}:{params:Pro
 
     <section className="record-hero card"><div className="member-main"><div className="avatar record-avatar">{name.slice(0,1).toUpperCase()}</div><div><div className="pill">MEMBER RECORD</div><h1>{name}</h1><p className="muted">{membership.role.replaceAll('_',' ')} • {membership.status}</p></div></div><div className="record-score"><strong>{completed}/5</strong><span>core training milestones completed</span></div></section>
     {query.saved&&<div className="notice success">Verified member record saved.</div>}{query.error&&<div className="notice error">{query.error}</div>}
+
+    <LearningScorecard userId={targetUserId} churchId={actor.church_id}/>
 
     <div className="record-layout"><aside>
       <section className="card record-side"><div className="pill">CONTACT</div><h3>Member information</h3><dl><dt>Email</dt><dd>{details?.email||'Not added'}</dd><dt>Phone</dt><dd>{details?.phone||'Not added'}</dd><dt>Address</dt><dd>{address}</dd><dt>Birthday</dt><dd>{fmt(details?.birthday)}</dd><dt>Anniversary</dt><dd>{fmt(details?.marriage_anniversary)}</dd></dl></section>
