@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { Church,ShieldCheck,UserCheck,Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { updateMembership } from './actions'
+import './church.css'
 
 const roleOptions=[['member','Member'],['group_leader','Group leader'],['ministry_leader','Ministry leader'],['minister','Minister'],['pastor','Pastor'],['church_admin','Church admin']] as const
 const statusOptions=[['active','Active'],['visitor','Visitor'],['pending','Pending'],['inactive','Inactive']] as const
