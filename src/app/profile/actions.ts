@@ -1,4 +1,21 @@
 'use server'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-export async function updateProfile(formData:FormData){const supabase=await createClient();const {data}=await supabase.auth.getClaims();const userId=data?.claims?.sub;if(!userId)redirect('/login');const {error}=await supabase.from('profiles').update({first_name:String(formData.get('first_name')??'').trim(),last_name:String(formData.get('last_name')??'').trim(),display_name:String(formData.get('display_name')??'').trim(),bio:String(formData.get('bio')??'').trim(),updated_at:new Date().toISOString()}).eq('id',userId);if(error)redirect('/profile?error='+encodeURIComponent(error.message));redirect('/profile?saved=1')}
+
+const text=(formData:FormData,key:string)=>String(formData.get(key)??'').trim()
+const nullable=(formData:FormData,key:string)=>{const v=text(formData,key);return v||null}
+
+export async function updateProfile(formData:FormData){
+  const supabase=await createClient()
+  const {data}=await supabase.auth.getClaims()
+  const userId=data?.claims?.sub
+  if(!userId)redirect('/login')
+  const now=new Date().toISOString()
+  const [profileResult,detailsResult]=await Promise.all([
+    supabase.from('profiles').update({first_name:text(formData,'first_name'),last_name:text(formData,'last_name'),display_name:text(formData,'display_name'),bio:text(formData,'bio'),updated_at:now}).eq('id',userId),
+    supabase.from('member_private_details').update({phone:nullable(formData,'phone'),address_line1:nullable(formData,'address_line1'),address_line2:nullable(formData,'address_line2'),city:nullable(formData,'city'),state:nullable(formData,'state'),postal_code:nullable(formData,'postal_code'),birthday:nullable(formData,'birthday'),marriage_anniversary:nullable(formData,'marriage_anniversary'),updated_at:now}).eq('user_id',userId)
+  ])
+  const error=profileResult.error??detailsResult.error
+  if(error)redirect('/profile?error='+encodeURIComponent(error.message))
+  redirect('/profile?saved=1')
+}
