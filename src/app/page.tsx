@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { ArrowRight,BriefcaseBusiness,CalendarDays,Church,FileText,GraduationCap,HandHeart,Megaphone,Sparkles,Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { CreatePost } from '@/components/create-post'
+import { CommunityFeed } from '@/components/community-feed'
 import { NotificationBell } from '@/components/notification-bell'
 import { getNextStep } from '@/lib/journey'
 
@@ -30,8 +30,7 @@ export default async function Home(){
 
   if(!membership?.church_id)return <main className="shell"><div className="card" style={{padding:24}}><h1>Account created.</h1><p>Your church membership is being connected.</p><form action="/auth/signout" method="post"><button className="btn">Sign out</button></form></div></main>
 
-  const [{data:posts},{data:milestones},{count:groupCount},{count:teamCount},{count:acceptedCount}]=await Promise.all([
-    supabase.from('community_posts').select('id,body,post_type,created_at,author_id,profiles:author_id(display_name,first_name,last_name)').eq('church_id',membership.church_id).order('created_at',{ascending:false}).limit(20),
+  const [{data:milestones},{count:groupCount},{count:teamCount},{count:acceptedCount}]=await Promise.all([
     supabase.from('member_milestones').select('holy_ghost_received,baptized,first_steps_status,soul_winning_status,bible_study_teacher_status').eq('church_id',membership.church_id).eq('user_id',userId).maybeSingle(),
     supabase.from('group_memberships').select('*',{count:'exact',head:true}).eq('user_id',userId),
     supabase.from('team_assignments').select('*',{count:'exact',head:true}).eq('assigned_user_id',userId),
@@ -52,6 +51,6 @@ export default async function Home(){
 
     <section className="module-grid">{modules.map(({title,desc,Icon,...module})=>{const body=<><Icon size={22}/><strong>{title}</strong><span>{desc}</span><small>{'href' in module?'Open module':'Foundation ready'}</small></>;return 'href' in module?<Link className="module card module-link" href={module.href} key={title}>{body}</Link>:<div className="module card" key={title}>{body}</div>})}</section>
 
-    <div className="content-grid"><section><CreatePost churchId={membership.church_id} userId={userId}/><div className="feed-head"><h2>Community</h2><span className="muted small">Member posts</span></div><div className="feed">{posts?.length?posts.map((post:any)=>{const p=Array.isArray(post.profiles)?post.profiles[0]:post.profiles;const author=p?.display_name||[p?.first_name,p?.last_name].filter(Boolean).join(' ')||'Church member';return <article className="card post" key={post.id}><div className="row"><div className="avatar">{author.slice(0,1).toUpperCase()}</div><div><strong>{author}</strong><div className="small muted">{post.post_type.replaceAll('_',' ')} • {new Date(post.created_at).toLocaleDateString()}</div></div></div><p>{post.body}</p></article>}):<div className="card empty"><h3>Start the community feed.</h3><p className="muted">Your first real post will appear here for other signed-in church members.</p></div>}</div></section><aside><div className="card side"><div className="pill">ACTIVE NOW</div><h3>Kingdom Network Alpha</h3><ul><li>Personalized My Next Step</li><li>In-app notifications</li><li>Member profiles & private contact info</li><li>Church admin & verified records</li><li>Friendship Groups & leader reports</li><li>First Steps Learning Center</li><li>Learning Studio & secure assessments</li><li>Outreach follow-up pipeline</li><li>Ministry opportunities & qualification</li><li>Unified church calendar & RSVPs</li><li>Team schedules & confirmations</li><li>Private document vault & verification</li><li>Community feed</li></ul></div><div className="card side"><div className="pill">COMING NEXT</div><h3>Kingdom Guide</h3><p className="muted">AI navigation, biblical resource search and personalized discipleship recommendations will connect to approved church resources.</p></div></aside></div>
+    <div className="content-grid"><CommunityFeed churchId={membership.church_id} userId={userId}/><aside><div className="card side"><div className="pill">ACTIVE NOW</div><h3>Kingdom Network Alpha</h3><ul><li>Personalized My Next Step</li><li>In-app notifications</li><li>Member profiles & private contact info</li><li>Church admin & verified records</li><li>Friendship Groups & leader reports</li><li>First Steps Learning Center</li><li>Learning Studio, levels, trophies & games</li><li>Weekly learning challenges & streaks</li><li>Outreach follow-up pipeline</li><li>Ministry opportunities & qualification</li><li>Unified church calendar & RSVPs</li><li>Team schedules & confirmations</li><li>Private document vault & verification</li><li>Community feed with comments & reactions</li></ul></div><div className="card side"><div className="pill">COMING NEXT</div><h3>Kingdom Guide</h3><p className="muted">AI navigation, biblical resource search and personalized discipleship recommendations will connect to approved church resources.</p></div></aside></div>
   </main>
 }
