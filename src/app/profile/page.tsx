@@ -7,6 +7,7 @@ import './badges.css'
 
 const label=(v?:string|null)=>v?v.replaceAll('_',' '):'not recorded'
 const yesNo=(v?:boolean|null)=>v===true?'Yes':v===false?'No':'Not recorded'
+const titleCase=(v:string)=>v.replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase())
 
 export default async function ProfilePage({searchParams}:{searchParams:Promise<{saved?:string;error?:string}>}){
   const params=await searchParams
@@ -15,14 +16,16 @@ export default async function ProfilePage({searchParams}:{searchParams:Promise<{
   const userId=claimsData?.claims?.sub
   if(!userId)redirect('/login')
 
-  const [profileResult,detailsResult,membershipResult]=await Promise.all([
+  const [profileResult,detailsResult,membershipResult,groupMembershipResult]=await Promise.all([
     supabase.from('profiles').select('*').eq('id',userId).single(),
     supabase.from('member_private_details').select('email,phone,address_line1,address_line2,city,state,postal_code,birthday,marriage_anniversary').eq('user_id',userId).single(),
-    supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).single()
+    supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).single(),
+    supabase.from('group_memberships').select('role,groups(id,name,group_type,active)').eq('user_id',userId)
   ])
   const profile:any=profileResult.data
   const details:any=detailsResult.data
   const membership:any=membershipResult.data
+  const groupMemberships:any[]=groupMembershipResult.data??[]
 
   let milestones:any=null
   let badges:any[]=[]
@@ -39,6 +42,7 @@ export default async function ProfilePage({searchParams}:{searchParams:Promise<{
   const isAdmin=role==='pastor'||role==='church_admin'
   const credentials=badges.filter((row:any)=>{const b=Array.isArray(row.badges)?row.badges[0]:row.badges;return b?.badge_kind!=='learning_trophy'})
   const trophies=badges.filter((row:any)=>{const b=Array.isArray(row.badges)?row.badges[0]:row.badges;return b?.badge_kind==='learning_trophy'})
+  const groupRoles=groupMemberships.flatMap((row:any)=>{const group=Array.isArray(row.groups)?row.groups[0]:row.groups;if(!group?.active)return[];return[{id:group.id,name:group.name,type:group.group_type,role:String(row.role??'member')}]})
 
   return <main className="shell">
     <div className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??'Your Church'} • My Profile</div></div><div className="row"><Link className="ghost" href="/journey">My Journey</Link><Link className="ghost" href="/account/privacy">Privacy</Link><Link className="ghost" href="/">← Home</Link></div></div>
@@ -67,9 +71,9 @@ export default async function ProfilePage({searchParams}:{searchParams:Promise<{
       </section>
       <aside>
         <div className="card side"><div className="pill">MY JOURNEY</div><h3>Verified milestones</h3><p className="small muted">These records are verified by church leadership. You can view them here, but cannot change them yourself.</p><ul><li>Holy Ghost: <strong>{yesNo(milestones?.holy_ghost_received)}</strong></li><li>Baptism: <strong>{yesNo(milestones?.baptized)}</strong></li><li>First Steps: <strong>{label(milestones?.first_steps_status)}</strong></li><li>Salt Series: <strong>{label(milestones?.salt_series_status)}</strong></li><li>Soul Winning: <strong>{label(milestones?.soul_winning_status)}</strong></li><li>Bible Study Teacher: <strong>{label(milestones?.bible_study_teacher_status)}</strong></li></ul><Link className="ghost" href="/journey">Open full Journey →</Link></div>
+        <div className="card side"><div className="pill">ROLES & SERVICE</div><h3>One member. More than one hat.</h3><p className="small muted">Membership, app access and service assignments are tracked separately so one role never has to erase another.</p><div style={{display:'grid',gap:8}}><div><span className="pill">MEMBER</span><p className="small muted" style={{margin:'5px 0 0'}}>{church?.name??'Your Church'}</p></div><div><span className="pill">ACCESS</span><p className="small" style={{margin:'5px 0 0'}}><strong>{titleCase(role)}</strong></p></div>{groupRoles.map((g:any)=><div key={`${g.id}-${g.role}`}><span className="pill">{g.type==='friendship'?'FRIENDSHIP GROUP':'GROUP'}</span><p className="small" style={{margin:'5px 0 0'}}><strong>{g.role==='leader'?'Leader':titleCase(g.role)}</strong> — {g.name}</p></div>)}</div><p className="small muted" style={{marginBottom:0}}>Verified ministry titles such as Minister, Pastor or Bishop can live in a separate title layer, while actual access continues to come from permission roles.</p>{isAdmin&&<Link className="btn" href="/church" style={{display:'inline-block',marginTop:10}}>Open Church Admin</Link>}</div>
         <div className="card side"><div className="pill">VERIFIED CREDENTIALS</div><h3>Qualifications & completed pathways</h3><p className="small muted">Seal-style credentials come from leadership-verified records and approved qualifications.</p><div className="badge-shelf">{credentials.map((row:any)=>{const b=Array.isArray(row.badges)?row.badges[0]:row.badges;return b?<BadgeSeal badge={b} earnedAt={row.earned_at} key={`${b.name}-${row.earned_at}`}/>:null})}{!credentials.length&&<div className="badge-empty">Verified training and ministry credentials will appear here as you complete approved pathways.</div>}</div></div>
         <div className="card side"><div className="pill">LEARNING TROPHIES</div><h3>Study achievements</h3><p className="small muted">These celebrate learning, quizzes and games—not spiritual rank.</p><div className="badge-shelf">{trophies.map((row:any)=>{const b=Array.isArray(row.badges)?row.badges[0]:row.badges;return b?<BadgeSeal badge={b} earnedAt={row.earned_at} compact key={`${b.name}-${row.earned_at}`}/>:null})}{!trophies.length&&<div className="badge-empty">Complete lessons, quizzes and games to begin filling your trophy case.</div>}</div></div>
-        <div className="card side"><div className="pill">CHURCH ACCESS</div><h3>{church?.name??'Your Church'}</h3><p className="muted">Current role: <strong>{role.replaceAll('_',' ')}</strong></p>{isAdmin&&<Link className="btn" href="/church" style={{display:'inline-block'}}>Open Church Admin</Link>}</div>
         <div className="card side"><div className="pill">ACCOUNT & PRIVACY</div><h3>Your controls.</h3><p className="muted">Manage what church members can see, how Kingdom Network alerts you, your login security and your own stored data.</p><div style={{display:'grid',gap:8}}><Link className="ghost" href="/account/privacy">Privacy settings</Link><Link className="ghost" href="/account/security">Login & security</Link><Link className="ghost" href="/account/notifications">Notification preferences</Link><Link className="ghost" href="/account/data">My data & download</Link></div></div>
       </aside>
     </div>
