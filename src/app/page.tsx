@@ -4,6 +4,7 @@ import { ArrowRight,BriefcaseBusiness,CalendarDays,Church,FileText,GraduationCap
 import { createClient } from '@/lib/supabase/server'
 import { CommunityFeed } from '@/components/community-feed'
 import { NotificationBell } from '@/components/notification-bell'
+import { OfficialUpdates } from '@/components/official-updates'
 import { getNextStep } from '@/lib/journey'
 
 const modules=[
@@ -14,7 +15,8 @@ const modules=[
   {title:'Calendar',desc:'Church & district events',Icon:CalendarDays,href:'/calendar'},
   {title:'Documents',desc:'Certificates & records',Icon:FileText,href:'/documents'},
   {title:'Teams',desc:'Schedules & assignments',Icon:BriefcaseBusiness,href:'/teams'},
-  {title:'Church',desc:'Member directory',Icon:Church,href:'/directory'}
+  {title:'Church',desc:'Member directory',Icon:Church,href:'/directory'},
+  {title:'Care',desc:'Prayer & pastoral support',Icon:HandHeart,href:'/help'}
 ] as const
 
 export default async function Home(){
@@ -55,6 +57,8 @@ export default async function Home(){
 
     <section className="module-grid">{modules.map(({title,desc,Icon,href})=><Link className="module card module-link" href={href} key={title}><Icon size={22}/><strong>{title}</strong><span>{desc}</span><small>Open module</small></Link>)}</section>
 
-    <div className="content-grid"><CommunityFeed churchId={membership.church_id} userId={userId}/><aside><div className="card side"><div className="pill">ACTIVE NOW</div><h3>Kingdom Network Alpha</h3><ul><li>Personalized My Next Step</li><li>In-app notifications</li><li>Member profiles & private contact info</li><li>Member directory & secure invitations</li><li>Church admin & verified records</li><li>Friendship Groups & leader reports</li><li>First Steps Learning Center</li><li>Learning Studio, levels, trophies & games</li><li>Weekly learning challenges & streaks</li><li>Outreach follow-up pipeline & history</li><li>Ministry opportunities & qualification</li><li>Unified church calendar & RSVPs</li><li>Team schedules & confirmations</li><li>Private document vault & verification</li><li>Community feed with comments & reactions</li></ul></div><div className="card side"><div className="pill">COMING NEXT</div><h3>Kingdom Guide</h3><p className="muted">AI navigation, biblical resource search and personalized discipleship recommendations will connect to approved church resources.</p></div></aside></div>
+    <OfficialUpdates churchId={membership.church_id}/>
+
+    <div className="content-grid"><CommunityFeed churchId={membership.church_id} userId={userId}/><aside><div className="card side"><div className="pill">ACTIVE NOW</div><h3>Kingdom Network Alpha</h3><ul><li>Personalized My Next Step</li><li>Official church updates & announcements</li><li>Private pastoral care requests</li><li>In-app notifications</li><li>Member profiles & private contact info</li><li>Member directory & secure invitations</li><li>Church admin & verified records</li><li>Friendship Groups & leader reports</li><li>First Steps Learning Center</li><li>Learning Studio, levels, trophies & games</li><li>Weekly learning challenges & streaks</li><li>Outreach follow-up pipeline & history</li><li>Ministry opportunities & qualification</li><li>Unified church calendar & RSVPs</li><li>Team schedules & confirmations</li><li>Private document vault & verification</li><li>Community feed with comments & reactions</li></ul></div><div className="card side"><div className="pill">COMING NEXT</div><h3>Kingdom Guide</h3><p className="muted">AI navigation, biblical resource search and personalized discipleship recommendations will connect to approved church resources.</p></div></aside></div>
   </main>
 }
