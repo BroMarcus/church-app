@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase/server'
 const text=(f:FormData,k:string)=>String(f.get(k)??'').trim()
 const num=(f:FormData,k:string,fallback:number)=>{const n=Number(f.get(k));return Number.isFinite(n)?n:fallback}
 const slugify=(v:string)=>v.toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,70)||'course'
+const audiences=['new_convert','member','teacher_training','leadership','general']
+const stages=['new_convert','foundation','outreach','teaching','leadership','specialized']
 
 async function manager(){
   const supabase=await createClient()
@@ -27,11 +29,26 @@ export async function createCourse(formData:FormData){
   const {data:existing}=await supabase.from('courses').select('id').eq('church_id',churchId).eq('slug',slug).maybeSingle()
   if(existing)slug=`${base}-${Date.now().toString().slice(-6)}`
   const languageCode=text(formData,'language_code')==='es'?'es':'en'
-  const audience=text(formData,'audience_level')||'general'
+  const audience=audiences.includes(text(formData,'audience_level'))?text(formData,'audience_level'):'general'
+  const stage=stages.includes(text(formData,'pathway_stage'))?text(formData,'pathway_stage'):'foundation'
   const translationKey=text(formData,'translation_key')||null
-  const {error}=await supabase.from('courses').insert({church_id:churchId,title,slug,description:text(formData,'description')||null,category:text(formData,'category')||'discipleship',estimated_minutes:num(formData,'estimated_minutes',0)||null,passing_score:Math.max(0,Math.min(100,num(formData,'passing_score',80))),badge_name:text(formData,'badge_name')||null,published:false,created_by:userId,language_code:languageCode,audience_level:audience,translation_key:translationKey})
+  const {error}=await supabase.from('courses').insert({church_id:churchId,title,slug,description:text(formData,'description')||null,category:text(formData,'category')||'discipleship',estimated_minutes:num(formData,'estimated_minutes',0)||null,passing_score:Math.max(0,Math.min(100,num(formData,'passing_score',80))),badge_name:text(formData,'badge_name')||null,published:false,created_by:userId,language_code:languageCode,audience_level:audience,translation_key:translationKey,pathway_stage:stage,pathway_order:Math.max(0,num(formData,'pathway_order',100)),curriculum_version:text(formData,'curriculum_version')||'1.0',source_revision:text(formData,'source_revision')||null})
   if(error)redirect('/learning/admin?error='+encodeURIComponent(error.message))
   revalidatePath('/learning/admin');redirect('/learning/admin?created=1')
+}
+
+export async function updateCourseSettings(formData:FormData){
+  const {supabase,churchId}=await manager()
+  const courseId=text(formData,'course_id')
+  if(!courseId)redirect('/learning/admin?error='+encodeURIComponent('Course not found.'))
+  const languageCode=text(formData,'language_code')==='es'?'es':'en'
+  const audience=audiences.includes(text(formData,'audience_level'))?text(formData,'audience_level'):'general'
+  const stage=stages.includes(text(formData,'pathway_stage'))?text(formData,'pathway_stage'):'foundation'
+  const {error}=await supabase.from('courses').update({
+    title:text(formData,'title'),description:text(formData,'description')||null,category:text(formData,'category')||'discipleship',estimated_minutes:num(formData,'estimated_minutes',0)||null,passing_score:Math.max(0,Math.min(100,num(formData,'passing_score',80))),badge_name:text(formData,'badge_name')||null,language_code:languageCode,audience_level:audience,translation_key:text(formData,'translation_key')||null,pathway_stage:stage,pathway_order:Math.max(0,num(formData,'pathway_order',100)),curriculum_version:text(formData,'curriculum_version')||'1.0',source_revision:text(formData,'source_revision')||null
+  }).eq('id',courseId).eq('church_id',churchId)
+  if(error)redirect('/learning/admin?error='+encodeURIComponent(error.message))
+  revalidatePath('/learning');revalidatePath('/learning/admin');revalidatePath(`/learning/${courseId}`);redirect('/learning/admin?settings=1')
 }
 
 export async function addLesson(formData:FormData){
