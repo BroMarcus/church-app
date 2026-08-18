@@ -8,9 +8,14 @@ const text=(f:FormData,k:string)=>String(f.get(k)??'').trim()
 async function auth(){const supabase=await createClient();const {data}=await supabase.auth.getClaims();const userId=data?.claims?.sub;if(!userId)redirect('/login');return{supabase,userId}}
 
 export async function createEvent(formData:FormData){
-  const {supabase,userId}=await auth();const churchId=text(formData,'church_id'),title=text(formData,'title'),starts=text(formData,'starts_at')
+  const {supabase,userId}=await auth();const churchId=text(formData,'church_id'),title=text(formData,'title'),starts=text(formData,'starts_at'),ends=text(formData,'ends_at')
   if(!churchId||!title||!starts)redirect('/calendar?error='+encodeURIComponent('Title and start time are required.'))
-  const {error}=await supabase.from('events').insert({church_id:churchId,created_by:userId,title,description:text(formData,'description')||null,starts_at:new Date(starts).toISOString(),ends_at:text(formData,'ends_at')?new Date(text(formData,'ends_at')).toISOString():null,location:text(formData,'location')||null,event_type:text(formData,'event_type')||'church'})
+  const {data:startUtc,error:startError}=await supabase.rpc('church_local_datetime_to_utc',{p_church_id:churchId,p_local_datetime:starts})
+  if(startError||!startUtc)redirect('/calendar?error='+encodeURIComponent(startError?.message||'Invalid start time.'))
+  let endUtc:string|null=null
+  if(ends){const result=await supabase.rpc('church_local_datetime_to_utc',{p_church_id:churchId,p_local_datetime:ends});if(result.error)redirect('/calendar?error='+encodeURIComponent(result.error.message));endUtc=result.data as string|null}
+  if(endUtc&&new Date(endUtc).getTime()<new Date(startUtc as string).getTime())redirect('/calendar?error='+encodeURIComponent('End time must be after the start time.'))
+  const {error}=await supabase.from('events').insert({church_id:churchId,created_by:userId,title,description:text(formData,'description')||null,starts_at:startUtc,ends_at:endUtc,location:text(formData,'location')||null,event_type:text(formData,'event_type')||'church'})
   if(error)redirect('/calendar?error='+encodeURIComponent(error.message))
   revalidatePath('/calendar');redirect('/calendar?created=1')
 }
