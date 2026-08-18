@@ -42,6 +42,30 @@ export async function updateGroupPrivateDetails(formData:FormData){
   revalidatePath(`/groups/${groupId}`);redirect(`/groups/${groupId}?private=1`)
 }
 
+export async function requestGroupMembership(formData:FormData){
+  const {supabase,userId}=await currentUser();const groupId=text(formData,'group_id'),churchId=text(formData,'church_id')
+  if(!groupId||!churchId)redirect('/groups?error='+encodeURIComponent('Group request is missing required information.'))
+  const {error}=await supabase.from('group_join_requests').insert({group_id:groupId,church_id:churchId,user_id:userId,message:text(formData,'message')||null})
+  if(error){const msg=error.code==='23505'?'You already have a pending request for this group.':error.message;redirect(`/groups/${groupId}?error=`+encodeURIComponent(msg))}
+  revalidatePath(`/groups/${groupId}`);revalidatePath('/groups');redirect(`/groups/${groupId}?requested=1`)
+}
+
+export async function cancelGroupJoinRequest(formData:FormData){
+  const {supabase}=await currentUser();const requestId=text(formData,'request_id'),groupId=text(formData,'group_id')
+  if(!requestId||!groupId)redirect('/groups')
+  const {error}=await supabase.from('group_join_requests').update({status:'cancelled'}).eq('id',requestId)
+  if(error)redirect(`/groups/${groupId}?error=`+encodeURIComponent(error.message))
+  revalidatePath(`/groups/${groupId}`);revalidatePath('/groups');redirect(`/groups/${groupId}?cancelled=1`)
+}
+
+export async function reviewGroupJoinRequest(formData:FormData){
+  const {supabase}=await currentUser();const requestId=text(formData,'request_id'),groupId=text(formData,'group_id'),decision=text(formData,'decision')
+  if(!requestId||!groupId||!['approved','declined'].includes(decision))redirect(`/groups/${groupId}?error=`+encodeURIComponent('Invalid join-request review.'))
+  const {error}=await supabase.from('group_join_requests').update({status:decision}).eq('id',requestId)
+  if(error)redirect(`/groups/${groupId}?error=`+encodeURIComponent(error.message))
+  revalidatePath(`/groups/${groupId}`);revalidatePath('/groups');redirect(`/groups/${groupId}?reviewed=1`)
+}
+
 export async function addGroupMember(formData:FormData){
   const {supabase}=await currentUser()
   const groupId=text(formData,'group_id'),userId=text(formData,'user_id'),role=text(formData,'role')||'member'
