@@ -1,13 +1,12 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Award,BookOpen,CheckCircle2,Compass,Layers,Send,ShieldCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { BadgeSeal } from '@/components/badge-seal'
 import { updateProfile } from './actions'
 import './badges.css'
 
 const label=(v?:string|null)=>v?v.replaceAll('_',' '):'not recorded'
 const yesNo=(v?:boolean|null)=>v===true?'Yes':v===false?'No':'Not recorded'
-const badgeIcon=(key?:string|null)=>{const props={size:18};switch(key){case'layers':return <Layers {...props}/>;case'send':return <Send {...props}/>;case'book_open':return <BookOpen {...props}/>;case'shield':return <ShieldCheck {...props}/>;case'compass':return <Compass {...props}/>;case'badge_check':return <CheckCircle2 {...props}/>;default:return <Award {...props}/>}}
 
 export default async function ProfilePage({searchParams}:{searchParams:Promise<{saved?:string;error?:string}>}){
   const params=await searchParams
@@ -30,7 +29,7 @@ export default async function ProfilePage({searchParams}:{searchParams:Promise<{
   if(membership?.church_id){
     const [milestoneResult,badgeResult]=await Promise.all([
       supabase.from('member_milestones').select('holy_ghost_received,baptized,first_steps_status,salt_series_status,soul_winning_status,bible_study_teacher_status,timothys_status,school_pastors_status,covenant_current').eq('church_id',membership.church_id).eq('user_id',userId).single(),
-      supabase.from('member_badges').select('earned_at,badges(name,description,category,icon_key)').eq('user_id',userId).order('earned_at',{ascending:false})
+      supabase.from('member_badges').select('earned_at,badges(name,description,category,icon_key,badge_kind,visual_tier,display_order)').eq('user_id',userId).order('earned_at',{ascending:false})
     ])
     milestones=milestoneResult.data as any
     badges=badgeResult.data??[]
@@ -38,6 +37,8 @@ export default async function ProfilePage({searchParams}:{searchParams:Promise<{
   const church:any=Array.isArray(membership?.churches)?membership.churches[0]:membership?.churches
   const role=String(membership?.role??'member')
   const isAdmin=role==='pastor'||role==='church_admin'
+  const credentials=badges.filter((row:any)=>{const b=Array.isArray(row.badges)?row.badges[0]:row.badges;return b?.badge_kind!=='learning_trophy'})
+  const trophies=badges.filter((row:any)=>{const b=Array.isArray(row.badges)?row.badges[0]:row.badges;return b?.badge_kind==='learning_trophy'})
 
   return <main className="shell">
     <div className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??'Your Church'} • My Profile</div></div><Link className="ghost" href="/">← Home</Link></div>
@@ -66,7 +67,8 @@ export default async function ProfilePage({searchParams}:{searchParams:Promise<{
       </section>
       <aside>
         <div className="card side"><div className="pill">MY JOURNEY</div><h3>Verified milestones</h3><p className="small muted">These records are verified by church leadership. You can view them here, but cannot change them yourself.</p><ul><li>Holy Ghost: <strong>{yesNo(milestones?.holy_ghost_received)}</strong></li><li>Baptism: <strong>{yesNo(milestones?.baptized)}</strong></li><li>First Steps: <strong>{label(milestones?.first_steps_status)}</strong></li><li>Salt Series: <strong>{label(milestones?.salt_series_status)}</strong></li><li>Soul Winning: <strong>{label(milestones?.soul_winning_status)}</strong></li><li>Bible Study Teacher: <strong>{label(milestones?.bible_study_teacher_status)}</strong></li></ul></div>
-        <div className="card side"><div className="pill">CREDENTIALS</div><h3>Earned badges</h3><p className="small muted">Meaningful training and ministry credentials earned from verified records.</p><div className="badge-shelf">{badges.map((row:any)=>{const b=Array.isArray(row.badges)?row.badges[0]:row.badges;return b?<div className="earned-badge" key={`${b.name}-${row.earned_at}`}><div className="badge-mark">{badgeIcon(b.icon_key)}</div><div><span className="badge-category">{String(b.category).replaceAll('_',' ')}</span><strong>{b.name}</strong><p>{b.description}</p><span className="badge-date">Earned {new Date(row.earned_at).toLocaleDateString()}</span></div></div>:null})}{!badges.length&&<div className="badge-empty">Your verified training credentials will appear here as you complete pathways and qualifications.</div>}</div></div>
+        <div className="card side"><div className="pill">VERIFIED CREDENTIALS</div><h3>Qualifications & completed pathways</h3><p className="small muted">Seal-style credentials come from leadership-verified records and approved qualifications.</p><div className="badge-shelf">{credentials.map((row:any)=>{const b=Array.isArray(row.badges)?row.badges[0]:row.badges;return b?<BadgeSeal badge={b} earnedAt={row.earned_at} key={`${b.name}-${row.earned_at}`}/>:null})}{!credentials.length&&<div className="badge-empty">Verified training and ministry credentials will appear here as you complete approved pathways.</div>}</div></div>
+        <div className="card side"><div className="pill">LEARNING TROPHIES</div><h3>Study achievements</h3><p className="small muted">These celebrate learning, quizzes and games—not spiritual rank.</p><div className="badge-shelf">{trophies.map((row:any)=>{const b=Array.isArray(row.badges)?row.badges[0]:row.badges;return b?<BadgeSeal badge={b} earnedAt={row.earned_at} compact key={`${b.name}-${row.earned_at}`}/>:null})}{!trophies.length&&<div className="badge-empty">Complete lessons, quizzes and games to begin filling your trophy case.</div>}</div></div>
         <div className="card side"><div className="pill">CHURCH ACCESS</div><h3>{church?.name??'Your Church'}</h3><p className="muted">Current role: <strong>{role.replaceAll('_',' ')}</strong></p>{isAdmin&&<Link className="btn" href="/church" style={{display:'inline-block'}}>Open Church Admin</Link>}</div>
         <div className="card side"><div className="pill">PRIVACY</div><h3>Three kinds of information</h3><p className="muted">You control your member profile and contact email. Your login/private details stay restricted. Leadership separately verifies discipleship, qualification and training records.</p></div>
       </aside>
