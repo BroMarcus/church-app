@@ -17,7 +17,10 @@ export async function createOutreachContact(formData:FormData){
   if(!churchId||!firstName)redirect('/outreach?error='+encodeURIComponent('First name is required.'))
   const payload={church_id:churchId,created_by:userId,assigned_to:nullable(formData,'assigned_to')||userId,first_name:firstName,last_name:nullable(formData,'last_name'),phone:nullable(formData,'phone'),email:nullable(formData,'email'),stage:'new_contact',bible_study_interest:text(formData,'bible_study_interest')==='on',messaging_consent:text(formData,'messaging_consent')==='on',prayer_request:nullable(formData,'prayer_request'),follow_up_due_at:nullable(formData,'follow_up_due_at'),notes:nullable(formData,'notes')}
   const {error}=await supabase.from('outreach_contacts').insert(payload)
-  if(error)redirect('/outreach?error='+encodeURIComponent(error.message))
+  if(error){
+    const message=error.code==='23505'?'This person may already be in Outreach. Check the existing pipeline before adding another record.':error.message
+    redirect('/outreach?error='+encodeURIComponent(message))
+  }
   revalidatePath('/outreach');redirect('/outreach?created=1')
 }
 
