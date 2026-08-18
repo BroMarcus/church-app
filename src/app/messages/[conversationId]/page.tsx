@@ -18,13 +18,15 @@ export default async function MessageThreadPage({params,searchParams}:{params:Pr
   const {data:conversation}=await supabase.from('direct_conversations').select('id,church_id,user_a,user_b,created_at').eq('id',conversationId).eq('church_id',membership.church_id).maybeSingle()
   if(!conversation)redirect('/messages?error='+encodeURIComponent('Conversation not found or unavailable.'))
   const targetId=conversation.user_a===userId?conversation.user_b:conversation.user_a
-  const [{data:target},{data:messages},{data:blockRow}]=await Promise.all([
+  const [{data:target},{data:messages},{data:blockRow},{data:available}]=await Promise.all([
     supabase.from('profiles').select('id,display_name,first_name,last_name').eq('id',targetId).single(),
     supabase.from('direct_messages').select('id,sender_id,body,created_at').eq('conversation_id',conversationId).order('created_at').limit(1000),
-    supabase.from('member_blocks').select('blocked_id').eq('church_id',membership.church_id).eq('blocker_id',userId).eq('blocked_id',targetId).maybeSingle()
+    supabase.from('member_blocks').select('blocked_id').eq('church_id',membership.church_id).eq('blocker_id',userId).eq('blocked_id',targetId).maybeSingle(),
+    supabase.rpc('messaging_available',{p_target_user_id:targetId})
   ])
   const targetName=personName(target)
   const blockedByMe=Boolean(blockRow)
+  const messagingAvailable=Boolean(available)
   const church:any=Array.isArray(membership.churches)?membership.churches[0]:membership.churches
 
   return <main className="shell"><div className="thread-shell">
@@ -34,7 +36,7 @@ export default async function MessageThreadPage({params,searchParams}:{params:Pr
 
     <section className="message-stack">{(messages??[]).map((m:any)=>{const mine=m.sender_id===userId;return <div className={`message-row ${mine?'mine':''}`} key={m.id}><article className="bubble"><p>{m.body}</p><div className="bubble-meta"><span>{mine?'You':targetName}</span><span>{new Date(m.created_at).toLocaleString()}</span></div>{!mine&&<details className="report-details"><summary>Report this message</summary><form action={reportDirectMessage} className="report-form"><input type="hidden" name="message_id" value={m.id}/><input type="hidden" name="conversation_id" value={conversationId}/><input name="reason" required minLength={3} maxLength={1000} placeholder="Why should leadership review this message?"/><button className="ghost"><ShieldAlert size={12}/> Report</button></form></details>}</article></div>})}{!messages?.length&&<div className="card message-empty"><MessageCircle size={22}/><h3>Start the conversation.</h3><p className="muted">Messages sent here stay between the two participants unless a specific message is reported.</p></div>}</section>
 
-    {blockedByMe?<div className="blocked-box"><Ban size={13}/> You blocked this member. Previous messages remain visible, but new messages are disabled until you unblock them.</div>:<form action={sendDirectMessage} className="card composer"><input type="hidden" name="conversation_id" value={conversationId}/><textarea name="body" required maxLength={5000} placeholder={`Message ${targetName}…`}/><button className="btn">Send</button></form>}
+    {blockedByMe?<div className="blocked-box"><Ban size={13}/> You blocked this member. Previous messages remain visible, but new messages are disabled until you unblock them.</div>:!messagingAvailable?<div className="blocked-box"><Ban size={13}/> Messaging is currently unavailable between these members. Previous messages remain visible.</div>:<form action={sendDirectMessage} className="card composer"><input type="hidden" name="conversation_id" value={conversationId}/><textarea name="body" required maxLength={5000} placeholder={`Message ${targetName}…`}/><button className="btn">Send</button></form>}
     <div className="privacy-box"><LockKeyhole size={13}/> Leadership does not have blanket access to this conversation. If you report a specific message, Kingdom Network preserves that message and your report reason for authorized moderation.</div>
   </div></main>
 }
