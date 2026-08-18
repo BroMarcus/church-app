@@ -3,12 +3,12 @@
 import Link from 'next/link'
 import { useEffect,useState } from 'react'
 import { usePathname } from 'next/navigation'
-import { Bell,BookOpen,BriefcaseBusiness,CalendarDays,Church,FileText,Globe2,GraduationCap,HandHeart,HeartHandshake,Home,Menu,Megaphone,MessageSquareText,UserRound,Users,X } from 'lucide-react'
+import { Bell,BookOpen,BriefcaseBusiness,CalendarDays,Church,FileText,Globe2,GraduationCap,HandHeart,HeartHandshake,Home,Menu,MessageCircle,Megaphone,MessageSquareText,UserRound,Users,X } from 'lucide-react'
 import styles from './mobile-nav.module.css'
 
 const main=[['/','Home',Home],['/learning','Learn',GraduationCap],['/groups','Groups',Users],['/calendar','Calendar',CalendarDays]] as const
 const more=[
-  ['/serve','Serve',HandHeart],['/outreach','Outreach',Megaphone],['/teams','Teams',BriefcaseBusiness],['/fundraising','Fundraising',HeartHandshake],['/network','Network',Globe2],['/documents','Documents',FileText],['/directory','Directory',Church],['/updates','Updates',MessageSquareText],['/help','Care',HandHeart],['/resources','Resources',BookOpen],['/notifications','Alerts',Bell],['/profile','Profile',UserRound]
+  ['/messages','Messages',MessageCircle],['/serve','Serve',HandHeart],['/outreach','Outreach',Megaphone],['/teams','Teams',BriefcaseBusiness],['/fundraising','Fundraising',HeartHandshake],['/network','Network',Globe2],['/documents','Documents',FileText],['/directory','Directory',Church],['/updates','Updates',MessageSquareText],['/help','Care',HandHeart],['/resources','Resources',BookOpen],['/notifications','Alerts',Bell],['/profile','Profile',UserRound]
 ] as const
 
 export function MobileNav(){
