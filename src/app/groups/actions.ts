@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/server'
 
 const text=(f:FormData,k:string)=>String(f.get(k)??'').trim()
 const number=(f:FormData,k:string)=>Math.max(0,Number.parseInt(text(f,k)||'0',10)||0)
+const frequencies=['weekly','biweekly','monthly','seasonal','other']
+const languages=['en','es','bilingual']
 
 async function currentUser(){const supabase=await createClient();const {data}=await supabase.auth.getClaims();const userId=data?.claims?.sub;if(!userId)redirect('/login');return {supabase,userId}}
 
@@ -21,10 +23,27 @@ export async function createGroup(formData:FormData){
   revalidatePath('/groups');redirect(`/groups/${group.id}`)
 }
 
+export async function updateGroupDetails(formData:FormData){
+  const {supabase}=await currentUser();const groupId=text(formData,'group_id'),name=text(formData,'name'),frequency=text(formData,'meeting_frequency'),language=text(formData,'language_code')
+  if(!groupId||!name||!frequencies.includes(frequency)||!languages.includes(language))redirect(`/groups/${groupId}?error=`+encodeURIComponent('Invalid group details.'))
+  const capacity=text(formData,'capacity')?number(formData,'capacity'):null
+  const {error}=await supabase.from('groups').update({name,description:text(formData,'description')||null,meeting_day:text(formData,'meeting_day')||null,meeting_time:text(formData,'meeting_time')||null,meeting_frequency:frequency,language_code:language,capacity,location_label:text(formData,'location_label')||null,accepting_members:text(formData,'accepting_members')==='on'}).eq('id',groupId)
+  if(error)redirect(`/groups/${groupId}?error=`+encodeURIComponent(error.message))
+  revalidatePath(`/groups/${groupId}`);revalidatePath('/groups');redirect(`/groups/${groupId}?details=1`)
+}
+
+export async function updateGroupPrivateDetails(formData:FormData){
+  const {supabase,userId}=await currentUser();const groupId=text(formData,'group_id')
+  if(!groupId)redirect('/groups')
+  const {error}=await supabase.from('group_private_details').upsert({group_id:groupId,meeting_address:text(formData,'meeting_address')||null,access_notes:text(formData,'access_notes')||null,updated_by:userId,updated_at:new Date().toISOString()},{onConflict:'group_id'})
+  if(error)redirect(`/groups/${groupId}?error=`+encodeURIComponent(error.message))
+  revalidatePath(`/groups/${groupId}`);redirect(`/groups/${groupId}?private=1`)
+}
+
 export async function addGroupMember(formData:FormData){
   const {supabase}=await currentUser()
   const groupId=text(formData,'group_id'),userId=text(formData,'user_id'),role=text(formData,'role')||'member'
-  if(!groupId||!userId)redirect(`/groups/${groupId}?error=`+encodeURIComponent('Choose a member.'))
+  if(!groupId||!userId||!['member','assistant','leader'].includes(role))redirect(`/groups/${groupId}?error=`+encodeURIComponent('Choose a valid member and role.'))
   const {error}=await supabase.from('group_memberships').upsert({group_id:groupId,user_id:userId,role},{onConflict:'group_id,user_id'})
   if(error)redirect(`/groups/${groupId}?error=`+encodeURIComponent(error.message))
   revalidatePath(`/groups/${groupId}`);revalidatePath('/groups');redirect(`/groups/${groupId}?member=1`)
