@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { CheckCircle2,ClipboardCheck,XCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -9,7 +10,8 @@ type Assessment={id:string;title:string;assessment_type:string;passing_score:num
 
 const opts=(raw:any)=>Array.isArray(raw)?raw.map((o:any,i:number)=>typeof o==='string'?{value:o,label:o}:{value:String(o?.value??o?.id??i),label:String(o?.label??o?.text??o?.value??`Option ${i+1}`)}):[]
 
-export function AssessmentCard({assessment}:{assessment:Assessment}){
+export function AssessmentCard({assessment,courseId}:{assessment:Assessment;courseId:string}){
+  const router=useRouter()
   const [answers,setAnswers]=useState<Record<string,any>>({})
   const [saving,setSaving]=useState(false)
   const [result,setResult]=useState<{percentage:number;passed:boolean;attempt_number:number}|null>(null)
@@ -26,8 +28,10 @@ export function AssessmentCard({assessment}:{assessment:Assessment}){
     const {data,error}=await supabase.rpc('submit_assessment_attempt',{p_assessment_id:assessment.id,p_answers:answers})
     if(error){setError(error.message);setSaving(false);return}
     const row=Array.isArray(data)?data[0]:data
+    const refresh=await supabase.rpc('refresh_my_course_completion',{p_course_id:courseId})
+    if(refresh.error){setError(refresh.error.message);setSaving(false);return}
     setResult(row?{percentage:Number(row.percentage),passed:Boolean(row.passed),attempt_number:Number(row.attempt_number)}:null)
-    setSaving(false)
+    setSaving(false);router.refresh()
   }
 
   return <article className="card assessment-card"><div className="assessment-head"><div><div className="pill">{assessment.assessment_type.replaceAll('_',' ')}</div><h3>{assessment.title}</h3><p className="small muted">Pass with {assessment.passing_score}%{assessment.max_attempts?` • ${assessment.max_attempts} attempt${assessment.max_attempts===1?'':'s'} max`:' • unlimited attempts'}</p></div><ClipboardCheck/></div>
