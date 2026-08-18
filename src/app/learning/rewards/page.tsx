@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { Award,Gamepad2,Sparkles,Trophy } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { BadgeSeal } from '@/components/badge-seal'
 import { GameCard } from './game-card'
 import './rewards.css'
 
@@ -16,7 +17,7 @@ export default async function RewardsPage({searchParams}:{searchParams:Promise<{
     supabase.from('learning_levels').select('*').order('level_number'),
     supabase.from('learning_xp_events').select('*').eq('user_id',userId).order('created_at',{ascending:false}),
     supabase.from('learning_games').select('*').eq('published',true).eq('language_code',lang).order('created_at'),
-    supabase.from('member_badges').select('earned_at,badges(name,description,category,icon_key)').eq('user_id',userId).order('earned_at',{ascending:false})
+    supabase.from('member_badges').select('earned_at,badges(name,description,category,icon_key,badge_kind,visual_tier,display_order)').eq('user_id',userId).order('earned_at',{ascending:false})
   ])
   const gameIds=(games??[]).map((g:any)=>g.id)
   let questions:any[]=[]
@@ -29,15 +30,17 @@ export default async function RewardsPage({searchParams}:{searchParams:Promise<{
   const current=[...levelRows].reverse().find((l:any)=>xp>=l.min_xp)??levelRows[0]
   const next=levelRows.find((l:any)=>l.min_xp>xp)
   const progress=next&&current?Math.max(0,Math.min(100,Math.round(((xp-current.min_xp)/(next.min_xp-current.min_xp))*100))):100
-  const official=(memberBadges??[]).filter((r:any)=>{const b=Array.isArray(r.badges)?r.badges[0]:r.badges;return b&&b.category!=='learning'})
-  const learning=(memberBadges??[]).filter((r:any)=>{const b=Array.isArray(r.badges)?r.badges[0]:r.badges;return b&&b.category==='learning'})
+  const official=(memberBadges??[]).filter((r:any)=>{const b=Array.isArray(r.badges)?r.badges[0]:r.badges;return b&&b.badge_kind!=='learning_trophy'})
+  const learning=(memberBadges??[]).filter((r:any)=>{const b=Array.isArray(r.badges)?r.badges[0]:r.badges;return b&&b.badge_kind==='learning_trophy'})
 
   return <main className="shell"><header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">Learning Rewards</div></div><div className="row"><Link className="ghost" href={`/learning/rewards?lang=${lang==='en'?'es':'en'}`}>{lang==='en'?'Español':'English'}</Link><Link className="ghost" href={`/learning?lang=${lang}`}>← Learning</Link></div></header>
     <section className="card rewards-hero"><div><div className="pill">LEARNING REWARDS</div><h1>{lang==='es'?'Aprende. Practica. Crece.':'Learn. Practice. Grow.'}</h1><p className="muted">{lang==='es'?'Los niveles y trofeos celebran el estudio y la comprensión. No son una clasificación espiritual.':'Levels and trophies celebrate study and understanding. They are not a spiritual ranking.'}</p></div><div className="level-card"><span>{lang==='es'?'NIVEL ACTUAL':'CURRENT LEVEL'}</span><strong>{current?.name??'Starting Point'}</strong><div className="level-progress"><span style={{width:`${progress}%`}}/></div><div className="xp-total">{xp} XP {next?`• ${next.min_xp-xp} XP to ${next.name}`:'• Highest current level'}</div></div></section>
 
-    <section className="reward-grid"><div className="card reward-stat"><Sparkles/><strong>{xp}</strong><span>Learning XP</span></div><div className="card reward-stat"><Award/><strong>{official.length}</strong><span>Official credentials</span></div><div className="card reward-stat"><Trophy/><strong>{learning.length}</strong><span>Learning trophies</span></div></section>
+    <section className="reward-grid"><div className="card reward-stat"><Sparkles/><strong>{xp}</strong><span>Learning XP</span></div><div className="card reward-stat"><Award/><strong>{official.length}</strong><span>Verified credentials</span></div><div className="card reward-stat"><Trophy/><strong>{learning.length}</strong><span>Learning trophies</span></div></section>
 
-    <section className="reward-section"><div className="pill"><Trophy size={12}/> TROPHY CASE</div><h2>{lang==='es'?'Trofeos de aprendizaje':'Learning trophies'}</h2><p className="muted">{lang==='es'?'Estos trofeos celebran estudio, práctica y comprensión.':'These trophies celebrate study, practice and understanding.'}</p><div className="level-list">{learning.map((row:any)=>{const b=Array.isArray(row.badges)?row.badges[0]:row.badges;return b?<div className="level-item current" key={`${b.name}-${row.earned_at}`}><strong>🏆 {b.name}</strong><span>{b.description}</span><span style={{display:'block',marginTop:5}}>Earned {new Date(row.earned_at).toLocaleDateString()}</span></div>:null})}{!learning.length&&<div className="level-item"><strong>Your first trophy is waiting.</strong><span>Complete a lesson, pass a quiz or earn a perfect game score to unlock one.</span></div>}</div></section>
+    <section className="reward-section"><div className="pill"><Trophy size={12}/> TROPHY CASE</div><h2>{lang==='es'?'Trofeos de aprendizaje':'Learning trophies'}</h2><p className="muted">{lang==='es'?'Estos trofeos celebran estudio, práctica y comprensión; no representan rango espiritual.':'These trophies celebrate study, practice and understanding; they do not represent spiritual rank.'}</p><div className="badge-showcase">{learning.map((row:any)=>{const b=Array.isArray(row.badges)?row.badges[0]:row.badges;return b?<BadgeSeal badge={b} earnedAt={row.earned_at} key={`${b.name}-${row.earned_at}`}/>:null})}{!learning.length&&<div className="card empty"><h3>Your first trophy is waiting.</h3><p className="muted">Complete a lesson, pass a quiz or earn a perfect game score to unlock one.</p></div>}</div></section>
+
+    <section className="reward-section"><div className="pill"><Award size={12}/> VERIFIED CREDENTIALS</div><h2>{lang==='es'?'Credenciales verificadas':'Verified credentials'}</h2><p className="muted">{lang==='es'?'Estas credenciales provienen de registros y aprobaciones verificadas por el liderazgo.':'These credentials come from leadership-verified records and approved qualifications.'}</p><div className="badge-showcase">{official.map((row:any)=>{const b=Array.isArray(row.badges)?row.badges[0]:row.badges;return b?<BadgeSeal badge={b} earnedAt={row.earned_at} key={`${b.name}-${row.earned_at}`}/>:null})}{!official.length&&<div className="card empty"><h3>No verified credentials yet.</h3><p className="muted">Approved discipleship, training and ministry qualifications will appear here.</p></div>}</div></section>
 
     <section className="reward-section"><div className="pill"><Gamepad2 size={12}/> {lang==='es'?'JUEGOS DE APRENDIZAJE':'LEARNING GAMES'}</div><h2>{lang==='es'?'Practica jugando':'Practice by playing'}</h2><p className="muted">{lang==='es'?'Los juegos dan una pequeña recompensa diaria de XP y se pueden repetir para practicar.':'Games give a small daily XP reward and can be replayed anytime for practice.'}</p><div className="game-grid">{gameRows.map((g:any)=><GameCard game={g} key={g.id}/>)}{!gameRows.length&&<div className="card empty"><h3>No games yet.</h3><p className="muted">Course-specific games will appear here as curriculum is added.</p></div>}</div></section>
 
