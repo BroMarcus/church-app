@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { qualification } from './qualification'
 
 const text=(f:FormData,k:string)=>String(f.get(k)??'').trim()
+const checked=(f:FormData,k:string)=>['on','true','1','yes'].includes(text(f,k).toLowerCase())
 async function auth(){const supabase=await createClient();const {data}=await supabase.auth.getClaims();const userId=data?.claims?.sub;if(!userId)redirect('/login');return{supabase,userId}}
 
 export async function createMinistry(formData:FormData){
@@ -14,9 +15,18 @@ export async function createMinistry(formData:FormData){
   if(!actor||!['ministry_leader','pastor','church_admin'].includes(actor.role))redirect('/serve')
   if(!name)redirect('/serve?error='+encodeURIComponent('Ministry name is required.'))
   const openings=text(formData,'openings')?Math.max(0,Number.parseInt(text(formData,'openings'),10)||0):null
-  const {error}=await supabase.from('ministries').insert({church_id:churchId,name,description:text(formData,'description')||null,openings,active:true})
+  const {error}=await supabase.from('ministries').insert({church_id:churchId,name,description:text(formData,'description')||null,openings,active:checked(formData,'active')})
   if(error)redirect('/serve?error='+encodeURIComponent(error.message))
-  revalidatePath('/serve');redirect('/serve?created=1')
+  revalidatePath('/serve');revalidatePath('/church/readiness');redirect('/serve?created=1')
+}
+
+export async function updateMinistry(formData:FormData){
+  const {supabase}=await auth();const ministryId=text(formData,'ministry_id'),name=text(formData,'name')
+  if(!ministryId||!name)redirect('/serve?error='+encodeURIComponent('Ministry name is required.'))
+  const openings=text(formData,'openings')?Math.max(0,Number.parseInt(text(formData,'openings'),10)||0):null
+  const {error}=await supabase.from('ministries').update({name,description:text(formData,'description')||null,openings,active:checked(formData,'active')}).eq('id',ministryId)
+  if(error)redirect('/serve?error='+encodeURIComponent(error.message))
+  revalidatePath('/serve');revalidatePath('/church/readiness');redirect('/serve?updated=1')
 }
 
 export async function addRequirement(formData:FormData){
@@ -27,10 +37,18 @@ export async function addRequirement(formData:FormData){
   revalidatePath('/serve');redirect('/serve?requirement=1')
 }
 
+export async function removeRequirement(formData:FormData){
+  const {supabase}=await auth();const requirementId=text(formData,'requirement_id')
+  if(!requirementId)redirect('/serve?error='+encodeURIComponent('Requirement not found.'))
+  const {error}=await supabase.from('ministry_requirements').delete().eq('id',requirementId)
+  if(error)redirect('/serve?error='+encodeURIComponent(error.message))
+  revalidatePath('/serve');redirect('/serve?requirement_removed=1')
+}
+
 export async function applyToMinistry(formData:FormData){
   const {supabase,userId}=await auth();const ministryId=text(formData,'ministry_id')
-  const {data:ministry}=await supabase.from('ministries').select('church_id').eq('id',ministryId).single()
-  if(!ministry)redirect('/serve?error='+encodeURIComponent('Ministry not found.'))
+  const {data:ministry}=await supabase.from('ministries').select('church_id,active').eq('id',ministryId).single()
+  if(!ministry?.active)redirect('/serve?error='+encodeURIComponent('This ministry is not currently open for applications.'))
   const [{data:requirements},{data:milestones},{data:membership}]=await Promise.all([
     supabase.from('ministry_requirements').select('*').eq('ministry_id',ministryId),
     supabase.from('member_milestones').select('*').eq('church_id',ministry.church_id).eq('user_id',userId).maybeSingle(),
