@@ -25,9 +25,9 @@ export async function createOfficialUpdate(formData:FormData){
   if(!types.includes(type)||!priorities.includes(priority))redirect('/updates?error='+encodeURIComponent('Invalid update type or priority.'))
   let expiresUtc:string|null=null
   if(expires){const result=await supabase.rpc('church_local_datetime_to_utc',{p_church_id:churchId,p_local_datetime:expires});if(result.error)redirect('/updates?error='+encodeURIComponent(result.error.message));expiresUtc=result.data as string|null}
-  const {error}=await supabase.from('official_updates').insert({church_id:churchId,created_by:userId,title,body,update_type:type,priority,pinned:formData.get('pinned')==='on',expires_at:expiresUtc,published_at:new Date().toISOString()})
+  const {error}=await supabase.from('official_updates').insert({church_id:churchId,created_by:userId,title,body,update_type:type,priority,pinned:formData.get('pinned')==='on',notify_members:formData.get('notify_members')==='on',expires_at:expiresUtc,published_at:new Date().toISOString()})
   if(error)redirect('/updates?error='+encodeURIComponent(error.message))
-  revalidatePath('/updates');revalidatePath('/');redirect('/updates?created=1')
+  revalidatePath('/updates');revalidatePath('/notifications');revalidatePath('/');redirect('/updates?created=1')
 }
 
 export async function toggleOfficialUpdatePin(formData:FormData){
