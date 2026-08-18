@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { AlertCircle,BriefcaseBusiness,Church,Clock3,FileWarning,MailPlus,ShieldCheck,UserCheck,Users } from 'lucide-react'
+import { AlertCircle,BriefcaseBusiness,Church,Clock3,FileWarning,HandHeart,MailPlus,ShieldCheck,UserCheck,Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { updateMembership } from './actions'
 import './church.css'
@@ -21,9 +21,10 @@ export default async function ChurchAdminPage({searchParams}:{searchParams:Promi
   const nowIso=new Date().toISOString()
   const soonDate=new Date(Date.now()+30*24*60*60*1000).toISOString().slice(0,10)
   const today=new Date().toISOString().slice(0,10)
-  const [{data:memberships},{count:openInvites},{count:overdueOutreach},{count:pendingDocs},{count:expiringDocs},{count:pendingApplications},{data:teamAssignments}]=await Promise.all([
+  const [{data:memberships},{count:openInvites},{count:openCare},{count:overdueOutreach},{count:pendingDocs},{count:expiringDocs},{count:pendingApplications},{data:teamAssignments}]=await Promise.all([
     supabase.from('church_memberships').select('id,user_id,role,status,joined_at,created_at').eq('church_id',churchId).order('created_at',{ascending:true}),
     supabase.from('church_invites').select('*',{count:'exact',head:true}).eq('church_id',churchId).is('redeemed_at',null).is('revoked_at',null).gt('expires_at',nowIso),
+    supabase.from('care_requests').select('*',{count:'exact',head:true}).eq('church_id',churchId).in('status',['new','in_review']),
     supabase.from('outreach_contacts').select('*',{count:'exact',head:true}).eq('church_id',churchId).lt('follow_up_due_at',nowIso).not('stage','in','("inactive","serving")'),
     supabase.from('member_documents').select('*',{count:'exact',head:true}).eq('church_id',churchId).eq('verification_status','pending'),
     supabase.from('member_documents').select('*',{count:'exact',head:true}).eq('church_id',churchId).gte('expires_at',today).lte('expires_at',soonDate),
@@ -46,6 +47,7 @@ export default async function ChurchAdminPage({searchParams}:{searchParams:Promi
   const leaders=rows.filter((r:any)=>r.membership.role!=='member').length
   const pending=rows.filter((r:any)=>['visitor','pending'].includes(r.membership.status)).length
   const attention=[
+    {title:'Pastoral care requests',count:openCare??0,href:'/help',Icon:HandHeart,urgent:(openCare??0)>0},
     {title:'Overdue outreach',count:overdueOutreach??0,href:'/outreach',Icon:AlertCircle,urgent:(overdueOutreach??0)>0},
     {title:'Documents to review',count:pendingDocs??0,href:'/documents',Icon:FileWarning,urgent:(pendingDocs??0)>0},
     {title:'Documents expiring',count:expiringDocs??0,href:'/documents',Icon:Clock3,urgent:false},
