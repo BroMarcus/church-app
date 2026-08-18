@@ -1,0 +1,81 @@
+import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { BarChart3,BookOpen,HandHeart,Users } from 'lucide-react'
+import { createClient } from '@/lib/supabase/server'
+import './analytics.css'
+
+const pct=(n:number,d:number)=>d?Math.round((n/d)*100):0
+const nice=(v:string)=>v.replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase())
+
+function Metric({label,value,total}:{label:string;value:number;total:number}){const p=pct(value,total);return <div className="metric-row"><span className="metric-label">{label}</span><div className="metric-track"><div className="metric-fill" style={{width:`${Math.min(100,p)}%`}}/></div><span className="metric-value">{value}/{total} • {p}%</span></div>}
+
+export default async function ChurchAnalyticsPage(){
+  const supabase=await createClient()
+  const {data:claims}=await supabase.auth.getClaims()
+  const userId=claims?.claims?.sub
+  if(!userId)redirect('/login')
+  const {data:membership}=await supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).single()
+  if(!membership?.church_id||!['pastor','church_admin'].includes(membership.role))redirect('/')
+  const churchId=membership.church_id
+  const church:any=Array.isArray(membership.churches)?membership.churches[0]:membership.churches
+  const nowIso=new Date().toISOString()
+
+  const [{data:members},{data:milestones},{data:groups},{data:outreach},{data:courses},{data:applications},{data:teamAssignments},{count:openCare},{count:pendingDocs},{data:campaigns}]=await Promise.all([
+    supabase.from('church_memberships').select('user_id').eq('church_id',churchId).eq('status','active'),
+    supabase.from('member_milestones').select('user_id,holy_ghost_received,baptized,first_steps_status,soul_winning_status,bible_study_teacher_status').eq('church_id',churchId),
+    supabase.from('groups').select('id').eq('church_id',churchId).eq('active',true),
+    supabase.from('outreach_contacts').select('stage,follow_up_due_at').eq('church_id',churchId),
+    supabase.from('courses').select('id,published').eq('church_id',churchId),
+    supabase.from('ministry_applications').select('user_id,status,ministries!inner(church_id)').eq('ministries.church_id',churchId),
+    supabase.from('team_assignments').select('id,assigned_user_id,confirmation_required,starts_at').eq('church_id',churchId).gte('starts_at',nowIso),
+    supabase.from('care_requests').select('*',{count:'exact',head:true}).eq('church_id',churchId).in('status',['new','in_review']),
+    supabase.from('member_documents').select('*',{count:'exact',head:true}).eq('church_id',churchId).eq('verification_status','pending'),
+    supabase.from('fundraising_campaigns').select('goal_amount,raised_amount,status').eq('church_id',churchId).eq('status','active')
+  ])
+
+  const memberIds=(members??[]).map((m:any)=>m.user_id)
+  const activeSet=new Set(memberIds)
+  const groupIds=(groups??[]).map((g:any)=>g.id)
+  const courseIds=(courses??[]).map((c:any)=>c.id)
+  const teamIds=(teamAssignments??[]).filter((a:any)=>a.confirmation_required).map((a:any)=>a.id)
+  const [{data:groupMemberships},{data:enrollments},{data:teamResponses}]=await Promise.all([
+    groupIds.length?supabase.from('group_memberships').select('user_id').in('group_id',groupIds):Promise.resolve({data:[] as any[]}),
+    courseIds.length?supabase.from('course_enrollments').select('user_id,credential_earned').in('course_id',courseIds):Promise.resolve({data:[] as any[]}),
+    teamIds.length?supabase.from('team_assignment_responses').select('assignment_id').in('assignment_id',teamIds):Promise.resolve({data:[] as any[]})
+  ])
+
+  const milestoneRows=(milestones??[]).filter((m:any)=>activeSet.has(m.user_id))
+  const total=memberIds.length
+  const verifiedRows=milestoneRows.length
+  const baptized=milestoneRows.filter((m:any)=>m.baptized===true).length
+  const holyGhost=milestoneRows.filter((m:any)=>m.holy_ghost_received===true).length
+  const firstSteps=milestoneRows.filter((m:any)=>m.first_steps_status==='completed').length
+  const soulWinning=milestoneRows.filter((m:any)=>m.soul_winning_status==='completed').length
+  const teachers=milestoneRows.filter((m:any)=>m.bible_study_teacher_status==='approved').length
+  const grouped=new Set((groupMemberships??[]).map((m:any)=>m.user_id).filter((id:string)=>activeSet.has(id))).size
+  const learnersCompleted=new Set((enrollments??[]).filter((e:any)=>e.credential_earned&&activeSet.has(e.user_id)).map((e:any)=>e.user_id)).size
+  const serving=new Set([...(applications??[]).filter((a:any)=>a.status==='accepted').map((a:any)=>a.user_id),...(teamAssignments??[]).map((a:any)=>a.assigned_user_id)].filter((id:string)=>activeSet.has(id))).size
+
+  const stages=['new_contact','invited','guest','bible_study','regular_attendee','baptized','holy_ghost','first_steps','connected','serving']
+  const stageCounts=new Map<string,number>();for(const s of stages)stageCounts.set(s,0);for(const o of outreach??[])if(stageCounts.has((o as any).stage))stageCounts.set((o as any).stage,(stageCounts.get((o as any).stage)??0)+1)
+  const overdue=(outreach??[]).filter((o:any)=>o.follow_up_due_at&&new Date(o.follow_up_due_at).getTime()<Date.now()&&!['inactive','serving'].includes(o.stage)).length
+  const pendingApps=(applications??[]).filter((a:any)=>['submitted','under_review'].includes(a.status)).length
+  const responded=new Set((teamResponses??[]).map((r:any)=>r.assignment_id));const teamDue=Math.max(0,teamIds.length-responded.size)
+  const campaignGoal=(campaigns??[]).reduce((s:number,c:any)=>s+Number(c.goal_amount||0),0);const campaignRaised=(campaigns??[]).reduce((s:number,c:any)=>s+Number(c.raised_amount||0),0)
+  const attention=[['Pastoral care',openCare??0,'/help'],['Overdue outreach',overdue,'/outreach'],['Documents awaiting review',pendingDocs??0,'/documents'],['Ministry applications',pendingApps,'/serve'],['Team confirmations',teamDue,'/teams']] as const
+
+  return <main className="shell">
+    <header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??'Your Church'} • Church Health</div></div><div className="row"><Link className="ghost" href="/church">← Church Admin</Link><Link className="ghost" href="/">Home</Link></div></header>
+    <section className="analytics-hero card"><div><div className="pill">CHURCH HEALTH</div><h1>See where people are connecting and growing.</h1><p className="muted">Operational and discipleship signals designed to help leadership know where follow-up is needed.</p></div><div className="hero-stat"><BarChart3 size={22}/><span>Live from current church records</span></div></section>
+
+    <section className="health-grid"><div className="card health-card"><strong>{total}</strong><span>Active members</span></div><div className="card health-card"><strong>{grouped}</strong><span>Group connected</span></div><div className="card health-card"><strong>{learnersCompleted}</strong><span>Completed a course</span></div><div className="card health-card"><strong>{serving}</strong><span>Serving / accepted</span></div></section>
+
+    <div className="analytics-layout"><section className="card analytics-panel"><div className="pill">VERIFIED JOURNEY</div><h2>Leadership-recorded milestones</h2><p className="small muted">These counts reflect verified records in Kingdom Network, not assumptions about a person’s spiritual experience.</p><div className="metric-list"><Metric label="Verified record present" value={verifiedRows} total={total}/><Metric label="Baptism recorded" value={baptized} total={total}/><Metric label="Holy Ghost recorded" value={holyGhost} total={total}/><Metric label="First Steps completed" value={firstSteps} total={total}/><Metric label="Soul Winning completed" value={soulWinning} total={total}/><Metric label="Bible Study Teacher approved" value={teachers} total={total}/><Metric label="Friendship Group connected" value={grouped} total={total}/><Metric label="Serving / ministry connected" value={serving} total={total}/></div><div className="analytics-note">Missing verified data means the record has not been entered or verified here; it does not mean the milestone did not happen.</div></section>
+
+    <section className="card analytics-panel"><div className="pill">OUTREACH FUNNEL</div><h2>People we are reaching</h2><p className="small muted">A snapshot of the current follow-up pipeline.</p><div className="stage-list">{stages.map(s=><div className="stage-row" key={s}><span>{nice(s)}</span><strong>{stageCounts.get(s)??0}</strong></div>)}</div></section>
+
+    <section className="card analytics-panel"><div className="pill">NEEDS ATTENTION</div><h2>Operational follow-up</h2><p className="small muted">Items that can turn into missed people or missed responsibilities if they sit too long.</p><div className="attention-list">{attention.map(([title,count,href])=><Link className={`attention-line ${count>0?'urgent':''}`} href={href} key={title}><span>{title}</span><strong>{count}</strong></Link>)}</div></section>
+
+    <section className="card analytics-panel"><div className="pill">MISSION & RESOURCES</div><h2>Learning and campaign signals</h2><div className="metric-list"><Metric label="Members with course completion" value={learnersCompleted} total={total}/><Metric label="Members connected to groups" value={grouped} total={total}/><Metric label="Members connected to service" value={serving} total={total}/></div><div className="analytics-note"><BookOpen size={12}/> Published and draft course data remains controlled through Learning Studio.</div><div className="analytics-note"><HandHeart size={12}/> Active fundraising campaigns: {campaigns?.length??0} • confirmed ${campaignRaised.toLocaleString()} of ${campaignGoal.toLocaleString()} total goals.</div></section></div>
+  </main>
+}
