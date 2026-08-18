@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 
 const stages=['new_contact','invited','guest','bible_study','regular_attendee','baptized','holy_ghost','first_steps','connected','serving','inactive'] as const
+const interactionTypes=['call','text','visit','invitation','bible_study','service_attendance','prayer','follow_up','note'] as const
 const text=(f:FormData,k:string)=>String(f.get(k)??'').trim()
 const nullable=(f:FormData,k:string)=>text(f,k)||null
 const int=(f:FormData,k:string)=>Math.max(0,Number.parseInt(text(f,k)||'0',10)||0)
@@ -32,4 +33,16 @@ export async function updateOutreachContact(formData:FormData){
   const {error}=await supabase.from('outreach_contacts').update(payload).eq('id',id)
   if(error)redirect('/outreach?error='+encodeURIComponent(error.message))
   revalidatePath('/outreach');redirect('/outreach?saved=1')
+}
+
+export async function logOutreachInteraction(formData:FormData){
+  const {supabase,userId}=await auth()
+  const contactId=text(formData,'contact_id'),type=text(formData,'interaction_type'),summary=text(formData,'summary')
+  if(!contactId||!interactionTypes.includes(type as any)||!summary)redirect('/outreach?error='+encodeURIComponent('Interaction type and note are required.'))
+  const {data:contact,error:contactError}=await supabase.from('outreach_contacts').select('church_id').eq('id',contactId).single()
+  if(contactError||!contact?.church_id)redirect('/outreach?error='+encodeURIComponent('Outreach contact not found or not available to you.'))
+  const lesson=type==='bible_study'&&text(formData,'bible_study_lesson')?int(formData,'bible_study_lesson'):null
+  const {error}=await supabase.from('outreach_interactions').insert({contact_id:contactId,church_id:contact.church_id,recorded_by:userId,interaction_type:type,summary,bible_study_lesson:lesson})
+  if(error)redirect('/outreach?error='+encodeURIComponent(error.message))
+  revalidatePath('/outreach');redirect('/outreach?interaction=1')
 }
