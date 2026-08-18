@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Award,Gamepad2,Sparkles,Trophy } from 'lucide-react'
+import { Award,Flame,Gamepad2,Sparkles,Trophy } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { BadgeSeal } from '@/components/badge-seal'
 import { GameCard } from './game-card'
@@ -14,12 +14,13 @@ export default async function RewardsPage({searchParams}:{searchParams:Promise<{
   const {data:claims}=await supabase.auth.getClaims()
   const userId=claims?.claims?.sub
   if(!userId)redirect('/login')
-  const [{data:levels},{data:xpEvents},{data:games},{data:memberBadges},{data:challenges}]=await Promise.all([
+  const [{data:levels},{data:xpEvents},{data:games},{data:memberBadges},{data:challenges},{data:streakRows}]=await Promise.all([
     supabase.from('learning_levels').select('*').order('level_number'),
     supabase.from('learning_xp_events').select('*').eq('user_id',userId).order('created_at',{ascending:false}),
     supabase.from('learning_games').select('*').eq('published',true).eq('language_code',lang).order('created_at'),
     supabase.from('member_badges').select('earned_at,badges(name,description,category,icon_key,badge_kind,visual_tier,display_order)').eq('user_id',userId).order('earned_at',{ascending:false}),
-    supabase.rpc('get_my_learning_challenges')
+    supabase.rpc('get_my_learning_challenges'),
+    supabase.rpc('get_my_learning_streak')
   ])
   const gameIds=(games??[]).map((g:any)=>g.id)
   let questions:any[]=[]
@@ -34,13 +35,14 @@ export default async function RewardsPage({searchParams}:{searchParams:Promise<{
   const progress=next&&current?Math.max(0,Math.min(100,Math.round(((xp-current.min_xp)/(next.min_xp-current.min_xp))*100))):100
   const official=(memberBadges??[]).filter((r:any)=>{const b=Array.isArray(r.badges)?r.badges[0]:r.badges;return b&&b.badge_kind!=='learning_trophy'})
   const learning=(memberBadges??[]).filter((r:any)=>{const b=Array.isArray(r.badges)?r.badges[0]:r.badges;return b&&b.badge_kind==='learning_trophy'})
+  const streak:any=Array.isArray(streakRows)?streakRows[0]:streakRows
 
   return <main className="shell"><header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">Learning Rewards</div></div><div className="row"><Link className="ghost" href={`/learning/rewards?lang=${lang==='en'?'es':'en'}`}>{lang==='en'?'Español':'English'}</Link><Link className="ghost" href={`/learning?lang=${lang}`}>← Learning</Link></div></header>
     <section className="card rewards-hero"><div><div className="pill">LEARNING REWARDS</div><h1>{lang==='es'?'Aprende. Practica. Crece.':'Learn. Practice. Grow.'}</h1><p className="muted">{lang==='es'?'Los niveles y trofeos celebran el estudio y la comprensión. No son una clasificación espiritual.':'Levels and trophies celebrate study and understanding. They are not a spiritual ranking.'}</p></div><div className="level-card"><span>{lang==='es'?'NIVEL ACTUAL':'CURRENT LEVEL'}</span><strong>{current?.name??'Starting Point'}</strong><div className="level-progress"><span style={{width:`${progress}%`}}/></div><div className="xp-total">{xp} XP {next?`• ${next.min_xp-xp} XP to ${next.name}`:'• Highest current level'}</div></div></section>
 
-    <section className="reward-grid"><div className="card reward-stat"><Sparkles/><strong>{xp}</strong><span>Learning XP</span></div><div className="card reward-stat"><Award/><strong>{official.length}</strong><span>Verified credentials</span></div><div className="card reward-stat"><Trophy/><strong>{learning.length}</strong><span>Learning trophies</span></div></section>
+    <section className="reward-grid"><div className="card reward-stat"><Sparkles/><strong>{xp}</strong><span>Learning XP</span></div><div className="card reward-stat"><Flame/><strong>{Number(streak?.current_streak??0)}</strong><span>{lang==='es'?'días de racha':'day study streak'} • best {Number(streak?.longest_streak??0)}</span></div><div className="card reward-stat"><Award/><strong>{official.length}</strong><span>Verified credentials</span></div><div className="card reward-stat"><Trophy/><strong>{learning.length}</strong><span>Learning trophies</span></div></section>
 
-    <section className="reward-section"><div className="pill">WEEKLY CHALLENGES</div><h2>{lang==='es'?'Metas pequeñas. Progreso constante.':'Small goals. Consistent progress.'}</h2><p className="muted">{lang==='es'?'Los desafíos semanales recompensan solamente actividades de aprendizaje verificadas.':'Weekly challenges reward verified learning activity only.'}</p><WeeklyChallenges challenges={(challenges??[]) as any[]} lang={lang}/></section>
+    <section className="reward-section"><div className="pill">WEEKLY CHALLENGES</div><h2>{lang==='es'?'Metas pequeñas. Progreso constante.':'Small goals. Consistent progress.'}</h2><p className="muted">{lang==='es'?`Has estudiado ${Number(streak?.active_days_this_week??0)} día(s) esta semana. Los desafíos recompensan solamente actividades de aprendizaje verificadas.`:`You have studied on ${Number(streak?.active_days_this_week??0)} day(s) this week. Challenges reward verified learning activity only.`}</p><WeeklyChallenges challenges={(challenges??[]) as any[]} lang={lang}/></section>
 
     <section className="reward-section"><div className="pill"><Trophy size={12}/> TROPHY CASE</div><h2>{lang==='es'?'Trofeos de aprendizaje':'Learning trophies'}</h2><p className="muted">{lang==='es'?'Estos trofeos celebran estudio, práctica y comprensión; no representan rango espiritual.':'These trophies celebrate study, practice and understanding; they do not represent spiritual rank.'}</p><div className="badge-showcase">{learning.map((row:any)=>{const b=Array.isArray(row.badges)?row.badges[0]:row.badges;return b?<BadgeSeal badge={b} earnedAt={row.earned_at} key={`${b.name}-${row.earned_at}`}/>:null})}{!learning.length&&<div className="card empty"><h3>Your first trophy is waiting.</h3><p className="muted">Complete a lesson, pass a quiz or earn a perfect game score to unlock one.</p></div>}</div></section>
 
