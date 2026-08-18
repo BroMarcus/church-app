@@ -4,6 +4,7 @@ import { BookOpen,CheckCircle2,ShieldCheck,Sparkles,UserRound } from 'lucide-rea
 import { createClient } from '@/lib/supabase/server'
 import { updateMilestones } from '../../actions'
 import { LearningScorecard } from './learning-scorecard'
+import { BibleStudyPracticum } from './bible-study-practicum'
 import '../../church.css'
 
 const progress=[['not_started','Not started'],['in_progress','In progress'],['completed','Completed'],['waived','Waived']] as const
@@ -16,7 +17,7 @@ const fmt=(v?:string|null)=>v?new Date(v+'T12:00:00').toLocaleDateString(undefin
 function SelectField({label,name,value,options}:{label:string;name:string;value:string;options:readonly(readonly[string,string])[]}){return <label className="record-field"><span>{label}</span><select name={name} defaultValue={value}>{options.map(([v,l])=><option value={v} key={v}>{l}</option>)}</select></label>}
 function DateField({label,name,value}:{label:string;name:string;value?:string|null}){return <label className="record-field"><span>{label}</span><input type="date" name={name} defaultValue={value??''}/></label>}
 
-export default async function MemberRecordPage({params,searchParams}:{params:Promise<{userId:string}>;searchParams:Promise<{saved?:string;error?:string}>}){
+export default async function MemberRecordPage({params,searchParams}:{params:Promise<{userId:string}>;searchParams:Promise<{saved?:string;practicum?:string;error?:string}>}){
   const [{userId:targetUserId},query]=await Promise.all([params,searchParams])
   const supabase=await createClient()
   const {data:claimsData}=await supabase.auth.getClaims()
@@ -41,9 +42,10 @@ export default async function MemberRecordPage({params,searchParams}:{params:Pro
     <header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??'Your Church'} • Verified Member Record</div></div><div className="row"><Link className="ghost" href="/church">← Members</Link><Link className="ghost" href="/">Home</Link></div></header>
 
     <section className="record-hero card"><div className="member-main"><div className="avatar record-avatar">{name.slice(0,1).toUpperCase()}</div><div><div className="pill">MEMBER RECORD</div><h1>{name}</h1><p className="muted">{membership.role.replaceAll('_',' ')} • {membership.status}</p></div></div><div className="record-score"><strong>{completed}/5</strong><span>core training milestones completed</span></div></section>
-    {query.saved&&<div className="notice success">Verified member record saved.</div>}{query.error&&<div className="notice error">{query.error}</div>}
+    {query.saved&&<div className="notice success">Verified member record saved.</div>}{query.practicum&&<div className="notice success">Bible Study Teacher practicum scorecard saved.</div>}{query.error&&<div className="notice error">{query.error}</div>}
 
     <LearningScorecard userId={targetUserId} churchId={actor.church_id}/>
+    <BibleStudyPracticum userId={targetUserId} churchId={actor.church_id}/>
 
     <div className="record-layout"><aside>
       <section className="card record-side"><div className="pill">CONTACT</div><h3>Member information</h3><dl><dt>Email</dt><dd>{details?.email||'Not added'}</dd><dt>Phone</dt><dd>{details?.phone||'Not added'}</dd><dt>Address</dt><dd>{address}</dd><dt>Birthday</dt><dd>{fmt(details?.birthday)}</dd><dt>Anniversary</dt><dd>{fmt(details?.marriage_anniversary)}</dd></dl></section>
