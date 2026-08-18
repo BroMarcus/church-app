@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowRight,BriefcaseBusiness,CalendarDays,Church,FileText,Globe2,GraduationCap,HandHeart,HeartHandshake,Megaphone,Sparkles,Users } from 'lucide-react'
+import { ArrowRight,BriefcaseBusiness,CalendarDays,Church,FileText,Globe2,GraduationCap,HandHeart,HeartHandshake,MessageCircle,Megaphone,Sparkles,Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { CommunityFeed } from '@/components/community-feed'
 import { NotificationBell } from '@/components/notification-bell'
@@ -12,6 +12,7 @@ import { getNextStep } from '@/lib/journey'
 const modules=[
   {title:'Learning',desc:'Courses, badges & growth',Icon:GraduationCap,href:'/learning'},
   {title:'Groups',desc:'Friendship groups & reports',Icon:Users,href:'/groups'},
+  {title:'Messages',desc:'Private member conversations',Icon:MessageCircle,href:'/messages'},
   {title:'Serve',desc:'Ministries & applications',Icon:HandHeart,href:'/serve'},
   {title:'Outreach',desc:'Guests & Bible studies',Icon:Megaphone,href:'/outreach'},
   {title:'Calendar',desc:'Church & district events',Icon:CalendarDays,href:'/calendar'},
@@ -68,6 +69,6 @@ export default async function Home(){
 
     <OfficialUpdates churchId={membership.church_id}/>
 
-    <div className="content-grid"><CommunityFeed churchId={membership.church_id} userId={userId}/><aside><div className="card side"><div className="pill">ACTIVE NOW</div><h3>Kingdom Network Alpha</h3><ul><li>Personalized My Next Step</li><li>Personalized upcoming responsibilities</li><li>Featured event discovery & flyers</li><li>Organization & district Network view</li><li>Church-specific logo, branding & welcome</li><li>Official church updates & announcements</li><li>Private pastoral care requests</li><li>In-app notifications</li><li>Member profiles & private contact info</li><li>Member directory & secure invitations</li><li>Church admin & verified records</li><li>Friendship Groups, join requests & leader reports</li><li>First Steps Learning Center</li><li>Learning Studio, levels, trophies & games</li><li>Weekly learning challenges & streaks</li><li>Outreach follow-up pipeline & history</li><li>Ministry opportunities & qualification</li><li>Unified church calendar & RSVPs</li><li>Team schedules & confirmations</li><li>Fundraising campaigns & goal tracking</li><li>Private document vault & verification</li><li>Community feed with comments & reactions</li></ul></div><div className="card side"><div className="pill">COMING NEXT</div><h3>Kingdom Guide</h3><p className="muted">AI navigation, biblical resource search and personalized discipleship recommendations will connect to approved church resources.</p></div></aside></div>
+    <div className="content-grid"><CommunityFeed churchId={membership.church_id} userId={userId}/><aside><div className="card side"><div className="pill">ACTIVE NOW</div><h3>Kingdom Network Alpha</h3><ul><li>Personalized My Next Step</li><li>Personalized upcoming responsibilities</li><li>Featured event discovery & flyers</li><li>Organization & district Network view</li><li>Private member messaging with block/report controls</li><li>Church-specific logo, branding & welcome</li><li>Official church updates & announcements</li><li>Private pastoral care requests</li><li>In-app notifications</li><li>Member profiles & private contact info</li><li>Member directory & secure invitations</li><li>Church admin & verified records</li><li>Friendship Groups, join requests & leader reports</li><li>First Steps Learning Center</li><li>Learning Studio, levels, trophies & games</li><li>Weekly learning challenges & streaks</li><li>Outreach follow-up pipeline & history</li><li>Ministry opportunities & qualification</li><li>Unified church calendar & RSVPs</li><li>Team schedules & confirmations</li><li>Fundraising campaigns & goal tracking</li><li>Private document vault & verification</li><li>Community feed with comments & reactions</li></ul></div><div className="card side"><div className="pill">COMING NEXT</div><h3>Kingdom Guide</h3><p className="muted">AI navigation, biblical resource search and personalized discipleship recommendations will connect to approved church resources.</p></div></aside></div>
   </main>
 }
