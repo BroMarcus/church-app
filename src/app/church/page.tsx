@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { AlertCircle,BarChart3,BriefcaseBusiness,Church,Clock3,FileWarning,HandHeart,MailPlus,ShieldCheck,UserCheck,Users } from 'lucide-react'
+import { AlertCircle,BarChart3,BriefcaseBusiness,Church,Clock3,FileWarning,HandHeart,MailPlus,Settings,ShieldCheck,UserCheck,Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { updateMembership } from './actions'
 import './church.css'
@@ -57,7 +57,7 @@ export default async function ChurchAdminPage({searchParams}:{searchParams:Promi
   ]
 
   return <main className="shell">
-    <header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??'Your Church'} • Church Admin</div></div><div className="row"><Link className="ghost" href="/church/analytics"><BarChart3 size={14}/> Church health</Link><Link className="ghost" href="/church/invites"><MailPlus size={14}/> Invite members{openInvites?` (${openInvites})`:''}</Link><Link className="ghost" href="/">← Home</Link><Link className="ghost" href="/profile">My profile</Link></div></header>
+    <header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??'Your Church'} • Church Admin</div></div><div className="row"><Link className="ghost" href="/church/settings"><Settings size={14}/> Settings</Link><Link className="ghost" href="/church/analytics"><BarChart3 size={14}/> Church health</Link><Link className="ghost" href="/church/invites"><MailPlus size={14}/> Invite members{openInvites?` (${openInvites})`:''}</Link><Link className="ghost" href="/">← Home</Link><Link className="ghost" href="/profile">My profile</Link></div></header>
     <section className="admin-hero card"><div><div className="pill">CHURCH ADMIN</div><h1>{church?.name??'Church Directory'}</h1><p className="muted">Manage membership, invitations, leadership access and verified discipleship records.</p></div><div className="admin-badge"><ShieldCheck size={22}/><div><strong>{actor.role.replaceAll('_',' ')}</strong><span>Your access</span></div></div></section>
     {params.saved&&<div className="notice success">Member access updated.</div>}{params.error&&<div className="notice error">{params.error}</div>}
     <section className="stat-grid"><div className="card stat-card"><Users/><div><strong>{total}</strong><span>Total people</span></div></div><div className="card stat-card"><UserCheck/><div><strong>{active}</strong><span>Active</span></div></div><div className="card stat-card"><ShieldCheck/><div><strong>{leaders}</strong><span>Leaders</span></div></div><div className="card stat-card"><Church/><div><strong>{pending}</strong><span>Guests / pending</span></div></div></section>
