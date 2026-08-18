@@ -47,6 +47,7 @@ export default async function ChurchAdminPage({searchParams}:{searchParams:Promi
   const active=rows.filter((r:any)=>r.membership.status==='active').length
   const leaders=rows.filter((r:any)=>r.membership.role!=='member').length
   const pending=rows.filter((r:any)=>['visitor','pending'].includes(r.membership.status)).length
+
   const attention=[
     {title:'Pastoral care requests',count:openCare??0,href:'/help',Icon:HandHeart,urgent:(openCare??0)>0},
     {title:'Reported private messages',count:openMessageReports??0,href:'/church/message-reports',Icon:ShieldAlert,urgent:(openMessageReports??0)>0},
@@ -58,17 +59,35 @@ export default async function ChurchAdminPage({searchParams}:{searchParams:Promi
     {title:'Open invitations',count:openInvites??0,href:'/church/invites',Icon:MailPlus,urgent:false}
   ]
 
+  const adminTools=[
+    {title:'Church Launch',subtitle:'Repeatable onboarding',href:'/church/launch',Icon:Church},
+    {title:'Pilot Readiness',subtitle:'Live readiness checks',href:'/church/readiness',Icon:ShieldCheck},
+    {title:'Church Health',subtitle:'Discipleship analytics',href:'/church/analytics',Icon:BarChart3},
+    {title:'Import Center',subtitle:'Stage & validate CSV data',href:'/church/import',Icon:Users},
+    {title:'Export Center',subtitle:'Download church-owned data',href:'/church/export',Icon:FileWarning},
+    {title:'Audit History',subtitle:'Sensitive change history',href:'/church/audit',Icon:Clock3},
+    {title:'Church Settings',subtitle:'Branding, contact & timezone',href:'/church/settings',Icon:Settings},
+    {title:'Member Invitations',subtitle:'Secure onboarding links',href:'/church/invites',Icon:MailPlus},
+    {title:'Message Reports',subtitle:'Reported-message moderation',href:'/church/message-reports',Icon:ShieldAlert}
+  ]
+
   return <main className="shell">
-    <header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??'Your Church'} • Church Admin</div></div><div className="row">{Boolean(openMessageReports)&&<Link className="ghost" href="/church/message-reports"><ShieldAlert size={14}/> Reports ({openMessageReports})</Link>}<Link className="ghost" href="/church/settings"><Settings size={14}/> Settings</Link><Link className="ghost" href="/church/analytics"><BarChart3 size={14}/> Church health</Link><Link className="ghost" href="/church/invites"><MailPlus size={14}/> Invite members{openInvites?` (${openInvites})`:''}</Link><Link className="ghost" href="/">← Home</Link><Link className="ghost" href="/profile">My profile</Link></div></header>
-    <section className="admin-hero card"><div><div className="pill">CHURCH ADMIN</div><h1>{church?.name??'Church Directory'}</h1><p className="muted">Manage membership, invitations, leadership access and verified discipleship records.</p></div><div className="admin-badge"><ShieldCheck size={22}/><div><strong>{actor.role.replaceAll('_',' ')}</strong><span>Your access</span></div></div></section>
+    <header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??'Your Church'} • Church Admin</div></div><div className="row">{Boolean(openMessageReports)&&<Link className="ghost" href="/church/message-reports"><ShieldAlert size={14}/> Reports ({openMessageReports})</Link>}<Link className="ghost" href="/church/readiness"><ShieldCheck size={14}/> Readiness</Link><Link className="ghost" href="/church/settings"><Settings size={14}/> Settings</Link><Link className="ghost" href="/church/analytics"><BarChart3 size={14}/> Church health</Link><Link className="ghost" href="/church/invites"><MailPlus size={14}/> Invite members{openInvites?` (${openInvites})`:''}</Link><Link className="ghost" href="/">← Home</Link><Link className="ghost" href="/profile">My profile</Link></div></header>
+
+    <section className="admin-hero card"><div><div className="pill">CHURCH ADMIN</div><h1>{church?.name??'Church Directory'}</h1><p className="muted">Manage people, permissions, onboarding, records, operations and pilot readiness from one command center.</p></div><div className="admin-badge"><ShieldCheck size={22}/><div><strong>{actor.role.replaceAll('_',' ')}</strong><span>Your access</span></div></div></section>
     {params.saved&&<div className="notice success">Member access updated.</div>}{params.error&&<div className="notice error">{params.error}</div>}
+
     <section className="stat-grid"><div className="card stat-card"><Users/><div><strong>{total}</strong><span>Total people</span></div></div><div className="card stat-card"><UserCheck/><div><strong>{active}</strong><span>Active</span></div></div><div className="card stat-card"><ShieldCheck/><div><strong>{leaders}</strong><span>Leaders</span></div></div><div className="card stat-card"><Church/><div><strong>{pending}</strong><span>Guests / pending</span></div></div></section>
+
+    <div className="section-heading"><div><div className="pill">ADMIN TOOLS</div><h2>Run & launch the church.</h2></div><span className="small muted">Setup, migration, readiness, analytics and accountability.</span></div>
+    <section className="attention-grid">{adminTools.map(({title,subtitle,href,Icon})=><Link className="card attention-card" href={href} key={title}><div className="attention-icon"><Icon size={17}/></div><div><strong style={{fontSize:16}}>{title}</strong><span>{subtitle}</span></div></Link>)}</section>
 
     <div className="section-heading"><div><div className="pill">NEEDS ATTENTION</div><h2>Leadership action queue</h2></div><span className="small muted">Live counts across church operations.</span></div>
     <section className="attention-grid">{attention.map(({title,count,href,Icon,urgent})=><Link className={`card attention-card ${urgent?'urgent':''}`} href={href} key={title}><div className="attention-icon"><Icon size={17}/></div><div><strong>{count}</strong><span>{title}</span></div></Link>)}</section>
 
     <div className="section-heading"><div><div className="pill">DIRECTORY</div><h2>Members & access</h2></div><span className="small muted">Pastors and church admins only.</span></div>
     <section className="member-list">{rows.map(({membership,profile,details}:any)=>{const name=profile?.display_name||[profile?.first_name,profile?.last_name].filter(Boolean).join(' ')||'Unnamed member';const isYou=membership.user_id===userId;return <article className="card member-admin-card" key={membership.id}><div className="member-main"><div className="avatar large">{name.slice(0,1).toUpperCase()}</div><div className="member-copy"><div className="member-name"><strong>{name}</strong>{isYou&&<span className="mini-pill">YOU</span>}</div><span>{details?.email??'Email not available'}</span><small>{details?.phone||'No phone added'} • Joined {niceDate(membership.joined_at)}</small><Link className="record-link" href={`/church/members/${membership.user_id}`}>Open verified record →</Link></div></div><form action={updateMembership} className="member-controls"><input type="hidden" name="membership_id" value={membership.id}/><label><span>Role</span><select name="role" defaultValue={membership.role}>{roleOptions.map(([v,l])=><option value={v} key={v}>{l}</option>)}</select></label><label><span>Status</span><select name="status" defaultValue={membership.status}>{statusOptions.map(([v,l])=><option value={v} key={v}>{l}</option>)}</select></label><button className="btn" type="submit">Save</button></form></article>})}{!rows.length&&<div className="card empty"><h3>No members yet.</h3><p className="muted">Create a secure member invitation to begin onboarding your church.</p><Link className="btn" href="/church/invites">Invite first member</Link></div>}</section>
+
     <section className="card admin-note"><div className="pill">VERIFIED RECORDS</div><h3>Discipleship milestones are separated from member-editable data.</h3><p className="muted">Open a member record to verify Holy Ghost, baptism, First Steps, ministry training, Bible-study qualification, safety training and covenant status.</p></section>
   </main>
 }
