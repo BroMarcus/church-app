@@ -8,21 +8,23 @@ const text=(f:FormData,k:string)=>String(f.get(k)??'').trim()
 const number=(f:FormData,k:string)=>Math.max(0,Number.parseInt(text(f,k)||'0',10)||0)
 const frequencies=['weekly','biweekly','monthly','seasonal','other']
 const languages=['en','es','bilingual']
+const withLang=(path:string,lang:string)=>lang==='es'?`${path}${path.includes('?')?'&':'?'}lang=es`:path
 
 async function currentUser(){const supabase=await createClient();const {data}=await supabase.auth.getClaims();const userId=data?.claims?.sub;if(!userId)redirect('/login');return {supabase,userId}}
 
 export async function createGroup(formData:FormData){
   const {supabase,userId}=await currentUser()
+  const lang=text(formData,'lang')
   const churchId=text(formData,'church_id'),name=text(formData,'name'),groupType=text(formData,'group_type')||'friendship',leaderId=text(formData,'leader_id')||null
   const frequency=text(formData,'meeting_frequency')||'weekly',language=text(formData,'language_code')||'en'
   const {data:actor}=await supabase.from('church_memberships').select('role,status').eq('church_id',churchId).eq('user_id',userId).eq('status','active').single()
-  if(!actor||!['pastor','church_admin'].includes(actor.role))redirect('/groups')
-  if(!name||!frequencies.includes(frequency)||!languages.includes(language))redirect('/groups?error='+encodeURIComponent('Valid group name, frequency and language are required.'))
+  if(!actor||!['pastor','church_admin'].includes(actor.role))redirect(withLang('/groups',lang))
+  if(!name||!frequencies.includes(frequency)||!languages.includes(language))redirect(withLang('/groups?error='+encodeURIComponent(lang==='es'?'Se requiere un nombre, frecuencia e idioma válidos.':'Valid group name, frequency and language are required.'),lang))
   const capacity=text(formData,'capacity')?number(formData,'capacity'):null
   const {data:group,error}=await supabase.from('groups').insert({church_id:churchId,name,group_type:groupType,leader_id:leaderId,description:text(formData,'description')||null,meeting_day:text(formData,'meeting_day')||null,meeting_time:text(formData,'meeting_time')||null,meeting_frequency:frequency,language_code:language,capacity,location_label:text(formData,'location_label')||null,accepting_members:text(formData,'accepting_members')==='on'}).select('id').single()
-  if(error||!group)redirect('/groups?error='+encodeURIComponent(error?.message??'Unable to create group.'))
+  if(error||!group)redirect(withLang('/groups?error='+encodeURIComponent(error?.message??(lang==='es'?'No se pudo crear el grupo.':'Unable to create group.')),lang))
   if(leaderId)await supabase.from('group_memberships').upsert({group_id:group.id,user_id:leaderId,role:'leader'})
-  revalidatePath('/groups');redirect(`/groups/${group.id}`)
+  revalidatePath('/groups');redirect(withLang(`/groups/${group.id}`,lang))
 }
 
 export async function updateGroupDetails(formData:FormData){
