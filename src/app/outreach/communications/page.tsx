@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { AlertTriangle,CheckCircle2,Clock3,Mail,MessageSquareText,PauseCircle,ShieldCheck,XCircle } from 'lucide-react'
+import { AlertTriangle,CheckCircle2,Clock3,Mail,MessageSquareText,PauseCircle,Settings,ShieldCheck,XCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { cancelQueuedCommunication,suppressContactCommunications,updateCommunicationTemplate } from './actions'
 
@@ -16,21 +16,24 @@ export default async function CommunicationsPage({searchParams}:{searchParams:Pr
   const {data:membership}=await supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).single()
   if(!membership?.church_id)redirect('/')
   const {data:customManage}=await supabase.rpc('current_user_has_church_permission',{p_church_id:membership.church_id,p_permission_key:'manage_outreach'})
-  const canManage=['pastor','church_admin','ministry_leader','minister'].includes(membership.role)||Boolean(customManage)
+  const isAdmin=['pastor','church_admin'].includes(membership.role)
+  const canManage=isAdmin||['ministry_leader','minister'].includes(membership.role)||Boolean(customManage)
   const church:any=Array.isArray(membership.churches)?membership.churches[0]:membership.churches
   let outboxQuery=supabase.from('communication_outbox').select('*').eq('church_id',membership.church_id).order('due_at',{ascending:true}).limit(150)
   if(params.status&&params.status!=='all')outboxQuery=outboxQuery.eq('status',params.status)
-  const [{data:outbox},{data:templates}]=await Promise.all([
+  const [{data:outbox},{data:templates},{data:provider}]=await Promise.all([
     outboxQuery,
-    canManage?supabase.from('communication_templates').select('*').eq('church_id',membership.church_id).order('template_key').order('channel').order('language_code'):Promise.resolve({data:[] as any[]})
+    canManage?supabase.from('communication_templates').select('*').eq('church_id',membership.church_id).order('template_key').order('channel').order('language_code'):Promise.resolve({data:[] as any[]}),
+    canManage?supabase.from('church_communication_providers').select('email_provider,email_ready,email_from,sms_provider,sms_ready').eq('church_id',membership.church_id).maybeSingle():Promise.resolve({data:null as any})
   ])
   const contactIds=Array.from(new Set((outbox??[]).map((x:any)=>x.contact_id)));let contacts:any[]=[];if(contactIds.length){const r=await supabase.from('outreach_contacts').select('id,first_name,last_name,email,phone,email_consent,sms_consent,communication_opt_out_at').in('id',contactIds);contacts=r.data??[]}
   const cm=new Map(contacts.map((c:any)=>[c.id,c])),all=outbox??[]
   const counts={waiting:all.filter((x:any)=>x.status==='waiting_provider').length,suppressed:all.filter((x:any)=>x.status==='suppressed').length,sent:all.filter((x:any)=>x.status==='sent').length,failed:all.filter((x:any)=>x.status==='failed').length}
+  const emailReady=Boolean(provider?.email_ready),smsReady=Boolean(provider?.sms_ready)
   return <main className="shell">
-    <header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??'Church'} • {es?'Comunicaciones de Evangelismo':'Evangelism Communications'}</div></div><div className="row"><Link className="ghost" href="/outreach/communications?lang=en">English</Link><Link className="ghost" href="/outreach/communications?lang=es">Español</Link><Link className="ghost" href={l('/outreach')}>{es?'← Evangelismo':'← Evangelism'}</Link></div></header>
+    <header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??'Church'} • {es?'Comunicaciones de Evangelismo':'Evangelism Communications'}</div></div><div className="row">{isAdmin&&<Link className="ghost" href={l('/outreach/communications/provider')}><Settings size={13}/> {es?'Proveedor':'Provider Setup'}</Link>}<Link className="ghost" href="/outreach/communications?lang=en">English</Link><Link className="ghost" href="/outreach/communications?lang=es">Español</Link><Link className="ghost" href={l('/outreach')}>{es?'← Evangelismo':'← Evangelism'}</Link></div></header>
 
-    <section className="card" style={{padding:24,marginBottom:16}}><div className="pill">{es?'AUTOMATIZACIÓN DE SEGUIMIENTO':'FOLLOW-UP AUTOMATION'}</div><h1>{es?'Cada mensaje debe ser visible, consentido y rastreable.':'Every message should be visible, consented and traceable.'}</h1><p className="muted">{es?'Kingdom Network prepara los mensajes cuando ocurre el siguiente paso de evangelismo. El envío externo permanece desactivado hasta conectar y verificar un proveedor real.':'Kingdom Network prepares messages when the next evangelism step happens. External delivery stays off until a real provider is connected and verified.'}</p><div className="notice" style={{marginTop:12}}><AlertTriangle size={15}/> <strong>{es?'Proveedor de correo/SMS todavía no conectado a la aplicación.':'Email/SMS transport is not connected to the app yet.'}</strong> {es?'Los mensajes con consentimiento esperan aquí; no se marcan como enviados.':'Consented messages wait here and are not marked sent.'}</div></section>
+    <section className="card" style={{padding:24,marginBottom:16}}><div className="pill">{es?'AUTOMATIZACIÓN DE SEGUIMIENTO':'FOLLOW-UP AUTOMATION'}</div><h1>{es?'Cada mensaje debe ser visible, consentido y rastreable.':'Every message should be visible, consented and traceable.'}</h1><p className="muted">{es?'Kingdom Network prepara los mensajes cuando ocurre el siguiente paso de evangelismo.':'Kingdom Network prepares messages when the next evangelism step happens.'}</p><div className={emailReady||smsReady?'notice success':'notice'} style={{marginTop:12}}>{emailReady||smsReady?<CheckCircle2 size={15}/>:<AlertTriangle size={15}/>} <strong>{es?'Estado de entrega:':'Delivery status:'}</strong> Email — {emailReady?(es?'activo':'active'):(es?'desactivado':'off')} • SMS — {smsReady?(es?'activo':'active'):(es?'no conectado':'not connected')}. {!emailReady&&!smsReady&&(es?'Los mensajes con consentimiento esperan aquí; no se marcan como enviados.':'Consented messages wait here and are not marked sent.')}</div></section>
     {params.template_saved&&<div className="notice success">{es?'Plantilla guardada.':'Template saved.'}</div>}{params.cancelled&&<div className="notice success">{es?'Mensaje cancelado.':'Message cancelled.'}</div>}{params.opted_out&&<div className="notice success">{es?'Se registró que la persona no desea comunicaciones.':'Communication opt-out recorded.'}</div>}{params.error&&<div className="notice error">{params.error}</div>}
 
     <section className="stat-grid" style={{marginBottom:18}}><div className="card stat-card"><Clock3/><div><strong>{counts.waiting}</strong><span>{es?'esperando proveedor':'waiting for provider'}</span></div></div><div className="card stat-card"><PauseCircle/><div><strong>{counts.suppressed}</strong><span>{es?'suprimidos por consentimiento':'suppressed / no consent'}</span></div></div><div className="card stat-card"><CheckCircle2/><div><strong>{counts.sent}</strong><span>{es?'enviados':'sent'}</span></div></div><div className="card stat-card"><XCircle/><div><strong>{counts.failed}</strong><span>{es?'fallidos':'failed'}</span></div></div></section>
