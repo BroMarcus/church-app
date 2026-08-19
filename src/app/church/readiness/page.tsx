@@ -11,6 +11,28 @@ const copy={
   es:{church:'Tu Iglesia',title:'Preparación del Piloto',admin:'← Administración',home:'Inicio',pill:'PREPARACIÓN DEL PILOTO',hero:'¿Qué necesita atención antes de invitar al grupo de prueba?',heroBody:'Revisiones en vivo de la iglesia/base de datos más algunos ajustes de plataforma que todavía necesitan revisión humana.',score:'revisiones listas',load:'No se pudieron cargar una o más revisiones:',open:'Abrir área relacionada →',platform:'REVISIONES DE PLATAFORMA',platformTitle:'Ajustes finales alrededor de la aplicación en vivo.',notIncluded:'No se incluyen en la puntuación de la aplicación.',required:'REQUERIDO PARA EL PILOTO',authTitle:'URL de producción de Supabase Auth',authBody:'Mantén la URL principal de Auth y las URLs de redirección permitidas apuntando a la dirección actual de producción de Kingdom Network. No necesitas comprar un dominio personalizado durante el piloto.',security:'SEGURIDAD',passwordTitle:'Protección contra contraseñas filtradas',passwordBody:'Activa la protección de contraseñas filtradas de Supabase Auth antes de un piloto más amplio si el plan actual lo permite. Es una mejora de seguridad, no un bloqueo para un grupo pequeño y controlado.',verified:'VERIFICADO',deployTitle:'Despliegue de producción',deployBody:'La rama principal se está desplegando correctamente a las direcciones estables de producción de Kingdom Network en la versión actual de Next.js.',plan:'PLAN DEL PILOTO',smallTitle:'Empieza con pocos',smallBody:'Invita primero al liderazgo y a unos pocos miembros de confianza. Prueba incorporación, aprendizaje, grupos, calendario, servicio, notificaciones, privacidad y uso móvil antes de invitar a toda la iglesia.',count:'CUENTA DE ACCIONES',needs:'revisión de la aplicación',attention:'necesitan atención ahora.',footer:'Esta página es una lista operativa ligada a datos reales de la iglesia, no una puntuación de mercadeo.',english:'English',spanish:'Español'}
 } as const
 
+function localizedCheck(r:any,lang:'en'|'es'){
+  const actionHref=r.check_key==='admin_redundancy'?'/church/admin-backup':r.action_href
+  if(lang==='en')return {...r,action_href:actionHref}
+  const n=String(r.detail??'').match(/^\d+/)?.[0]??'0'
+  const map:Record<string,{label:string;detail:string}>={
+    admin_redundancy:{label:'Administrador de respaldo',detail:r.check_status==='ready'?`${n} cuentas activas de pastor/administrador pueden manejar la iglesia.`:'Solo hay una cuenta activa de pastor/administrador. Agrega a un líder de confianza como administrador de respaldo.'},
+    church_identity:{label:'Datos de la iglesia y zona horaria',detail:r.check_status==='ready'?'El nombre, ubicación y zona horaria están configurados.':'Completa el nombre, ubicación y zona horaria de la iglesia.'},
+    branding:{label:'Imagen de la iglesia',detail:r.check_status==='ready'?'El logo y color principal están configurados.':'El logo y color pueden agregarse para un piloto más pulido, pero no bloquean el uso.'},
+    members:{label:'Miembros activos',detail:`${n} cuenta(s) activa(s) de miembros están conectadas.`},
+    learning:{label:'Aprendizaje publicado',detail:`${n} curso(s) publicado(s) están disponibles para los miembros.`},
+    groups:{label:'Grupos activos',detail:`${n} grupo(s) activo(s) están configurados.`},
+    calendar:{label:'Próximos eventos',detail:`${n} evento(s) próximo(s) están publicados.`},
+    serving:{label:'Servicio y ministerios',detail:r.check_status==='ready'?`${n} oportunidad(es) de ministerio están activas.`:'Todavía no hay ministerios activos publicados. Crea por lo menos una oportunidad real antes de probar el flujo de Servicio → solicitud → equipos.'},
+    outreach_followup:{label:'Seguimiento de alcance',detail:r.check_status==='ready'?'No hay seguimientos de alcance vencidos.':`${n} seguimiento(s) de alcance están vencidos.`},
+    document_review:{label:'Revisión de documentos',detail:r.check_status==='ready'?'No hay documentos esperando verificación.':`${n} documento(s) esperan verificación.`},
+    milestone_integrity:{label:'Consistencia de registros verificados',detail:r.check_status==='ready'?'Las fechas y estados de los registros verificados son consistentes.':`${n} registro(s) verificado(s) tienen fechas o estados inconsistentes.`},
+    open_invites:{label:'Invitaciones abiertas',detail:`${n} invitación(es) activa(s) esperan ser aceptadas.`}
+  }
+  const translated=map[r.check_key]
+  return {...r,action_href:actionHref,check_label:translated?.label??r.check_label,detail:translated?.detail??r.detail}
+}
+
 export default async function ReadinessPage({searchParams}:{searchParams:Promise<{lang?:string}>}){
   const params=await searchParams
   const lang:'en'|'es'=params.lang==='es'?'es':'en'
@@ -22,7 +44,7 @@ export default async function ReadinessPage({searchParams}:{searchParams:Promise
   const {data:membership}=await supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).single()
   if(!membership?.church_id||!['pastor','church_admin'].includes(membership.role))redirect('/')
   const {data:checks,error}=await supabase.rpc('church_pilot_readiness',{p_church_id:membership.church_id})
-  const rows=checks??[]
+  const rows=(checks??[]).map((r:any)=>localizedCheck(r,lang))
   const scored=rows.filter((r:any)=>!['optional','info'].includes(r.check_status))
   const ready=scored.filter((r:any)=>r.check_status==='ready').length
   const score=scored.length?Math.round(ready/scored.length*100):0
@@ -30,7 +52,7 @@ export default async function ReadinessPage({searchParams}:{searchParams:Promise
   const church:any=Array.isArray(membership.churches)?membership.churches[0]:membership.churches
 
   return <main className="shell">
-    <header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??t.church} • {t.title}</div></div><div className="row"><Languages size={15}/><Link className="ghost" href="/church/readiness?lang=en">{t.english}</Link><Link className="ghost" href="/church/readiness?lang=es">{t.spanish}</Link><Link className="ghost" href="/church">{t.admin}</Link><Link className="ghost" href="/">{t.home}</Link></div></header>
+    <header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??t.church} • {t.title}</div></div><div className="row"><Languages size={15}/><Link className="ghost" href="/church/readiness?lang=en">{t.english}</Link><Link className="ghost" href="/church/readiness?lang=es">{t.spanish}</Link><Link className="ghost" href={`/church${lang==='es'?'?lang=es':''}`}>{t.admin}</Link><Link className="ghost" href="/">{t.home}</Link></div></header>
     <section className="readiness-hero card"><div><div className="pill">{t.pill}</div><h1>{t.hero}</h1><p className="muted">{t.heroBody}</p></div><div className="readiness-score"><div><strong>{score}%</strong><span>{t.score}</span></div></div></section>
     {error&&<div className="notice error">{t.load} {error.message}</div>}
 
