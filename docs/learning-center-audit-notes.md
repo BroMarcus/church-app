@@ -13,5 +13,20 @@ Learning Center should be the place a member actually completes discipleship/tra
 7. First-time guide should explain the page without blocking normal repeat use.
 8. Mobile view must keep Continue/Next actions prominent.
 
-## Status
-Audit in progress. Production visual verification is intentionally deferred until Vercel build limits reset.
+## Verified 2026-08-19
+- Learning landing page is Supabase-backed and shows current enrollment, available courses, prerequisites, credentials, XP and learning awards.
+- Enrollment writes are protected by church membership/prerequisite checks before creating a course enrollment.
+- Required assessment submission is server-scored in Supabase; later checkpoints are blocked until prior required checkpoints are passed.
+- Passing a required module assessment automatically marks that module complete in `course_module_progress`.
+- Course credential fields are protected by `trg_protect_course_enrollment_authority`; a member cannot directly self-award a credential or fake a final score.
+- Learning tables reviewed in this pass have RLS enabled, including enrollments, module progress, attempts, courses, modules, assessments, questions and milestones.
+- Published learning assessment counts now meet the P0 standard: required checkpoints are 5–10 questions; required final exams are 20–25 questions.
+- Effective Soul Winning has 2 required six-question checkpoints and a 20-question final. Its UI was corrected so grouped checkpoints can unlock the final instead of incorrectly requiring one checkpoint per module.
+- First Steps has 17 required class tests and a 25-question final.
+- Transcript and leader/admin learning screens exist and use the same course/enrollment/assessment records.
+
+## Still open in this tab
+- Finish full English/Spanish coverage on course-detail, transcript and learning-admin/member status copy.
+- Add/verify first-visit Learning Center guide behavior specifically on the Learning routes.
+- Verify mobile Continue/Next prominence visually after the next deployment.
+- Production visual verification remains intentionally deferred until the next deployment pass.
