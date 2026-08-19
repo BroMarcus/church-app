@@ -20,7 +20,8 @@ export default async function ServePage({searchParams}:{searchParams:Promise<{cr
   const {data:membership}=await supabase.from('church_memberships').select('church_id,role,status,churches(name)').eq('user_id',userId).eq('status','active').limit(1).single()
   if(!membership?.church_id)redirect('/')
   const churchId=membership.church_id
-  const canManage=['ministry_leader','pastor','church_admin'].includes(membership.role)
+  const {data:customManage}=await supabase.rpc('current_user_has_church_permission',{p_church_id:churchId,p_permission_key:'manage_ministries'})
+  const canManage=['ministry_leader','pastor','church_admin'].includes(membership.role)||Boolean(customManage)
 
   let ministryQuery:any=supabase.from('ministries').select('*').eq('church_id',churchId).order('active',{ascending:false}).order('name')
   if(!canManage)ministryQuery=ministryQuery.eq('active',true)
