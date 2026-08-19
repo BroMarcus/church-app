@@ -18,7 +18,9 @@ async function manager(){
   const userId=data?.claims?.sub
   if(!userId)redirect('/login')
   const {data:membership}=await supabase.from('church_memberships').select('church_id,role').eq('user_id',userId).eq('status','active').limit(1).single()
-  if(!membership?.church_id||!['minister','pastor','church_admin'].includes(membership.role))redirect('/learning')
+  if(!membership?.church_id)redirect('/learning')
+  const {data:customLearningAccess}=await supabase.rpc('current_user_has_church_permission',{p_church_id:membership.church_id,p_permission_key:'manage_learning'})
+  if(!['minister','pastor','church_admin'].includes(membership.role)&&!customLearningAccess)redirect('/learning')
   return {supabase,userId,churchId:membership.church_id}
 }
 
