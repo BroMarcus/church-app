@@ -108,8 +108,9 @@ export async function submitGroupReport(formData:FormData){
   const followUpDue=new Date(Date.now()+24*60*60*1000).toISOString()
   const owner=group.leader_id||userId
   const sourceLabel=[group.name,meetingDate,meetingType!=='regular'?meetingType.replaceAll('_',' '):'',locationLabel||''].filter(Boolean).join(' • ')
+  const sourceOccurredAt=meetingDate?new Date(`${meetingDate}T12:00:00Z`).toISOString():new Date().toISOString()
   for(const guest of namedGuests){
-    const {error:guestError}=await supabase.from('outreach_contacts').insert({church_id:group.church_id,created_by:userId,assigned_to:owner,first_name:guest.first_name,last_name:guest.last_name,phone:guest.phone,email:guest.email,stage:'guest',bible_study_interest:false,messaging_consent:false,follow_up_due_at:followUpDue,notes:`Added from Friendship Group: ${sourceLabel}`})
+    const {error:guestError}=await supabase.from('outreach_contacts').insert({church_id:group.church_id,created_by:userId,assigned_to:owner,first_name:guest.first_name,last_name:guest.last_name,phone:guest.phone,email:guest.email,stage:'guest',bible_study_interest:false,messaging_consent:false,follow_up_due_at:followUpDue,source_type:'friendship_group',source_label:sourceLabel,source_occurred_at:sourceOccurredAt,notes:`Added from Friendship Group: ${sourceLabel}`})
     if(!guestError)guestsAdded++
     else if(guestError.code==='23505')duplicateGuests++
   }
