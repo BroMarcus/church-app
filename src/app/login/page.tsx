@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
+import { createClient as createPublicClient } from '@supabase/supabase-js'
+import { SUPABASE_PUBLISHABLE_KEY,SUPABASE_URL } from '@/lib/supabase/config'
 import { login,signup,requestPasswordReset,resendConfirmation } from './actions'
 
 const copy={
@@ -10,7 +11,7 @@ const copy={
 export default async function LoginPage({searchParams}:{searchParams:Promise<{error?:string;message?:string;invite?:string;lang?:string;mode?:string}>}){
   const params=await searchParams
   const lang=params.lang==='es'?'es':'en',t=copy[lang]
-  const supabase=await createClient()
+  const supabase=createPublicClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}})
   let invite:any=null
   if(params.invite){const {data}=await supabase.rpc('get_invite_preview',{p_invite_id:params.invite});invite=Array.isArray(data)?data[0]:data}
   const {data:publicStatusData}=await supabase.rpc('get_public_signup_status')
@@ -30,14 +31,14 @@ export default async function LoginPage({searchParams}:{searchParams:Promise<{er
     {mode==='signup'&&canCreate&&<>
       <div className="notice success"><strong>{validInvite?(lang==='es'?`Invitación a ${invite.church_name}`:`Invitation to ${invite.church_name}`):(lang==='es'?'REGISTRO ABIERTO':'OPEN SIGNUP')}</strong><div className="small" style={{marginTop:4}}>{validInvite?(lang==='es'?'Esta invitación te conectará con tu iglesia.':'This invitation will connect you with your church.'):t.publicHelp}</div></div>
       <div className="card" style={{padding:14,margin:'12px 0',background:'rgba(255,255,255,.025)'}}><strong>{t.step1}</strong><div className="small muted" style={{marginTop:5}}>{t.step2} → {t.step3}</div></div>
-      <form action={signup}><input type="hidden" name="lang" value={lang}/>{validInvite&&<input type="hidden" name="invite_id" value={params.invite??''}/>}<div className="row"><label className="field" style={{flex:1}}><span>{t.first}</span><input name="first_name" autoComplete="given-name" required/></label><label className="field" style={{flex:1}}><span>{t.last}</span><input name="last_name" autoComplete="family-name" required/></label></div><label className="field"><span>{t.email}</span><input name="email" type="email" autoComplete="email" required/></label><label className="field"><span>{t.createPassword}</span><input name="password" type="password" minLength={8} autoComplete="new-password" required/></label><label className="field"><span>{t.again}</span><input name="confirm_password" type="password" minLength={8} autoComplete="new-password" required/></label><button className="btn" type="submit" style={{width:'100%'}}>{t.accept}</button></form>
+      <form action={signup}><input type="hidden" name="lang" value={lang}/>{validInvite&&<input type="hidden" name="invite_id" value={params.invite??''}/>}<div className="row"><label className="field" style={{flex:1}}><span>{t.first}</span><input name="first_name" autoComplete="given-name" required/></label><label className="field" style={{flex:1}}><span>{t.last}</span><input name="last_name" autoComplete="family-name" required/></label></div><label className="field"><span>{t.email}</span><input name="email" type="email" inputMode="email" autoComplete="email" required/></label><label className="field"><span>{t.createPassword}</span><input name="password" type="password" minLength={8} autoComplete="new-password" required/></label><label className="field"><span>{t.again}</span><input name="confirm_password" type="password" minLength={8} autoComplete="new-password" required/></label><button className="btn" type="submit" style={{width:'100%'}}>{t.accept}</button></form>
       <p className="small muted" style={{textAlign:'center',marginTop:14}}>{t.returning} <Link href={query('signin')} style={{textDecoration:'underline'}}>{t.signIn}</Link></p>
     </>}
 
     {mode==='signin'&&<>
-      <form action={login}><input type="hidden" name="lang" value={lang}/><label className="field"><span>{t.email}</span><input name="email" type="email" autoComplete="email" required/></label><label className="field"><span>{t.password}</span><input name="password" type="password" autoComplete="current-password" required/></label><button className="btn" type="submit" style={{width:'100%'}}>{t.signIn}</button></form>
+      <form action={login}><input type="hidden" name="lang" value={lang}/><label className="field"><span>{t.email}</span><input name="email" type="email" inputMode="email" autoComplete="email" required/></label><label className="field"><span>{t.password}</span><input name="password" type="password" autoComplete="current-password" required/></label><button className="btn" type="submit" style={{width:'100%'}}>{t.signIn}</button></form>
       {canCreate&&<p className="small muted" style={{textAlign:'center',marginTop:14}}>{t.newHere} <Link href={query('signup')} style={{textDecoration:'underline'}}>{t.create}</Link></p>}
-      <details style={{marginTop:22,paddingTop:14,borderTop:'1px solid rgba(255,255,255,.12)'}}><summary style={{fontWeight:800,cursor:'pointer'}}>{t.trouble}</summary><p className="small muted">{t.resetHelp}</p><form><input type="hidden" name="lang" value={lang}/><label className="field"><span>{t.accountEmail}</span><input name="reset_email" type="email" autoComplete="email" required/></label><div style={{display:'grid',gap:8}}><button className="btn secondary" formAction={requestPasswordReset}>{t.forgot}</button><div className="small muted">{t.resetTip}</div><button className="btn secondary" formAction={resendConfirmation}>{t.resend}</button><div className="small muted">{t.confirmTip}</div></div><div className="notice" style={{marginTop:12}}>{t.emailTip}</div></form></details>
+      <details style={{marginTop:22,paddingTop:14,borderTop:'1px solid rgba(255,255,255,.12)'}}><summary style={{fontWeight:800,cursor:'pointer'}}>{t.trouble}</summary><p className="small muted">{t.resetHelp}</p><form><input type="hidden" name="lang" value={lang}/><label className="field"><span>{t.accountEmail}</span><input name="reset_email" type="email" inputMode="email" autoComplete="email" required/></label><div style={{display:'grid',gap:8}}><button className="btn secondary" formAction={requestPasswordReset}>{t.forgot}</button><div className="small muted">{t.resetTip}</div><button className="btn secondary" formAction={resendConfirmation}>{t.resend}</button><div className="small muted">{t.confirmTip}</div></div><div className="notice" style={{marginTop:12}}>{t.emailTip}</div></form></details>
     </>}
   </div></main>
 }
