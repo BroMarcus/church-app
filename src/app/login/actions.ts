@@ -16,6 +16,9 @@ function friendlyAuthEmailError(message:string,lang:'en'|'es'){
       ? 'Se solicitaron demasiados correos en poco tiempo. Espera aproximadamente un minuto y solicita solo un correo nuevo. Hacer clic repetidamente puede extender la espera.'
       : 'Too many account emails were requested in a short period. Please wait about one minute, then request one fresh email. Repeated clicks can keep the cooldown active.'
   }
+  if(normalized.includes('public_signup_closed')) return lang==='es'
+    ? 'El grupo piloto ya alcanzó su límite de 30 personas. El registro público está cerrado por ahora.'
+    : 'The pilot group has reached its 30-person limit. Public signup is closed for now.'
   return message
 }
 
@@ -59,14 +62,23 @@ export async function signup(formData:FormData){
   const email=text(formData,'email').toLowerCase(),password=String(formData.get('password')??''),confirmPassword=String(formData.get('confirm_password')??''),firstName=text(formData,'first_name'),lastName=text(formData,'last_name'),inviteId=text(formData,'invite_id')
   const invitePart=inviteId?`&invite=${encodeURIComponent(inviteId)}`:''
   const fail=(en:string,es:string)=>redirect(loginUrl(lang,invitePart+'&error='+encodeURIComponent(lang==='es'?es:en)))
-  if(!inviteId)fail('A valid church invitation is required to create a member account.','Se requiere una invitación válida de la iglesia para crear una cuenta.')
   if(!firstName||!lastName)fail('First and last name are required to create your account.','Se requieren nombre y apellido para crear tu cuenta.')
   if(password!==confirmPassword)fail('The two passwords do not match. Please type them again.','Las dos contraseñas no coinciden. Escríbelas de nuevo.')
-  const {data:valid,error:inviteError}=await supabase.rpc('validate_invite_email',{p_invite_id:inviteId,p_email:email})
-  if(inviteError||!valid)fail('This invitation is expired, already used, revoked, or belongs to a different email address.','Esta invitación venció, ya fue usada, fue cancelada o pertenece a otro correo electrónico.')
+
+  let publicSignup=false
+  if(inviteId){
+    const {data:valid,error:inviteError}=await supabase.rpc('validate_invite_email',{p_invite_id:inviteId,p_email:email})
+    if(inviteError||!valid)fail('This invitation is expired, already used, revoked, or belongs to a different email address.','Esta invitación venció, ya fue usada, fue cancelada o pertenece a otro correo electrónico.')
+  }else{
+    const {data:status}=await supabase.rpc('get_public_signup_status')
+    const row=Array.isArray(status)?status[0]:status
+    if(!row?.open)fail('The 30-person public pilot is full right now.','El piloto público de 30 personas ya está lleno por ahora.')
+    publicSignup=true
+  }
+
   const displayName=`${firstName} ${lastName}`.trim()
   const startPath=`/start?welcome=1${lang==='es'?'&lang=es':''}`
-  const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath),data:{first_name:firstName,last_name:lastName,display_name:displayName,invite_id:inviteId,onboarding_completed:false,preferred_language:lang}}})
+  const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath),data:{first_name:firstName,last_name:lastName,display_name:displayName,invite_id:inviteId||null,public_signup:publicSignup,onboarding_completed:false,preferred_language:lang}}})
   if(error)redirect(loginUrl(lang,invitePart+'&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))
   if(data.session)redirect(startPath)
   const message=lang==='es'
