@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Archive,BookOpen,FileText,Languages,Search,ShieldCheck } from 'lucide-react'
+import { Archive,BookOpen,FileText,Images,Languages,Search,ShieldCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { ResourceUploader } from './resource-uploader'
 import './resources.css'
@@ -19,7 +19,7 @@ export default async function ResourcesPage({searchParams}:{searchParams:Promise
   const canManage=['group_leader','ministry_leader','minister','pastor','church_admin'].includes(membership.role)
   const canApproveOfficial=['pastor','church_admin'].includes(membership.role)
 
-  let query=supabase.from('media_assets').select('*').eq('church_id',membership.church_id).order('source_year',{ascending:false,nullsFirst:false}).order('created_at',{ascending:false})
+  let query=supabase.from('media_assets').select('*').eq('church_id',membership.church_id).eq('library_kind','knowledge').order('source_year',{ascending:false,nullsFirst:false}).order('created_at',{ascending:false})
   if(params.status&&params.status!=='all')query=query.eq('archive_status',params.status)
   if(params.lang&&params.lang!=='all')query=query.eq('language_code',params.lang)
   if(params.type&&params.type!=='all')query=query.eq('resource_type',params.type)
@@ -29,8 +29,8 @@ export default async function ResourcesPage({searchParams}:{searchParams:Promise
   const rows=await Promise.all((assets??[]).map(async(asset:any)=>{const signed=await supabase.storage.from('resource-library').createSignedUrl(asset.storage_path,60*10);return {...asset,url:signed.data?.signedUrl??null}}))
   const legacy=rows.filter((r:any)=>r.archive_status==='legacy').length
 
-  return <main className="shell"><header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??'Your Church'} • Resource Library</div></div><div className="row"><Link className="ghost" href="/learning">Learning</Link><Link className="ghost" href="/">← Home</Link></div></header>
-    <section className="card resources-hero"><div><div className="pill">RESOURCE LIBRARY</div><h1>Preserve what the church has learned.</h1><p className="muted">Current curriculum, official references, old lessons, Bible studies, handouts, teacher notes, sermons and ministry resources—kept searchable with clear source authority.</p></div><div className="resource-counter"><strong>{rows.length}</strong><span>resources shown • {legacy} legacy</span></div></section>
+  return <main className="shell"><header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??'Your Church'} • Resource Library</div></div><div className="row"><Link className="ghost" href="/media"><Images size={13}/> Media Library</Link><Link className="ghost" href="/learning">Learning</Link><Link className="ghost" href="/">← Home</Link></div></header>
+    <section className="card resources-hero"><div><div className="pill">KNOWLEDGE LIBRARY</div><h1>Preserve what the church has learned.</h1><p className="muted">Current curriculum, official references, old lessons, Bible studies, handouts, teacher notes, sermons and ministry resources—kept searchable with clear source authority.</p></div><div className="resource-counter"><strong>{rows.length}</strong><span>resources shown • {legacy} legacy</span></div></section>
 
     {canManage&&<ResourceUploader churchId={membership.church_id} userId={userId} canApproveOfficial={canApproveOfficial}/>}    
 
