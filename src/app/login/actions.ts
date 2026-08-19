@@ -33,7 +33,7 @@ export async function login(formData:FormData){
     else if(normalized.includes('email not confirmed')) message=lang==='es'
       ? 'Tu correo todavía no está confirmado. Abre el correo de confirmación más reciente que te enviamos y confirma tu cuenta antes de iniciar sesión.'
       : 'Your email is not confirmed yet. Open the newest confirmation email we sent and confirm your account before signing in.'
-    redirect(loginUrl(lang,'&error='+encodeURIComponent(message)))
+    redirect(loginUrl(lang,'&mode=signin&error='+encodeURIComponent(message)))
   }
   const userId=data.user?.id
   if(userId){
@@ -50,7 +50,7 @@ export async function login(formData:FormData){
       if(hasBasicProfile&&!hasActivity)redirect(`/start?welcome=1${lang==='es'?'&lang=es':''}`)
     }
   }
-  redirect('/')
+  redirect(lang==='es'?'/?lang=es':'/')
 }
 
 export async function signup(formData:FormData){
@@ -58,7 +58,7 @@ export async function signup(formData:FormData){
   const lang=langOf(formData)
   const email=text(formData,'email').toLowerCase(),password=String(formData.get('password')??''),confirmPassword=String(formData.get('confirm_password')??''),firstName=text(formData,'first_name'),lastName=text(formData,'last_name'),inviteId=text(formData,'invite_id')
   const invitePart=inviteId?`&invite=${encodeURIComponent(inviteId)}`:''
-  const fail=(en:string,es:string)=>redirect(loginUrl(lang,invitePart+'&error='+encodeURIComponent(lang==='es'?es:en)))
+  const fail=(en:string,es:string)=>redirect(loginUrl(lang,invitePart+'&mode=signup&error='+encodeURIComponent(lang==='es'?es:en)))
   if(!firstName||!lastName)fail('First and last name are required to create your account.','Se requieren nombre y apellido para crear tu cuenta.')
   if(password!==confirmPassword)fail('The two passwords do not match. Please type them again.','Las dos contraseñas no coinciden. Escríbelas de nuevo.')
 
@@ -76,37 +76,37 @@ export async function signup(formData:FormData){
   const displayName=`${firstName} ${lastName}`.trim()
   const startPath=`/start?welcome=1${lang==='es'?'&lang=es':''}`
   const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath),data:{first_name:firstName,last_name:lastName,display_name:displayName,invite_id:inviteId||null,public_signup:publicSignup,onboarding_completed:false,preferred_language:lang}}})
-  if(error)redirect(loginUrl(lang,invitePart+'&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))
+  if(error)redirect(loginUrl(lang,invitePart+'&mode=signup&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))
   if(data.session)redirect(startPath)
   const message=lang==='es'
     ? 'Cuenta creada. Enviamos un correo de confirmación. Revisa también Spam/Correo no deseado. Abre el correo más reciente; después te llevaremos directamente a Empieza Aquí.'
     : 'Account created. We sent a confirmation email. Check Spam/Junk too. Open the newest email; after confirmation we will take you directly to Start Here.'
-  redirect(loginUrl(lang,'&message='+encodeURIComponent(message)))
+  redirect(loginUrl(lang,'&mode=signin&message='+encodeURIComponent(message)))
 }
 
 export async function requestPasswordReset(formData:FormData){
   const supabase=await createClient()
   const lang=langOf(formData)
   const email=text(formData,'reset_email').toLowerCase()
-  if(!email)redirect(loginUrl(lang,'&error='+encodeURIComponent(lang==='es'?'Escribe primero tu correo electrónico.':'Enter your email address first.')))
+  if(!email)redirect(loginUrl(lang,'&mode=signin&error='+encodeURIComponent(lang==='es'?'Escribe primero tu correo electrónico.':'Enter your email address first.')))
   const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:callbackUrl(lang,'recovery',`/auth/update-password?lang=${lang}`)})
-  if(error)redirect(loginUrl(lang,'&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))
+  if(error)redirect(loginUrl(lang,'&mode=signin&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))
   const message=lang==='es'
     ? 'Correo para cambiar la contraseña enviado. Revisa Recibidos y Spam/Correo no deseado. Abre solamente el enlace más reciente.'
     : 'Password reset email sent. Check Inbox and Spam/Junk, then open only the newest reset link.'
-  redirect(loginUrl(lang,'&message='+encodeURIComponent(message)))
+  redirect(loginUrl(lang,'&mode=signin&message='+encodeURIComponent(message)))
 }
 
 export async function resendConfirmation(formData:FormData){
   const supabase=await createClient()
   const lang=langOf(formData)
   const email=text(formData,'reset_email').toLowerCase()
-  if(!email)redirect(loginUrl(lang,'&error='+encodeURIComponent(lang==='es'?'Escribe primero tu correo electrónico.':'Enter your email address first.')))
+  if(!email)redirect(loginUrl(lang,'&mode=signin&error='+encodeURIComponent(lang==='es'?'Escribe primero tu correo electrónico.':'Enter your email address first.')))
   const startPath=`/start?welcome=1${lang==='es'?'&lang=es':''}`
   const {error}=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath)}})
-  if(error)redirect(loginUrl(lang,'&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))
+  if(error)redirect(loginUrl(lang,'&mode=signin&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))
   const message=lang==='es'
     ? 'Correo de confirmación enviado otra vez. Abre solamente el correo más reciente y revisa Spam/Correo no deseado si no aparece.'
     : 'Confirmation email sent again. Open only the newest email and check Spam/Junk if you do not see it.'
-  redirect(loginUrl(lang,'&message='+encodeURIComponent(message)))
+  redirect(loginUrl(lang,'&mode=signin&message='+encodeURIComponent(message)))
 }
