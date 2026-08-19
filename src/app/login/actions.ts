@@ -16,7 +16,9 @@ function friendlyAuthEmailError(message:string,lang:'en'|'es'){
       ? 'Se solicitaron demasiados correos en poco tiempo. Espera aproximadamente un minuto y solicita solo un correo nuevo. Hacer clic repetidamente puede extender la espera.'
       : 'Too many account emails were requested in a short period. Please wait about one minute, then request one fresh email. Repeated clicks can keep the cooldown active.'
   }
-  return message
+  return lang==='es'
+    ? 'No pudimos enviar el correo de la cuenta en este momento. Espera un momento e inténtalo otra vez.'
+    : 'We could not send the account email right now. Wait a moment and try again.'
 }
 
 export async function login(formData:FormData){
@@ -26,13 +28,16 @@ export async function login(formData:FormData){
   const {data,error}=await supabase.auth.signInWithPassword({email,password})
   if(error){
     const normalized=error.message.toLowerCase()
-    let message=error.message
+    let message=lang==='es'
+      ? 'No pudimos iniciar sesión. Revisa tus datos e inténtalo otra vez.'
+      : 'We could not sign you in. Check your information and try again.'
     if(normalized.includes('invalid login credentials')) message=lang==='es'
       ? 'No pudimos iniciar sesión. Revisa el correo y la contraseña. Si no recuerdas la contraseña, usa “Olvidé mi contraseña” abajo.'
       : 'We could not sign you in. Double-check the email and password you created. If you just made this account, use Forgot password below to set a new password.'
     else if(normalized.includes('email not confirmed')) message=lang==='es'
       ? 'Tu correo todavía no está confirmado. Abre el correo de confirmación más reciente que te enviamos y confirma tu cuenta antes de iniciar sesión.'
       : 'Your email is not confirmed yet. Open the newest confirmation email we sent and confirm your account before signing in.'
+    console.error('login failed',{message:error.message})
     redirect(loginUrl(lang,'&mode=signin&error='+encodeURIComponent(message)))
   }
   const userId=data.user?.id
@@ -78,7 +83,7 @@ export async function signup(formData:FormData){
   const displayName=`${firstName} ${lastName}`.trim()
   const startPath=`/start?welcome=1${lang==='es'?'&lang=es':''}`
   const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath),data:{first_name:firstName,last_name:lastName,display_name:displayName,invite_id:inviteId||null,public_signup:publicSignup,onboarding_completed:false,preferred_language:lang}}})
-  if(error)redirect(loginUrl(lang,invitePart+'&mode=signup&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))
+  if(error){console.error('signup failed',{message:error.message});redirect(loginUrl(lang,invitePart+'&mode=signup&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))}
   if(data.user&&Array.isArray(data.user.identities)&&data.user.identities.length===0){
     const message=lang==='es'
       ? 'Ese correo ya tiene una cuenta. Inicia sesión con tu contraseña existente o usa “Olvidé mi contraseña” si no la recuerdas.'
@@ -98,7 +103,7 @@ export async function requestPasswordReset(formData:FormData){
   const email=text(formData,'reset_email').toLowerCase()
   if(!email)redirect(loginUrl(lang,'&mode=signin&error='+encodeURIComponent(lang==='es'?'Escribe primero tu correo electrónico.':'Enter your email address first.')))
   const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:callbackUrl(lang,'recovery',`/auth/update-password?lang=${lang}`)})
-  if(error)redirect(loginUrl(lang,'&mode=signin&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))
+  if(error){console.error('requestPasswordReset failed',{message:error.message});redirect(loginUrl(lang,'&mode=signin&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))}
   const message=lang==='es'
     ? 'Correo para cambiar la contraseña enviado. Revisa Recibidos y Spam/Correo no deseado. Abre solamente el enlace más reciente.'
     : 'Password reset email sent. Check Inbox and Spam/Junk, then open only the newest reset link.'
@@ -112,7 +117,7 @@ export async function resendConfirmation(formData:FormData){
   if(!email)redirect(loginUrl(lang,'&mode=signin&error='+encodeURIComponent(lang==='es'?'Escribe primero tu correo electrónico.':'Enter your email address first.')))
   const startPath=`/start?welcome=1${lang==='es'?'&lang=es':''}`
   const {error}=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath)}})
-  if(error)redirect(loginUrl(lang,'&mode=signin&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))
+  if(error){console.error('resendConfirmation failed',{message:error.message});redirect(loginUrl(lang,'&mode=signin&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))}
   const message=lang==='es'
     ? 'Correo de confirmación enviado otra vez. Abre solamente el correo más reciente y revisa Spam/Correo no deseado si no aparece.'
     : 'Confirmation email sent again. Open only the newest email and check Spam/Junk if you do not see it.'
