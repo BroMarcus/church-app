@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 
 const safe=(name:string)=>name.replace(/[^a-zA-Z0-9._-]/g,'_').slice(-120)
 const split=(v:FormDataEntryValue|null)=>String(v??'').split(',').map(x=>x.trim()).filter(Boolean)
+const assetType=(resourceType:string)=>resourceType==='video'?'video':resourceType==='audio'?'audio':resourceType==='slides'?'slides':'other'
 
 export function ResourceUploader({churchId,userId,canApproveOfficial}:{churchId:string;userId:string;canApproveOfficial:boolean}){
   const [busy,setBusy]=useState(false)
@@ -17,16 +18,17 @@ export function ResourceUploader({churchId,userId,canApproveOfficial}:{churchId:
     if(file.size>50*1024*1024){setMessage('File must be 50 MB or smaller.');return}
     setBusy(true);setMessage('')
     const supabase=createClient()
-    const path=`${churchId}/${crypto.randomUUID()}/${safe(file.name)}`
+    const path=`${churchId}/${userId}/${crypto.randomUUID()}/${safe(file.name)}`
     const up=await supabase.storage.from('resource-library').upload(path,file,{contentType:file.type,upsert:false})
     if(up.error){setMessage(up.error.message);setBusy(false);return}
     const yearRaw=String(formData.get('source_year')??'').trim()
     const requestedScope=String(formData.get('source_scope')||'local_church')
     const sourceScope=canApproveOfficial?requestedScope:['local_church','ministry','group','external'].includes(requestedScope)?requestedScope:'local_church'
     const official=canApproveOfficial&&formData.get('official_source')==='on'
+    const resourceType=String(formData.get('resource_type')||'lesson')
     const insert=await supabase.from('media_assets').insert({
-      church_id:churchId,uploaded_by:userId,title:String(formData.get('title')||file.name).trim(),asset_type:file.type||'application/octet-stream',storage_path:path,
-      description:String(formData.get('description')||'').trim()||null,resource_type:String(formData.get('resource_type')||'lesson'),language_code:String(formData.get('language_code')||'en'),
+      church_id:churchId,uploaded_by:userId,library_kind:'knowledge',title:String(formData.get('title')||file.name).trim(),asset_type:assetType(resourceType),storage_path:path,
+      description:String(formData.get('description')||'').trim()||null,resource_type:resourceType,language_code:String(formData.get('language_code')||'en'),
       source_year:yearRaw?Number(yearRaw):null,ministry_area:String(formData.get('ministry_area')||'').trim()||null,topic_tags:split(formData.get('topic_tags')),scripture_refs:split(formData.get('scripture_refs')),
       archive_status:String(formData.get('archive_status')||'legacy'),source_label:String(formData.get('source_label')||'').trim()||null,approved_for_members:formData.get('approved_for_members')==='on',can_edit_copy:true,
       source_scope:sourceScope,official_source:official,reviewed_by:official?userId:null,reviewed_at:official?new Date().toISOString():null
