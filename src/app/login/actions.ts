@@ -6,6 +6,18 @@ import { createClient } from '@/lib/supabase/server'
 const text=(f:FormData,k:string)=>String(f.get(k)??'').trim()
 const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
 
+function friendlyAuthEmailError(message:string){
+  const normalized=message.toLowerCase()
+  if(
+    normalized.includes('rate limit') ||
+    normalized.includes('over_email_send_rate_limit') ||
+    normalized.includes('security purposes')
+  ){
+    return 'Too many account emails were requested in a short period. Please wait about one minute, then request one fresh email. Repeated clicks can keep the cooldown active.'
+  }
+  return message
+}
+
 export async function login(formData:FormData){
   const supabase=await createClient()
   const email=text(formData,'email').toLowerCase(),password=String(formData.get('password')??'')
@@ -36,7 +48,7 @@ export async function signup(formData:FormData){
       data:{first_name:firstName,last_name:lastName,display_name:displayName,invite_id:inviteId}
     }
   })
-  if(error)redirect(`/login?invite=${encodeURIComponent(inviteId)}&error=`+encodeURIComponent(error.message))
+  if(error)redirect(`/login?invite=${encodeURIComponent(inviteId)}&error=`+encodeURIComponent(friendlyAuthEmailError(error.message)))
   if(data.session)redirect('/')
   redirect('/login?message='+encodeURIComponent('Account created. We sent a confirmation email. If you do not see it, check Spam/Junk. After confirming, come back here and sign in with the password you just created.'))
 }
@@ -46,6 +58,6 @@ export async function requestPasswordReset(formData:FormData){
   const email=text(formData,'reset_email').toLowerCase()
   if(!email)redirect('/login?error='+encodeURIComponent('Enter your email address first.'))
   const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:`${siteUrl}/auth/update-password`})
-  if(error)redirect('/login?error='+encodeURIComponent(error.message))
-  redirect('/login?message='+encodeURIComponent('Password reset email sent. Check your Inbox and Spam/Junk folder, then open the link to choose a new password.'))
+  if(error)redirect('/login?error='+encodeURIComponent(friendlyAuthEmailError(error.message)))
+  redirect('/login?message='+encodeURIComponent('Password reset email sent. Check your Inbox and Spam/Junk folder, then open the newest reset link to choose a new password. If you need another email, wait at least one minute before requesting it.'))
 }
