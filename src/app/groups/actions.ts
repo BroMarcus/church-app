@@ -90,12 +90,41 @@ export async function submitGroupReport(formData:FormData){
   const baptismNames=names(text(formData,'baptism_names'))
   const holyGhostNames=names(text(formData,'holy_ghost_names'))
   const meetingDate=text(formData,'meeting_date')
+  const meetingType=['regular','outreach','fellowship','special'].includes(text(formData,'meeting_type'))?text(formData,'meeting_type'):'regular'
+  const selectedAttendees=Array.from(new Set(formData.getAll('attendee_user_id').map(v=>String(v).trim()).filter(Boolean)))
   const firstTimeGuests=Math.max(number(formData,'first_time_guests'),namedGuests.length)
   const baptisms=Math.max(number(formData,'baptisms'),baptismNames.length)
   const holyGhostReceived=Math.max(number(formData,'holy_ghost_received'),holyGhostNames.length)
+  const attendanceCount=Math.max(number(formData,'attendance_count'),selectedAttendees.length+firstTimeGuests)
 
-  const {data:report,error}=await supabase.from('group_reports').insert({group_id:groupId,submitted_by:userId,meeting_date:meetingDate,attendance_count:number(formData,'attendance_count'),first_time_guests:firstTimeGuests,active_bible_studies:number(formData,'active_bible_studies'),baptisms,holy_ghost_received:holyGhostReceived,lesson_title:text(formData,'lesson_title')||null,follow_up_notes:text(formData,'follow_up_notes')||null}).select('id').single()
+  const {data:report,error}=await supabase.from('group_reports').insert({
+    group_id:groupId,
+    submitted_by:userId,
+    meeting_date:meetingDate,
+    attendance_count:attendanceCount,
+    first_time_guests:firstTimeGuests,
+    active_bible_studies:number(formData,'active_bible_studies'),
+    baptisms,
+    holy_ghost_received:holyGhostReceived,
+    lesson_title:text(formData,'lesson_title')||null,
+    follow_up_notes:text(formData,'follow_up_notes')||null,
+    meeting_type:meetingType,
+    location_label:text(formData,'location_label')||null,
+    prayer_needs:text(formData,'prayer_needs')||null,
+    issues_notes:text(formData,'issues_notes')||null,
+    general_notes:text(formData,'general_notes')||null
+  }).select('id').single()
   if(error||!report)redirect(`/groups/${groupId}?error=`+encodeURIComponent(error?.message||'Unable to save report.'))
+
+  let attendanceRecorded=0
+  if(selectedAttendees.length){
+    const {data:validMembers}=await supabase.from('group_memberships').select('user_id').eq('group_id',groupId).in('user_id',selectedAttendees)
+    const validIds=(validMembers??[]).map((r:any)=>r.user_id)
+    if(validIds.length){
+      const {error:attendanceError}=await supabase.from('group_report_attendance').insert(validIds.map(attendeeId=>({church_id:group.church_id,group_id:groupId,group_report_id:report.id,user_id:attendeeId,present:true})))
+      if(!attendanceError)attendanceRecorded=validIds.length
+    }
+  }
 
   let guestsAdded=0
   let duplicateGuests=0
@@ -114,6 +143,7 @@ export async function submitGroupReport(formData:FormData){
 
   revalidatePath(`/groups/${groupId}`);revalidatePath('/outreach');revalidatePath('/church/analytics')
   const params=new URLSearchParams({reported:'1'})
+  if(attendanceRecorded)params.set('attendance_recorded',String(attendanceRecorded))
   if(guestsAdded)params.set('guests_added',String(guestsAdded))
   if(duplicateGuests)params.set('guest_duplicates',String(duplicateGuests))
   if(milestoneRows.length)params.set('milestones_queued',String(milestoneRows.length))
