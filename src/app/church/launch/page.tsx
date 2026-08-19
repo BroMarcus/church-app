@@ -13,10 +13,11 @@ export default async function ChurchLaunchPage({searchParams}:{searchParams:Prom
   const params=await searchParams
   const lang=params.lang==='es'?'es':'en'
   const t=copy[lang]
+  const l=(path:string)=>lang==='es'?`${path}${path.includes('?')?'&':'?'}lang=es`:path
   const supabase=await createClient()
   const {data:claims}=await supabase.auth.getClaims()
   const userId=claims?.claims?.sub
-  if(!userId)redirect(`/login${lang==='es'?'?lang=es':''}`)
+  if(!userId)redirect(l('/login'))
   const {data:membership}=await supabase.from('church_memberships').select('church_id,role,churches(name,city,state,timezone,logo_path,brand_color,welcome_message)').eq('user_id',userId).eq('status','active').limit(1).single()
   if(!membership?.church_id||!['pastor','church_admin'].includes(membership.role))redirect('/')
   const churchId=membership.church_id
@@ -38,14 +39,14 @@ export default async function ChurchLaunchPage({searchParams}:{searchParams:Prom
   const groupReady=(groups??0)>0
   const calendar=(events??0)>0
   const steps=lang==='es'?[ 
-    {title:'1. Datos básicos de la iglesia',body:'Confirma el nombre, ciudad, estado y zona horaria.',href:'/church/settings',done:identity,Icon:Church},
-    {title:'2. Agrega un administrador de respaldo',body:'Dale acceso administrativo a un líder de confianza para no depender de una sola cuenta.',href:'/church',done:adminReady,Icon:ShieldCheck},
-    {title:'3. Hazlo tuyo',body:'Agrega el logo, color de la iglesia y un mensaje corto de bienvenida.',href:'/church/settings',done:branding,Icon:Palette},
-    {title:'4. Agrega a las primeras personas',body:'Invita a unos pocos miembros reales del piloto. También puedes importar una lista cuando estés listo.',href:'/church/invites?lang=es',done:people,Icon:MailPlus},
-    {title:'5. Dale a los miembros un próximo paso',body:'Publica al menos una clase o curso de discipulado.',href:'/learning',done:learning,Icon:GraduationCap},
-    {title:'6. Agrega un grupo',body:'Crea al menos un Grupo de Amistad, ministerio o comunidad.',href:'/groups',done:groupReady,Icon:Users},
-    {title:'7. Agrega un evento',body:'Pon un próximo evento de la iglesia en el calendario.',href:'/calendar',done:calendar,Icon:CalendarDays},
-    {title:'8. Revisa si el piloto está listo',body:'Haz la revisión final antes de invitar al grupo piloto.',href:'/church/readiness?lang=es',done:false,Icon:Check}
+    {title:'1. Datos básicos de la iglesia',body:'Confirma el nombre, ciudad, estado y zona horaria.',href:l('/church/settings'),done:identity,Icon:Church},
+    {title:'2. Agrega un administrador de respaldo',body:'Dale acceso administrativo a un líder de confianza para no depender de una sola cuenta.',href:l('/church'),done:adminReady,Icon:ShieldCheck},
+    {title:'3. Hazlo tuyo',body:'Agrega el logo, color de la iglesia y un mensaje corto de bienvenida.',href:l('/church/settings'),done:branding,Icon:Palette},
+    {title:'4. Agrega a las primeras personas',body:'Invita a unos pocos miembros reales del piloto. También puedes importar una lista cuando estés listo.',href:l('/church/invites'),done:people,Icon:MailPlus},
+    {title:'5. Dale a los miembros un próximo paso',body:'Publica al menos una clase o curso de discipulado.',href:l('/learning'),done:learning,Icon:GraduationCap},
+    {title:'6. Agrega un grupo',body:'Crea al menos un Grupo de Amistad, ministerio o comunidad.',href:l('/groups'),done:groupReady,Icon:Users},
+    {title:'7. Agrega un evento',body:'Pon un próximo evento de la iglesia en el calendario.',href:l('/calendar'),done:calendar,Icon:CalendarDays},
+    {title:'8. Revisa si el piloto está listo',body:'Haz la revisión final antes de invitar al grupo piloto.',href:l('/church/readiness'),done:false,Icon:Check}
   ]:[
     {title:'1. Church basics',body:'Confirm your church name, city, state and timezone.',href:'/church/settings',done:identity,Icon:Church},
     {title:'2. Add a backup admin',body:'Give one trusted leader admin access so the church is never dependent on one account.',href:'/church',done:adminReady,Icon:ShieldCheck},
@@ -62,14 +63,14 @@ export default async function ChurchLaunchPage({searchParams}:{searchParams:Prom
   const NextIcon=nextStep.Icon
 
   return <main className="shell">
-    <header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??t.church} • Church Builder</div></div><div className="row"><Languages size={15}/><Link className="ghost" href="/church/launch?lang=en">{t.english}</Link><Link className="ghost" href="/church/launch?lang=es">{t.spanish}</Link><Link className="ghost" href="/church">{t.admin}</Link></div></header>
+    <header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??t.church} • Church Builder</div></div><div className="row"><Languages size={15}/><Link className="ghost" href="/church/launch?lang=en">{t.english}</Link><Link className="ghost" href="/church/launch?lang=es">{t.spanish}</Link><Link className="ghost" href={l('/church')}>{t.admin}</Link></div></header>
     <section className="launch-hero card"><div><div className="pill">CHURCH BUILDER</div><h1>{t.title}</h1><p className="muted">{t.subtitle}</p></div><div className="launch-progress"><strong>{pct}%</strong><span>{completed} {t.of} 7 {t.ready}</span><div className="launch-bar"><i style={{width:`${pct}%`}}/></div></div></section>
 
     <section className="card" style={{marginBottom:16}}><div className="pill">{t.next}</div><h2 style={{marginBottom:6}}><NextIcon size={18}/> {nextStep.title}</h2><p className="muted">{nextStep.body}</p><Link className="btn" href={nextStep.href}>{t.open}</Link></section>
 
     <section className="launch-grid">{steps.map((s,index)=>{const Icon=s.Icon;return <Link href={s.href} className={`card launch-step ${s.done?'done':''}`} key={s.title}><div className="launch-num">{s.done?<Check size={14}/>:index+1}</div><div className="launch-copy"><strong><Icon size={12}/> {s.title}</strong><span>{s.body}</span><div className="launch-status">{index===7?t.final:s.done?t.done:t.needed}</div></div></Link>})}</section>
 
-    <section className="launch-manual"><div className="section-heading"><div><div className="pill">{t.pilot}</div><h2>{t.handles}</h2></div></div><div className="manual-grid"><article className="card manual-launch-card"><h3>{t.domain}</h3><p>{t.domainBody}</p></article><article className="card manual-launch-card"><h3>{t.small}</h3><p>{t.smallBody}</p></article><article className="card manual-launch-card"><h3>{t.help}</h3><p>{t.helpBody}</p><Link href={`/guide${lang==='es'?'?lang=es':''}`}>{t.guide}</Link></article></div></section>
+    <section className="launch-manual"><div className="section-heading"><div><div className="pill">{t.pilot}</div><h2>{t.handles}</h2></div></div><div className="manual-grid"><article className="card manual-launch-card"><h3>{t.domain}</h3><p>{t.domainBody}</p></article><article className="card manual-launch-card"><h3>{t.small}</h3><p>{t.smallBody}</p></article><article className="card manual-launch-card"><h3>{t.help}</h3><p>{t.helpBody}</p><Link href={l('/guide')}>{t.guide}</Link></article></div></section>
 
     <section className="card launch-footer"><div className="pill">{t.when}</div><h2>{t.run}</h2><p className="small muted">{t.runBody}</p></section>
   </main>
