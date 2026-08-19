@@ -80,7 +80,33 @@ export async function addGroupMember(formData:FormData){
 export async function submitGroupReport(formData:FormData){
   const {supabase,userId}=await currentUser()
   const groupId=text(formData,'group_id')
-  const {error}=await supabase.from('group_reports').insert({group_id:groupId,submitted_by:userId,meeting_date:text(formData,'meeting_date'),attendance_count:number(formData,'attendance_count'),first_time_guests:number(formData,'first_time_guests'),active_bible_studies:number(formData,'active_bible_studies'),baptisms:number(formData,'baptisms'),holy_ghost_received:number(formData,'holy_ghost_received'),lesson_title:text(formData,'lesson_title')||null,follow_up_notes:text(formData,'follow_up_notes')||null})
+  if(!groupId)redirect('/groups?error='+encodeURIComponent('Group report is missing a group.'))
+  const {data:group,error:groupError}=await supabase.from('groups').select('church_id,leader_id,name').eq('id',groupId).single()
+  if(groupError||!group?.church_id)redirect(`/groups/${groupId}?error=`+encodeURIComponent('Group not found or unavailable.'))
+
+  const namedGuests=Array.from({length:5},(_,i)=>{
+    const n=i+1
+    return {first_name:text(formData,`guest_${n}_first_name`),last_name:text(formData,`guest_${n}_last_name`)||null,phone:text(formData,`guest_${n}_phone`)||null,email:text(formData,`guest_${n}_email`)||null}
+  }).filter(g=>g.first_name)
+  const meetingDate=text(formData,'meeting_date')
+  const firstTimeGuests=Math.max(number(formData,'first_time_guests'),namedGuests.length)
+
+  const {error}=await supabase.from('group_reports').insert({group_id:groupId,submitted_by:userId,meeting_date:meetingDate,attendance_count:number(formData,'attendance_count'),first_time_guests:firstTimeGuests,active_bible_studies:number(formData,'active_bible_studies'),baptisms:number(formData,'baptisms'),holy_ghost_received:number(formData,'holy_ghost_received'),lesson_title:text(formData,'lesson_title')||null,follow_up_notes:text(formData,'follow_up_notes')||null})
   if(error)redirect(`/groups/${groupId}?error=`+encodeURIComponent(error.message))
-  revalidatePath(`/groups/${groupId}`);redirect(`/groups/${groupId}?reported=1`)
+
+  let guestsAdded=0
+  let duplicateGuests=0
+  const followUpDue=new Date(Date.now()+24*60*60*1000).toISOString()
+  const owner=group.leader_id||userId
+  for(const guest of namedGuests){
+    const {error:guestError}=await supabase.from('outreach_contacts').insert({church_id:group.church_id,created_by:userId,assigned_to:owner,first_name:guest.first_name,last_name:guest.last_name,phone:guest.phone,email:guest.email,stage:'guest',bible_study_interest:false,messaging_consent:false,follow_up_due_at:followUpDue,notes:`Added from Friendship Group: ${group.name}${meetingDate?` • ${meetingDate}`:''}`})
+    if(!guestError)guestsAdded++
+    else if(guestError.code==='23505')duplicateGuests++
+  }
+
+  revalidatePath(`/groups/${groupId}`);revalidatePath('/outreach')
+  const params=new URLSearchParams({reported:'1'})
+  if(guestsAdded)params.set('guests_added',String(guestsAdded))
+  if(duplicateGuests)params.set('guest_duplicates',String(duplicateGuests))
+  redirect(`/groups/${groupId}?${params.toString()}`)
 }
