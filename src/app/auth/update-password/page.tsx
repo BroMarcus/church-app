@@ -16,10 +16,18 @@ export default function UpdatePasswordPage(){
     const supabase=createClient()
     let mounted=true
     const check=async()=>{
+      const url=new URL(window.location.href)
+      const code=url.searchParams.get('code')
+      if(code){
+        const {error}=await supabase.auth.exchangeCodeForSession(code)
+        if(error&&mounted){setMessage('This reset link is invalid or expired. Please request one fresh reset email.');return}
+        url.searchParams.delete('code')
+        window.history.replaceState({},'',`${url.pathname}${url.search}${url.hash}`)
+      }
       const {data}=await supabase.auth.getSession()
       if(!mounted)return
       if(data.session){setReady(true);setMessage('Choose a new password below.')}
-      else setMessage('This reset link is invalid or expired. Go back to Sign in and request a new one.')
+      else setMessage('This reset link is invalid or expired. Go back to Sign in and request one fresh reset email.')
     }
     check()
     const {data:listener}=supabase.auth.onAuthStateChange((event,session)=>{
@@ -36,7 +44,7 @@ export default function UpdatePasswordPage(){
     setBusy(true)
     const supabase=createClient()
     const {error}=await supabase.auth.updateUser({password})
-    if(error){setMessage(error.message);setBusy(false);return}
+    if(error){setMessage('We could not update the password. Please request a fresh reset email and try again.');setBusy(false);return}
     setMessage('Password updated. Taking you back to sign in…')
     await supabase.auth.signOut()
     router.replace('/login?message='+encodeURIComponent('Password updated. Sign in with your new password.'))
