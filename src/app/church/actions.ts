@@ -29,21 +29,36 @@ export async function updateMembership(formData:FormData){
   const membershipId=value(formData,'membership_id')
   const role=value(formData,'role')
   const status=value(formData,'status')
+  const lang=langOf(formData)
+  const base=lang==='es'?'/church?lang=es':'/church'
+  const withError=(message:string)=>`${base}${base.includes('?')?'&':'?'}error=${encodeURIComponent(message)}`
   const supabase=await createClient()
   const {data:claimsData}=await supabase.auth.getClaims()
   const userId=claimsData?.claims?.sub
-  if(!userId)redirect('/login')
+  if(!userId)redirect(lang==='es'?'/login?lang=es':'/login')
 
-  if(!membershipId||!allowedRoles.includes(role as (typeof allowedRoles)[number])||!allowedStatuses.includes(status as (typeof allowedStatuses)[number]))redirect('/church?error='+encodeURIComponent('Invalid member update.'))
-  const {data:target}=await supabase.from('church_memberships').select('id,church_id,user_id').eq('id',membershipId).single()
-  if(!target)redirect('/church?error='+encodeURIComponent('Member not found.'))
+  if(!membershipId||!allowedRoles.includes(role as (typeof allowedRoles)[number])||!allowedStatuses.includes(status as (typeof allowedStatuses)[number]))redirect(withError(lang==='es'?'Actualización de acceso inválida.':'Invalid member access update.'))
+  const {data:target}=await supabase.from('church_memberships').select('id,church_id,user_id,role,status').eq('id',membershipId).single()
+  if(!target)redirect(withError(lang==='es'?'No se encontró el miembro.':'Member not found.'))
   const {data:actor}=await supabase.from('church_memberships').select('role,status').eq('church_id',target.church_id).eq('user_id',userId).eq('status','active').single()
   if(!actor||!['pastor','church_admin'].includes(actor.role))redirect('/')
-  if(target.user_id===userId&&(status!=='active'||!['pastor','church_admin'].includes(role)))redirect('/church?error='+encodeURIComponent('You cannot remove your own admin access.'))
+
+  const removingAdminAccess=status!=='active'||!['pastor','church_admin'].includes(role)
+  if(target.user_id===userId&&removingAdminAccess)redirect(withError(lang==='es'?'No puedes quitar tu propio acceso administrativo.':'You cannot remove your own admin access.'))
+
+  // Church admins may manage normal member access, but only a pastor can assign,
+  // demote, deactivate, or otherwise change a pastor account.
+  if(actor.role!=='pastor'&&(target.role==='pastor'||role==='pastor'))redirect(withError(lang==='es'?'Solo un pastor puede asignar o cambiar el acceso de pastor.':'Only a pastor can assign or change pastor access.'))
+
+  // Never allow an access change to leave the church without an active pastor/admin.
+  if(['pastor','church_admin'].includes(target.role)&&target.status==='active'&&removingAdminAccess){
+    const {count}=await supabase.from('church_memberships').select('id',{count:'exact',head:true}).eq('church_id',target.church_id).eq('status','active').in('role',['pastor','church_admin']).neq('id',membershipId)
+    if((count??0)<1)redirect(withError(lang==='es'?'La iglesia debe conservar al menos un pastor o administrador activo. Agrega otro administrador antes de quitar este acceso.':'The church must keep at least one active pastor or church admin. Add another admin before removing this access.'))
+  }
 
   const {error}=await supabase.from('church_memberships').update({role,status}).eq('id',membershipId)
-  if(error)redirect('/church?error='+encodeURIComponent(error.message))
-  revalidatePath('/church');revalidatePath('/');redirect('/church?saved=1')
+  if(error)redirect(withError(lang==='es'?'No se pudo guardar el acceso del miembro. Inténtalo de nuevo.':'Member access could not be saved. Please try again.'))
+  revalidatePath('/church');revalidatePath('/');redirect(`${base}${base.includes('?')?'&':'?'}saved=1`)
 }
 
 export async function updateMilestones(formData:FormData){
