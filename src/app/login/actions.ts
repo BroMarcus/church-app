@@ -86,3 +86,16 @@ export async function requestPasswordReset(formData:FormData){
     : 'Password reset email sent. Check your Inbox and Spam/Junk folder, then open the newest reset link to choose a new password. If you need another email, wait at least one minute before requesting it.'
   redirect(loginUrl(lang,'&message='+encodeURIComponent(message)))
 }
+
+export async function resendConfirmation(formData:FormData){
+  const supabase=await createClient()
+  const lang=langOf(formData)
+  const email=text(formData,'reset_email').toLowerCase()
+  if(!email)redirect(loginUrl(lang,'&error='+encodeURIComponent(lang==='es'?'Escribe primero tu correo electrónico.':'Enter your email address first.')))
+  const {error}=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:`${siteUrl}/start?welcome=1${lang==='es'?'&lang=es':''}`}})
+  if(error)redirect(loginUrl(lang,'&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))
+  const message=lang==='es'
+    ? 'Correo de confirmación enviado otra vez. Abre solamente el correo más reciente y revisa Spam/Correo no deseado si no aparece. Espera al menos un minuto antes de pedir otro.'
+    : 'Confirmation email sent again. Open only the newest email and check Spam/Junk if you do not see it. Wait at least one minute before requesting another.'
+  redirect(loginUrl(lang,'&message='+encodeURIComponent(message)))
+}
