@@ -1,0 +1,13 @@
+drop policy if exists learning_asset_objects_delete on storage.objects;
+drop policy if exists learning_asset_objects_insert on storage.objects;
+drop policy if exists learning_asset_objects_read on storage.objects;
+drop policy if exists learning_asset_objects_update on storage.objects;
+drop policy if exists resource_library_objects_delete on storage.objects;
+drop policy if exists resource_library_objects_insert on storage.objects;
+
+create policy learning_asset_objects_read on storage.objects for select to authenticated using (bucket_id='learning-assets' and exists (select 1 from public.churches c where c.id::text=(storage.foldername(name))[1] and private.is_church_member(c.id)));
+create policy learning_asset_objects_insert on storage.objects for insert to authenticated with check (bucket_id='learning-assets' and exists (select 1 from public.churches c where c.id::text=(storage.foldername(name))[1] and private.has_church_role(c.id,array['minister','pastor','church_admin'])));
+create policy learning_asset_objects_update on storage.objects for update to authenticated using (bucket_id='learning-assets' and exists (select 1 from public.churches c where c.id::text=(storage.foldername(name))[1] and private.has_church_role(c.id,array['minister','pastor','church_admin']))) with check (bucket_id='learning-assets' and exists (select 1 from public.churches c where c.id::text=(storage.foldername(name))[1] and private.has_church_role(c.id,array['minister','pastor','church_admin'])));
+create policy learning_asset_objects_delete on storage.objects for delete to authenticated using (bucket_id='learning-assets' and exists (select 1 from public.churches c where c.id::text=(storage.foldername(name))[1] and private.has_church_role(c.id,array['minister','pastor','church_admin'])));
+create policy resource_library_objects_insert on storage.objects for insert to authenticated with check (bucket_id='resource-library' and (storage.foldername(name))[2]=(select auth.uid())::text and exists (select 1 from public.churches c where c.id::text=(storage.foldername(name))[1] and (private.has_church_role(c.id,array['group_leader','ministry_leader','minister','pastor','church_admin']) or private.has_church_permission(c.id,'manage_media'))));
+create policy resource_library_objects_delete on storage.objects for delete to authenticated using (bucket_id='resource-library' and not exists (select 1 from public.media_assets m where m.storage_path=storage.objects.name) and (storage.foldername(name))[2]=(select auth.uid())::text and exists (select 1 from public.churches c where c.id::text=(storage.foldername(name))[1] and private.has_church_role(c.id,array['group_leader','ministry_leader','minister','pastor','church_admin'])));
