@@ -16,9 +16,6 @@ function friendlyAuthEmailError(message:string,lang:'en'|'es'){
       ? 'Se solicitaron demasiados correos en poco tiempo. Espera aproximadamente un minuto y solicita solo un correo nuevo. Hacer clic repetidamente puede extender la espera.'
       : 'Too many account emails were requested in a short period. Please wait about one minute, then request one fresh email. Repeated clicks can keep the cooldown active.'
   }
-  if(normalized.includes('public_signup_closed')) return lang==='es'
-    ? 'El grupo piloto ya alcanzó su límite de 30 personas. El registro público está cerrado por ahora.'
-    : 'The pilot group has reached its 30-person limit. Public signup is closed for now.'
   return message
 }
 
@@ -72,7 +69,7 @@ export async function signup(formData:FormData){
   }else{
     const {data:status}=await supabase.rpc('get_public_signup_status')
     const row=Array.isArray(status)?status[0]:status
-    if(!row?.open)fail('The 30-person public pilot is full right now.','El piloto público de 30 personas ya está lleno por ahora.')
+    if(!row?.open)fail('Public pilot signup is temporarily unavailable.','El registro público del piloto no está disponible temporalmente.')
     publicSignup=true
   }
 
