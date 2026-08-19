@@ -8,7 +8,7 @@ import './serve.css'
 
 const statusLabel=(v:string)=>v.replaceAll('_',' ')
 const personName=(p:any)=>p?.display_name||[p?.first_name,p?.last_name].filter(Boolean).join(' ')||'Member'
-const reqTypes=[['membership','Active member'],['holy_ghost','Holy Ghost'],['baptism','Baptism'],['course','Course completion'],['covenant','Covenant'],['training','Safety training'],['custom','Custom/manual']] as const
+const reqTypes=[['membership','Active member'],['holy_ghost','Holy Ghost'],['baptism','Baptism'],['course','Course completion'],['covenant','Covenant'],['training','Safety training'],['bible_study_teacher','Bible study teacher approval'],['custom','Custom/manual']] as const
 const reqKeys=[['','None'],['first_steps','First Steps'],['salt_series','Salt Series'],['soul_winning','Effective Soul Winning'],['timothys','Timothys'],['school_pastors','School of Pastors'],['child_abuse','Child Abuse Training'],['sexual_harassment','Sexual Harassment Training']] as const
 
 export default async function ServePage({searchParams}:{searchParams:Promise<{created?:string;updated?:string;requirement?:string;requirement_removed?:string;applied?:string;reviewed?:string;error?:string}>}){
