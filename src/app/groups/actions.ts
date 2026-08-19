@@ -8,6 +8,7 @@ const text=(f:FormData,k:string)=>String(f.get(k)??'').trim()
 const number=(f:FormData,k:string)=>Math.max(0,Number.parseInt(text(f,k)||'0',10)||0)
 const frequencies=['weekly','biweekly','monthly','seasonal','other']
 const languages=['en','es','bilingual']
+const meetingTypes=['regular','matthew_party','picnic','barbecue','special_event','other']
 const withLang=(path:string,lang:string)=>lang==='es'?`${path}${path.includes('?')?'&':'?'}lang=es`:path
 const names=(value:string)=>value.split(/\r?\n|,/).map(v=>v.trim()).filter(Boolean).slice(0,20)
 
@@ -82,7 +83,7 @@ export async function submitGroupReport(formData:FormData){
   const {supabase,userId}=await currentUser()
   const groupId=text(formData,'group_id')
   if(!groupId)redirect('/groups?error='+encodeURIComponent('Group report is missing a group.'))
-  const {data:group,error:groupError}=await supabase.from('groups').select('church_id,leader_id,name').eq('id',groupId).single()
+  const {data:group,error:groupError}=await supabase.from('groups').select('church_id,leader_id,name,location_label').eq('id',groupId).single()
   if(groupError||!group?.church_id)redirect(`/groups/${groupId}?error=`+encodeURIComponent('Group not found or unavailable.'))
 
   const namedGuests=Array.from({length:5},(_,i)=>{
@@ -92,19 +93,23 @@ export async function submitGroupReport(formData:FormData){
   const baptismNames=names(text(formData,'baptism_names'))
   const holyGhostNames=names(text(formData,'holy_ghost_names'))
   const meetingDate=text(formData,'meeting_date')
+  const requestedType=text(formData,'meeting_type')||'regular'
+  const meetingType=meetingTypes.includes(requestedType)?requestedType:'regular'
+  const locationLabel=text(formData,'location_label')||group.location_label||null
   const firstTimeGuests=Math.max(number(formData,'first_time_guests'),namedGuests.length)
   const baptisms=Math.max(number(formData,'baptisms'),baptismNames.length)
   const holyGhostReceived=Math.max(number(formData,'holy_ghost_received'),holyGhostNames.length)
 
-  const {data:report,error}=await supabase.from('group_reports').insert({group_id:groupId,submitted_by:userId,meeting_date:meetingDate,attendance_count:number(formData,'attendance_count'),first_time_guests:firstTimeGuests,active_bible_studies:number(formData,'active_bible_studies'),baptisms,holy_ghost_received:holyGhostReceived,lesson_title:text(formData,'lesson_title')||null,follow_up_notes:text(formData,'follow_up_notes')||null}).select('id').single()
+  const {data:report,error}=await supabase.from('group_reports').insert({group_id:groupId,submitted_by:userId,meeting_date:meetingDate,meeting_type:meetingType,location_label:locationLabel,attendance_count:number(formData,'attendance_count'),first_time_guests:firstTimeGuests,active_bible_studies:number(formData,'active_bible_studies'),baptisms,holy_ghost_received:holyGhostReceived,lesson_title:text(formData,'lesson_title')||null,prayer_needs:text(formData,'prayer_needs')||null,issues_notes:text(formData,'issues_notes')||null,follow_up_notes:text(formData,'follow_up_notes')||null,general_notes:text(formData,'general_notes')||null}).select('id').single()
   if(error||!report)redirect(`/groups/${groupId}?error=`+encodeURIComponent(error?.message||'Unable to save report.'))
 
   let guestsAdded=0
   let duplicateGuests=0
   const followUpDue=new Date(Date.now()+24*60*60*1000).toISOString()
   const owner=group.leader_id||userId
+  const sourceLabel=[group.name,meetingDate,meetingType!=='regular'?meetingType.replaceAll('_',' '):'',locationLabel||''].filter(Boolean).join(' • ')
   for(const guest of namedGuests){
-    const {error:guestError}=await supabase.from('outreach_contacts').insert({church_id:group.church_id,created_by:userId,assigned_to:owner,first_name:guest.first_name,last_name:guest.last_name,phone:guest.phone,email:guest.email,stage:'guest',bible_study_interest:false,messaging_consent:false,follow_up_due_at:followUpDue,notes:`Added from Friendship Group: ${group.name}${meetingDate?` • ${meetingDate}`:''}`})
+    const {error:guestError}=await supabase.from('outreach_contacts').insert({church_id:group.church_id,created_by:userId,assigned_to:owner,first_name:guest.first_name,last_name:guest.last_name,phone:guest.phone,email:guest.email,stage:'guest',bible_study_interest:false,messaging_consent:false,follow_up_due_at:followUpDue,notes:`Added from Friendship Group: ${sourceLabel}`})
     if(!guestError)guestsAdded++
     else if(guestError.code==='23505')duplicateGuests++
   }
