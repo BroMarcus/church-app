@@ -18,7 +18,8 @@ export default async function TeamsPage({searchParams}:{searchParams:Promise<{cr
   const {data:membership}=await supabase.from('church_memberships').select('church_id,role,churches(name,timezone)').eq('user_id',userId).eq('status','active').limit(1).single()
   if(!membership?.church_id)redirect('/')
   const churchId=membership.church_id
-  const canManage=['ministry_leader','minister','pastor','church_admin'].includes(membership.role)
+  const {data:customManage}=await supabase.rpc('current_user_has_church_permission',{p_church_id:churchId,p_permission_key:'manage_teams'})
+  const canManage=['ministry_leader','minister','pastor','church_admin'].includes(membership.role)||Boolean(customManage)
   let assignmentQuery=supabase.from('team_assignments').select('*').eq('church_id',churchId).gte('starts_at',new Date(Date.now()-24*60*60*1000).toISOString()).order('starts_at').limit(100)
   if(!canManage)assignmentQuery=assignmentQuery.eq('assigned_user_id',userId)
   const [{data:assignments},{data:responses},{data:ministries},{data:churchMembers}]=await Promise.all([
