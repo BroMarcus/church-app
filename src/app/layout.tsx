@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { MobileNav } from '@/components/mobile-nav'
+import { ProphetLauncher } from '@/components/prophet-launcher'
 import { createClient } from '@/lib/supabase/server'
 import './globals.css'
 
@@ -21,5 +22,6 @@ export default async function RootLayout({children}:Readonly<{children:React.Rea
     isGroupLeader=Boolean(groupLeadership)
   }
 
-  return <html lang="en"><body>{children}<MobileNav authenticated={Boolean(userId)} churchRole={churchRole} isGroupLeader={isGroupLeader}/></body></html>
+  const authenticated=Boolean(userId)
+  return <html lang="en"><body>{children}<ProphetLauncher authenticated={authenticated}/><MobileNav authenticated={authenticated} churchRole={churchRole} isGroupLeader={isGroupLeader}/></body></html>
 }
