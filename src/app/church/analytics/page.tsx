@@ -22,7 +22,7 @@ export default async function ChurchAnalyticsPage(){
   const nowIso=now.toISOString()
   const thirtyDaysAgo=new Date(now.getTime()-30*24*60*60*1000).toISOString().slice(0,10)
 
-  const [{data:members},{data:milestones},{data:groups},{data:outreach},{data:courses},{data:applications},{data:teamAssignments},{count:openCare},{count:pendingDocs},{data:campaigns}]=await Promise.all([
+  const [{data:members},{data:milestones},{data:groups},{data:outreach},{data:courses},{data:applications},{data:teamAssignments},{count:openCare},{count:pendingDocs},{count:pendingMilestones},{data:campaigns}]=await Promise.all([
     supabase.from('church_memberships').select('user_id').eq('church_id',churchId).eq('status','active'),
     supabase.from('member_milestones').select('user_id,holy_ghost_received,baptized,first_steps_status,soul_winning_status,bible_study_teacher_status').eq('church_id',churchId),
     supabase.from('groups').select('id').eq('church_id',churchId).eq('active',true),
@@ -32,6 +32,7 @@ export default async function ChurchAnalyticsPage(){
     supabase.from('team_assignments').select('id,assigned_user_id,confirmation_required,starts_at').eq('church_id',churchId).gte('starts_at',nowIso),
     supabase.from('care_requests').select('*',{count:'exact',head:true}).eq('church_id',churchId).in('status',['new','in_review']),
     supabase.from('member_documents').select('*',{count:'exact',head:true}).eq('church_id',churchId).eq('verification_status','pending'),
+    supabase.from('reported_milestones').select('*',{count:'exact',head:true}).eq('church_id',churchId).eq('status','pending'),
     supabase.from('fundraising_campaigns').select('goal_amount,raised_amount,status').eq('church_id',churchId).eq('status','active')
   ])
 
@@ -73,7 +74,7 @@ export default async function ChurchAnalyticsPage(){
   const pendingApps=(applications??[]).filter((a:any)=>['submitted','under_review'].includes(a.status)).length
   const responded=new Set((teamResponses??[]).map((r:any)=>r.assignment_id));const teamDue=Math.max(0,teamIds.length-responded.size)
   const campaignGoal=(campaigns??[]).reduce((s:number,c:any)=>s+Number(c.goal_amount||0),0);const campaignRaised=(campaigns??[]).reduce((s:number,c:any)=>s+Number(c.raised_amount||0),0)
-  const attention=[['Pastoral care',openCare??0,'/help'],['Overdue outreach',overdue,'/outreach'],['Documents awaiting review',pendingDocs??0,'/documents'],['Ministry applications',pendingApps,'/serve'],['Team confirmations',teamDue,'/teams']] as const
+  const attention=[['Pastoral care',openCare??0,'/help'],['Overdue outreach',overdue,'/outreach'],['Milestones to verify',pendingMilestones??0,'/church/milestone-review'],['Documents awaiting review',pendingDocs??0,'/documents'],['Ministry applications',pendingApps,'/serve'],['Team confirmations',teamDue,'/teams']] as const
 
   return <main className="shell">
     <header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??'Your Church'} • Church Health</div></div><div className="row"><Link className="ghost" href="/church">← Church Admin</Link><Link className="ghost" href="/">Home</Link></div></header>
