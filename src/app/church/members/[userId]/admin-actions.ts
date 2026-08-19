@@ -15,6 +15,7 @@ const clean=(v:string,max=180)=>v.slice(0,max)
 const emptyNull=(v:string)=>v||null
 const num=(v:string,min:number,max:number)=>{const n=Number(v);return Number.isFinite(n)?Math.max(min,Math.min(max,Math.round(n))):null}
 const back=(userId:string,l:'en'|'es',key:string,value='1')=>`/church/members/${userId}?lang=${l}&${key}=${encodeURIComponent(value)}`
+const saveError=(l:'en'|'es',es:string,en:string)=>l==='es'?es:en
 
 async function requireAdmin(churchId:string,targetUserId:string){
   const supabase=await createClient()
@@ -44,7 +45,7 @@ export async function updateMemberAccessFromRecord(formData:FormData){
     if((count??0)<1)redirect(back(targetUserId,l,'error',l==='es'?'La iglesia debe conservar al menos un pastor o administrador activo.':'The church must keep at least one active Pastor or Church Admin.'))
   }
   const {error}=await supabase.from('church_memberships').update({role,status}).eq('id',membershipId)
-  if(error)redirect(back(targetUserId,l,'error',error.message))
+  if(error){console.error('updateMemberAccessFromRecord failed',{code:error.code,message:error.message});redirect(back(targetUserId,l,'error',saveError(l,'No pudimos guardar el acceso del miembro.','We could not save member access.')))}
   revalidatePath(`/church/members/${targetUserId}`);revalidatePath('/church');revalidatePath('/');
   redirect(back(targetUserId,l,'access'))
 }
@@ -57,7 +58,7 @@ export async function updateMemberProfileFromRecord(formData:FormData){
   const displayName=clean(text(formData,'display_name')||[firstName,lastName].filter(Boolean).join(' '),120)
   const bio=clean(text(formData,'bio'),500)
   const {error:profileError}=await supabase.from('profiles').update({first_name:firstName||null,last_name:lastName||null,display_name:displayName||null,bio:bio||null}).eq('id',targetUserId)
-  if(profileError)redirect(back(targetUserId,l,'error',profileError.message))
+  if(profileError){console.error('updateMemberProfileFromRecord profile failed',{code:profileError.code,message:profileError.message});redirect(back(targetUserId,l,'error',saveError(l,'No pudimos guardar el perfil del miembro.','We could not save the member profile.')))}
   const privatePayload={
     user_id:targetUserId,
     email:emptyNull(clean(text(formData,'email'),180).toLowerCase()),
@@ -71,7 +72,7 @@ export async function updateMemberProfileFromRecord(formData:FormData){
     marriage_anniversary:emptyNull(text(formData,'marriage_anniversary'))
   }
   const {error:detailsError}=await supabase.from('member_private_details').upsert(privatePayload,{onConflict:'user_id'})
-  if(detailsError)redirect(back(targetUserId,l,'error',detailsError.message))
+  if(detailsError){console.error('updateMemberProfileFromRecord private details failed',{code:detailsError.code,message:detailsError.message});redirect(back(targetUserId,l,'error',saveError(l,'El perfil público se guardó, pero no pudimos guardar los datos privados.','The public profile saved, but we could not save the private details.')))}
   revalidatePath(`/church/members/${targetUserId}`);revalidatePath('/church');revalidatePath('/directory');
   redirect(back(targetUserId,l,'profile'))
 }
@@ -92,7 +93,7 @@ export async function overrideCourseEnrollment(formData:FormData){
   const completedAt=earned?(completedDate?`${completedDate}T12:00:00.000Z`:now):null
   const payload={course_id:courseId,user_id:targetUserId,progress,final_score:finalScore,credential_earned:earned,completed_at:completedAt,updated_at:now,admin_override_by:actorId,admin_override_at:now,admin_override_reason:reason}
   const {error}=await supabase.from('course_enrollments').upsert(payload,{onConflict:'course_id,user_id'})
-  if(error)redirect(back(targetUserId,l,'error',error.message))
+  if(error){console.error('overrideCourseEnrollment failed',{code:error.code,message:error.message});redirect(back(targetUserId,l,'error',saveError(l,'No pudimos guardar la corrección del curso.','We could not save the course correction.')))}
   revalidatePath(`/church/members/${targetUserId}`);revalidatePath('/learning');revalidatePath('/journey');
   redirect(back(targetUserId,l,'course'))
 }
@@ -106,7 +107,7 @@ export async function updateMemberMinistryApplication(formData:FormData){
   if(!application||ministry?.church_id!==churchId)redirect(back(targetUserId,l,'error',l==='es'?'Solicitud de ministerio no encontrada.':'Ministry application not found.'))
   const note=clean(text(formData,'review_note'),500)
   const {error}=await supabase.from('ministry_applications').update({status,review_note:note||null,reviewed_by:actorId,reviewed_at:new Date().toISOString()}).eq('id',applicationId)
-  if(error)redirect(back(targetUserId,l,'error',error.message))
+  if(error){console.error('updateMemberMinistryApplication failed',{code:error.code,message:error.message});redirect(back(targetUserId,l,'error',saveError(l,'No pudimos guardar el cambio de ministerio.','We could not save the ministry change.')))}
   revalidatePath(`/church/members/${targetUserId}`);revalidatePath('/serve');revalidatePath('/teams');
   redirect(back(targetUserId,l,'service'))
 }
@@ -119,7 +120,7 @@ export async function updateMemberBusinessFromRecord(formData:FormData){
   if(!listing||listing.church_id!==churchId||listing.owner_user_id!==targetUserId)redirect(back(targetUserId,l,'error',l==='es'?'Negocio no encontrado para este miembro.':'Business not found for this member.'))
   const verified=text(formData,'is_verified')==='yes'
   const {error}=await supabase.from('business_listings').update({status,is_verified:verified,is_sponsored:false,updated_at:new Date().toISOString()}).eq('id',businessId)
-  if(error)redirect(back(targetUserId,l,'error',error.message))
+  if(error){console.error('updateMemberBusinessFromRecord failed',{code:error.code,message:error.message});redirect(back(targetUserId,l,'error',saveError(l,'No pudimos guardar el negocio del miembro.','We could not save the member business.')))}
   revalidatePath(`/church/members/${targetUserId}`);revalidatePath('/business');
   redirect(back(targetUserId,l,'business'))
 }
