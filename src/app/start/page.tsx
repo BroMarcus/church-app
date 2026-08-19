@@ -12,13 +12,14 @@ const copy={
 
 export default async function StartPage({searchParams}:{searchParams:Promise<{lang?:string;error?:string}>}){
   const params=await searchParams
-  const lang=params.lang==='es'?'es':'en'
+  const supabase=await createClient()
+  const {data:{user}}=await supabase.auth.getUser()
+  const preferred=user?.user_metadata?.preferred_language==='es'?'es':'en'
+  const lang=params.lang==='es'?'es':params.lang==='en'?'en':preferred
   const t=copy[lang]
   const suffix=lang==='es'?'?lang=es':''
   const withLang=(path:string)=>lang==='es'?`${path}${path.includes('?')?'&':'?'}lang=es`:path
-  const supabase=await createClient()
-  const {data:claims}=await supabase.auth.getClaims()
-  const userId=claims?.claims?.sub
+  const userId=user?.id
   if(!userId)redirect(`/login${suffix}`)
   const [{data:profile},{data:membership}]=await Promise.all([
     supabase.from('profiles').select('display_name,first_name,last_name').eq('id',userId).maybeSingle(),
