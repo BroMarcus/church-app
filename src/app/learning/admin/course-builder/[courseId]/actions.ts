@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 
 const text=(f:FormData,k:string)=>String(f.get(k)??'').trim()
+const score=(value:FormDataEntryValue|null)=>Math.max(80,Math.min(100,Number(value||80)))
 
 async function manager(courseId:string){
   const supabase=await createClient()
@@ -66,7 +67,7 @@ export async function createCourseAssessmentShell(formData:FormData){
   if(!courseId)return
   const {supabase,userId}=await manager(courseId)
   const title=text(formData,'title')||'Course Final Review'
-  await supabase.from('course_assessments').insert({course_id:courseId,title,assessment_type:'final_exam',passing_score:Math.max(0,Math.min(100,Number(formData.get('passing_score')||80))),required:true,published:false,created_by:userId})
+  await supabase.from('course_assessments').insert({course_id:courseId,title,assessment_type:'final_exam',passing_score:score(formData.get('passing_score')),required:true,published:false,created_by:userId})
   revalidatePath(`/learning/admin/course-builder/${courseId}`)
 }
 
@@ -74,7 +75,7 @@ export async function saveBuilderCourse(formData:FormData){
   const courseId=text(formData,'course_id')
   if(!courseId)return
   const {supabase,churchId}=await manager(courseId)
-  await supabase.from('courses').update({title:text(formData,'title'),description:text(formData,'description')||null,badge_name:text(formData,'badge_name')||null,passing_score:Math.max(0,Math.min(100,Number(formData.get('passing_score')||80))),language_code:text(formData,'language_code')==='es'?'es':'en'}).eq('id',courseId).eq('church_id',churchId)
+  await supabase.from('courses').update({title:text(formData,'title'),description:text(formData,'description')||null,badge_name:text(formData,'badge_name')||null,passing_score:score(formData.get('passing_score')),language_code:text(formData,'language_code')==='es'?'es':'en'}).eq('id',courseId).eq('church_id',churchId)
   revalidatePath(`/learning/admin/course-builder/${courseId}`)
   revalidatePath('/learning/admin')
 }
@@ -110,7 +111,7 @@ export async function applyExtractionPlan(formData:FormData){
   const lessonRows=plan.lessons.slice(0,40).map((lesson:any,i:number)=>({course_id:courseId,position:i+1,title:String(lesson.title||`Lesson ${i+1}`).slice(0,140),content:{summary:String(lesson.summary||''),body:'',source_assisted:true}}))
   await supabase.from('course_modules').insert(lessonRows)
   const {count:assessmentCount}=await supabase.from('course_assessments').select('*',{count:'exact',head:true}).eq('course_id',courseId)
-  if((assessmentCount??0)===0)await supabase.from('course_assessments').insert({course_id:courseId,title:plan.assessment?.title||'Course Final Review',assessment_type:'final_exam',passing_score:Number(plan.assessment?.passing_score||80),required:true,published:false,created_by:userId})
+  if((assessmentCount??0)===0)await supabase.from('course_assessments').insert({course_id:courseId,title:plan.assessment?.title||'Course Final Review',assessment_type:'final_exam',passing_score:Math.max(80,Math.min(100,Number(plan.assessment?.passing_score||80))),required:true,published:false,created_by:userId})
   await supabase.from('church_setup_uploads').update({extraction_status:'applied',extraction_applied_at:new Date().toISOString()}).eq('id',source.id)
   revalidatePath(`/learning/admin/course-builder/${courseId}`)
   revalidatePath('/learning/admin')
