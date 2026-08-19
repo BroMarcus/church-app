@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowRight,Bell,BookOpen,CalendarDays,HandHeart,Megaphone,Sparkles,Users } from 'lucide-react'
+import { ArrowRight,Bell,BookOpen,CalendarDays,ClipboardList,HandHeart,Megaphone,Sparkles,Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { ProphetCommandBox } from '../guide/prophet-command-box'
 
@@ -14,6 +14,8 @@ export default async function ProphetPage({searchParams}:{searchParams:Promise<{
   const {data:membership}=await supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).single()
   if(!membership?.church_id)redirect('/')
   const church:any=Array.isArray(membership.churches)?membership.churches[0]:membership.churches
+  const {data:manageMembers}=await supabase.rpc('current_user_has_church_permission',{p_church_id:membership.church_id,p_permission_key:'manage_members'})
+  const canManageMembers=['pastor','church_admin'].includes(membership.role)||Boolean(manageMembers)
   const nowIso=new Date().toISOString(),weekIso=new Date(Date.now()+7*86400000).toISOString()
   const [{data:assignments},{count:unread},{data:ledGroups},{data:groupRoles}]=await Promise.all([
     supabase.from('team_assignments').select('id,title,confirmation_required').eq('church_id',membership.church_id).eq('assigned_user_id',userId).gte('starts_at',nowIso).lte('starts_at',weekIso).order('starts_at').limit(10),
@@ -29,13 +31,14 @@ export default async function ProphetPage({searchParams}:{searchParams:Promise<{
   let reports:any[]=[];if(groupIds.length){const r=await supabase.from('group_reports').select('group_id,meeting_date').in('group_id',groupIds).order('meeting_date',{ascending:false});reports=r.data??[]}
   const lastReport=new Map<string,string>();for(const r of reports){if(!lastReport.has(r.group_id))lastReport.set(r.group_id,r.meeting_date)}
   const overdueGroups=leaderGroups.filter((g:any)=>{const d=lastReport.get(g.id);return !d||Date.now()-new Date(`${d}T12:00:00`).getTime()>8*86400000})
-  const links=[
+  const links:any[]=[
     [es?'Mi Horario':'My Schedule',es?'Mis asignaciones, clases y grupo.':'Assignments, classes and group.', '/calendar/my',CalendarDays],
     [es?'Reporte de Grupo':'Group Report',es?'Abrir mi Grupo de Amistad y reportar la reunión.':'Open Friendship Groups and report the meeting.','/groups',Users],
     [es?'Evangelismo':'Evangelism',es?'Agregar visita o dar seguimiento.':'Add a guest or follow up.','/outreach',Megaphone],
     [es?'Aprendizaje':'Learning',es?'Continuar una clase o ver el siguiente paso.':'Continue a course or see the next step.','/learning',BookOpen],
     [es?'Oración y Cuidado':'Prayer & Care',es?'Guardar una necesidad de oración o pedir ayuda.':'Record a prayer need or request help.','/help',HandHeart]
-  ] as const
+  ]
+  if(canManageMembers)links.unshift([es?'Registros de Miembros':'Member Records',es?'Buscar personas, contacto y hitos verificados.':'Search people, contact information and verified milestones.','/church/member-records',ClipboardList])
   const l=(p:string)=>es?`${p}${p.includes('?')?'&':'?'}lang=es`:p
   const nudges=[
     pendingAssignments.length?{title:es?'Tienes una asignación esperando respuesta.':'You have an assignment waiting for a response.',body:es?'Confirma si puedes servir para que tu líder no tenga que perseguir la respuesta.':'Confirm whether you can serve so your leader does not have to chase the response.',href:'/teams',action:es?'Responder ahora':'Respond now'}:null,
