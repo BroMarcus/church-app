@@ -1,0 +1,24 @@
+import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { CheckCircle2,ShieldCheck,UserRoundSearch } from 'lucide-react'
+import { createClient } from '@/lib/supabase/server'
+import { updateMemberRelationship } from '../actions'
+
+const relLabel=(v:string,es:boolean)=>({guest:es?'Invitado':'Guest',attendee:es?'Asistente regular':'Regular attendee',member:es?'Miembro':'Member',inactive:es?'Inactivo':'Inactive'} as Record<string,string>)[v]||v
+
+export default async function RelationshipReviewPage({searchParams}:{searchParams:Promise<{lang?:string}>}){
+  const params=await searchParams,es=params.lang==='es',lang=es?'es':'en'
+  const l=(p:string)=>es?`${p}${p.includes('?')?'&':'?'}lang=es`:p
+  const supabase=await createClient();const {data:claims}=await supabase.auth.getClaims();const userId=claims?.claims?.sub
+  if(!userId)redirect(l('/login'))
+  const {data:membership}=await supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).single()
+  if(!membership?.church_id)redirect('/')
+  const {data:custom}=await supabase.rpc('current_user_has_church_permission',{p_church_id:membership.church_id,p_permission_key:'manage_members'})
+  if(!['pastor','church_admin'].includes(membership.role)&&!custom)redirect('/')
+  const {data:queue,error}=await supabase.rpc('church_relationship_verification_queue',{p_church_id:membership.church_id})
+  if(error)throw new Error(error.message)
+  const church:any=Array.isArray(membership.churches)?membership.churches[0]:membership.churches
+  return <main className="shell"><header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??'Church'} • {es?'Revisión de Relaciones':'Relationship Review'}</div></div><div className="row"><Link className="ghost" href="/church/member-records/review?lang=en">English</Link><Link className="ghost" href="/church/member-records/review?lang=es">Español</Link><Link className="ghost" href={l('/church/member-records')}>{es?'← Registros':'← Member Records'}</Link></div></header>
+  <section className="card" style={{padding:24,marginBottom:18}}><div className="pill">{es?'LIMPIEZA DE DATOS DEL PILOTO':'PILOT DATA CLEANUP'}</div><h1>{es?'Confirma los registros heredados antes de confiar plenamente en el conteo de Miembros.':'Confirm legacy records before fully trusting the Member count.'}</h1><p className="muted">{es?'Estos son registros que existían antes de separar acceso a la aplicación de relación con la iglesia. No se eliminará ninguna cuenta. Solo confirma cómo debe contarse la persona.':'These records existed before app access was separated from church relationship. No account will be deleted. You are only confirming how the person should be counted.'}</p></section>
+  <section style={{display:'grid',gap:12}}>{(queue??[]).map((row:any)=><article className="card" style={{padding:18}} key={row.user_id}><div className="row" style={{justifyContent:'space-between',gap:12,alignItems:'flex-start',flexWrap:'wrap'}}><div><div className="row" style={{gap:8}}><UserRoundSearch size={18}/><h3 style={{margin:0}}>{row.name}</h3></div><div className="small muted" style={{marginTop:5}}>{row.email||(es?'Sin correo':'No email')} • {es?'origen':'source'}: {String(row.relationship_source).replaceAll('_',' ')}</div><div className="small muted">{es?'creado':'created'} {new Date(row.created_at).toLocaleDateString()}</div></div><Link className="ghost" href={l(`/church/members/${row.user_id}`)}>{es?'Abrir registro':'Open record'} →</Link></div><form action={updateMemberRelationship} className="row" style={{gap:8,alignItems:'end',marginTop:14,flexWrap:'wrap'}}><input type="hidden" name="church_id" value={membership.church_id}/><input type="hidden" name="user_id" value={row.user_id}/><input type="hidden" name="lang" value={lang}/><label className="field" style={{minWidth:220}}><span>{es?'Confirmar relación':'Confirm relationship'}</span><select name="relationship_status" defaultValue={row.relationship_status}><option value="member">{relLabel('member',es)}</option><option value="guest">{relLabel('guest',es)}</option><option value="attendee">{relLabel('attendee',es)}</option><option value="inactive">{relLabel('inactive',es)}</option></select></label><button className="btn"><ShieldCheck size={14}/> {es?'Confirmar':'Confirm'}</button></form></article>)}{!queue?.length&&<div className="card" style={{padding:26,textAlign:'center'}}><CheckCircle2 size={30}/><h2>{es?'Todos los registros de Miembros están verificados.':'All Member relationships are verified.'}</h2><p className="muted">{es?'El conteo formal de Miembros ya no depende de registros heredados sin revisar.':'The formal Member count no longer depends on unreviewed legacy records.'}</p></div>}</section></main>
+}
