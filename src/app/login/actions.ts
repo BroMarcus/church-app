@@ -26,14 +26,21 @@ export async function login(formData:FormData){
   }
   const userId=data.user?.id
   if(userId){
-    const [{data:profile},{count:groups},{count:enrollments}]=await Promise.all([
-      supabase.from('profiles').select('first_name,last_name,display_name,bio').eq('id',userId).maybeSingle(),
-      supabase.from('group_memberships').select('*',{count:'exact',head:true}).eq('user_id',userId),
-      supabase.from('course_enrollments').select('*',{count:'exact',head:true}).eq('user_id',userId)
-    ])
-    const hasBasicProfile=Boolean(profile?.first_name&&profile?.last_name)
-    const hasActivity=(groups??0)>0||(enrollments??0)>0||Boolean(profile?.bio)
-    if(hasBasicProfile&&!hasActivity)redirect('/start?welcome=1')
+    const onboardingState=data.user?.user_metadata?.onboarding_completed
+    if(onboardingState===false)redirect('/start?welcome=1')
+
+    // Legacy pilot accounts created before onboarding state existed still get one guided start
+    // only when they have a basic profile but no meaningful activity yet.
+    if(onboardingState===undefined){
+      const [{data:profile},{count:groups},{count:enrollments}]=await Promise.all([
+        supabase.from('profiles').select('first_name,last_name,display_name,bio').eq('id',userId).maybeSingle(),
+        supabase.from('group_memberships').select('*',{count:'exact',head:true}).eq('user_id',userId),
+        supabase.from('course_enrollments').select('*',{count:'exact',head:true}).eq('user_id',userId)
+      ])
+      const hasBasicProfile=Boolean(profile?.first_name&&profile?.last_name)
+      const hasActivity=(groups??0)>0||(enrollments??0)>0||Boolean(profile?.bio)
+      if(hasBasicProfile&&!hasActivity)redirect('/start?welcome=1')
+    }
   }
   redirect('/')
 }
@@ -47,7 +54,7 @@ export async function signup(formData:FormData){
   const {data:valid,error:inviteError}=await supabase.rpc('validate_invite_email',{p_invite_id:inviteId,p_email:email})
   if(inviteError||!valid)redirect(`/login?invite=${encodeURIComponent(inviteId)}&error=`+encodeURIComponent('This invitation is expired, already used, revoked, or belongs to a different email address.'))
   const displayName=`${firstName} ${lastName}`.trim()
-  const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:`${siteUrl}/start?welcome=1`,data:{first_name:firstName,last_name:lastName,display_name:displayName,invite_id:inviteId}}})
+  const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:`${siteUrl}/start?welcome=1`,data:{first_name:firstName,last_name:lastName,display_name:displayName,invite_id:inviteId,onboarding_completed:false}}})
   if(error)redirect(`/login?invite=${encodeURIComponent(inviteId)}&error=`+encodeURIComponent(friendlyAuthEmailError(error.message)))
   if(data.session)redirect('/start?welcome=1')
   redirect('/login?message='+encodeURIComponent('Account created. We sent a confirmation email. If you do not see it, check Spam/Junk. After confirming, sign in with the password you created and we will guide you through Start Here.'))
