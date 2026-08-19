@@ -60,6 +60,8 @@ export async function signup(formData:FormData){
   const invitePart=inviteId?`&invite=${encodeURIComponent(inviteId)}`:''
   const fail=(en:string,es:string)=>redirect(loginUrl(lang,invitePart+'&mode=signup&error='+encodeURIComponent(lang==='es'?es:en)))
   if(!firstName||!lastName)fail('First and last name are required to create your account.','Se requieren nombre y apellido para crear tu cuenta.')
+  if(!email)fail('Enter your email address.','Escribe tu correo electrónico.')
+  if(password.length<8)fail('Your password must be at least 8 characters.','Tu contraseña debe tener por lo menos 8 caracteres.')
   if(password!==confirmPassword)fail('The two passwords do not match. Please type them again.','Las dos contraseñas no coinciden. Escríbelas de nuevo.')
 
   let publicSignup=false
@@ -77,6 +79,12 @@ export async function signup(formData:FormData){
   const startPath=`/start?welcome=1${lang==='es'?'&lang=es':''}`
   const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath),data:{first_name:firstName,last_name:lastName,display_name:displayName,invite_id:inviteId||null,public_signup:publicSignup,onboarding_completed:false,preferred_language:lang}}})
   if(error)redirect(loginUrl(lang,invitePart+'&mode=signup&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))
+  if(data.user&&Array.isArray(data.user.identities)&&data.user.identities.length===0){
+    const message=lang==='es'
+      ? 'Ese correo ya tiene una cuenta. Inicia sesión con tu contraseña existente o usa “Olvidé mi contraseña” si no la recuerdas.'
+      : 'That email already has an account. Sign in with your existing password, or use “I forgot my password” if you do not remember it.'
+    redirect(loginUrl(lang,'&mode=signin&message='+encodeURIComponent(message)))
+  }
   if(data.session)redirect(startPath)
   const message=lang==='es'
     ? 'Cuenta creada. Enviamos un correo de confirmación. Revisa también Spam/Correo no deseado. Abre el correo más reciente; después te llevaremos directamente a Empieza Aquí.'
