@@ -40,7 +40,7 @@ export default async function ChurchLaunchPage({searchParams}:{searchParams:Prom
   const calendar=(events??0)>0
   const steps=lang==='es'?[ 
     {title:'1. Datos básicos de la iglesia',body:'Confirma el nombre, ciudad, estado y zona horaria.',href:l('/church/settings'),done:identity,Icon:Church},
-    {title:'2. Agrega un administrador de respaldo',body:'Dale acceso administrativo a un líder de confianza para no depender de una sola cuenta.',href:l('/church'),done:adminReady,Icon:ShieldCheck},
+    {title:'2. Agrega un administrador de respaldo',body:'Dale acceso administrativo a un líder de confianza para no depender de una sola cuenta.',href:l('/church/admin-backup'),done:adminReady,Icon:ShieldCheck},
     {title:'3. Hazlo tuyo',body:'Agrega el logo, color de la iglesia y un mensaje corto de bienvenida.',href:l('/church/settings'),done:branding,Icon:Palette},
     {title:'4. Agrega a las primeras personas',body:'Invita a unos pocos miembros reales del piloto. También puedes importar una lista cuando estés listo.',href:l('/church/invites'),done:people,Icon:MailPlus},
     {title:'5. Dale a los miembros un próximo paso',body:'Publica al menos una clase o curso de discipulado.',href:l('/learning'),done:learning,Icon:GraduationCap},
@@ -49,7 +49,7 @@ export default async function ChurchLaunchPage({searchParams}:{searchParams:Prom
     {title:'8. Revisa si el piloto está listo',body:'Haz la revisión final antes de invitar al grupo piloto.',href:l('/church/readiness'),done:false,Icon:Check}
   ]:[
     {title:'1. Church basics',body:'Confirm your church name, city, state and timezone.',href:'/church/settings',done:identity,Icon:Church},
-    {title:'2. Add a backup admin',body:'Give one trusted leader admin access so the church is never dependent on one account.',href:'/church',done:adminReady,Icon:ShieldCheck},
+    {title:'2. Add a backup admin',body:'Give one trusted leader admin access so the church is never dependent on one account.',href:'/church/admin-backup',done:adminReady,Icon:ShieldCheck},
     {title:'3. Make it yours',body:'Add your logo, church color and a short welcome message.',href:'/church/settings',done:branding,Icon:Palette},
     {title:'4. Add your first people',body:'Invite a few real pilot members. You can also import a list when you are ready.',href:'/church/invites',done:people,Icon:MailPlus},
     {title:'5. Give members a next step',body:'Publish at least one class or discipleship course.',href:'/learning',done:learning,Icon:GraduationCap},
