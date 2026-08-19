@@ -5,32 +5,39 @@ import { createClient } from '@/lib/supabase/server'
 
 const text=(f:FormData,k:string)=>String(f.get(k)??'').trim()
 const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
+const langOf=(f:FormData)=>text(f,'lang')==='es'?'es':'en'
+const loginUrl=(lang:string,extra='')=>`/login?lang=${lang}${extra}`
 
-function friendlyAuthEmailError(message:string){
+function friendlyAuthEmailError(message:string,lang:'en'|'es'){
   const normalized=message.toLowerCase()
   if(normalized.includes('rate limit')||normalized.includes('over_email_send_rate_limit')||normalized.includes('security purposes')){
-    return 'Too many account emails were requested in a short period. Please wait about one minute, then request one fresh email. Repeated clicks can keep the cooldown active.'
+    return lang==='es'
+      ? 'Se solicitaron demasiados correos en poco tiempo. Espera aproximadamente un minuto y solicita solo un correo nuevo. Hacer clic repetidamente puede extender la espera.'
+      : 'Too many account emails were requested in a short period. Please wait about one minute, then request one fresh email. Repeated clicks can keep the cooldown active.'
   }
   return message
 }
 
 export async function login(formData:FormData){
   const supabase=await createClient()
+  const lang=langOf(formData)
   const email=text(formData,'email').toLowerCase(),password=String(formData.get('password')??'')
   const {data,error}=await supabase.auth.signInWithPassword({email,password})
   if(error){
-    const message=error.message.toLowerCase().includes('invalid login credentials')
-      ? 'We could not sign you in. Double-check the email and password you created. If you just made this account, use Forgot password below to set a new password.'
-      : error.message
-    redirect('/login?error='+encodeURIComponent(message))
+    const normalized=error.message.toLowerCase()
+    let message=error.message
+    if(normalized.includes('invalid login credentials')) message=lang==='es'
+      ? 'No pudimos iniciar sesión. Revisa el correo y la contraseña. Si no recuerdas la contraseña, usa “Olvidé mi contraseña” abajo.'
+      : 'We could not sign you in. Double-check the email and password you created. If you just made this account, use Forgot password below to set a new password.'
+    else if(normalized.includes('email not confirmed')) message=lang==='es'
+      ? 'Tu correo todavía no está confirmado. Abre el correo de confirmación más reciente que te enviamos y confirma tu cuenta antes de iniciar sesión.'
+      : 'Your email is not confirmed yet. Open the newest confirmation email we sent and confirm your account before signing in.'
+    redirect(loginUrl(lang,'&error='+encodeURIComponent(message)))
   }
   const userId=data.user?.id
   if(userId){
     const onboardingState=data.user?.user_metadata?.onboarding_completed
-    if(onboardingState===false)redirect('/start?welcome=1')
-
-    // Legacy pilot accounts created before onboarding state existed still get one guided start
-    // only when they have a basic profile but no meaningful activity yet.
+    if(onboardingState===false)redirect(`/start?welcome=1${lang==='es'?'&lang=es':''}`)
     if(onboardingState===undefined){
       const [{data:profile},{count:groups},{count:enrollments}]=await Promise.all([
         supabase.from('profiles').select('first_name,last_name,display_name,bio').eq('id',userId).maybeSingle(),
@@ -39,7 +46,7 @@ export async function login(formData:FormData){
       ])
       const hasBasicProfile=Boolean(profile?.first_name&&profile?.last_name)
       const hasActivity=(groups??0)>0||(enrollments??0)>0||Boolean(profile?.bio)
-      if(hasBasicProfile&&!hasActivity)redirect('/start?welcome=1')
+      if(hasBasicProfile&&!hasActivity)redirect(`/start?welcome=1${lang==='es'?'&lang=es':''}`)
     }
   }
   redirect('/')
@@ -47,24 +54,35 @@ export async function login(formData:FormData){
 
 export async function signup(formData:FormData){
   const supabase=await createClient()
+  const lang=langOf(formData)
   const email=text(formData,'email').toLowerCase(),password=String(formData.get('password')??''),confirmPassword=String(formData.get('confirm_password')??''),firstName=text(formData,'first_name'),lastName=text(formData,'last_name'),inviteId=text(formData,'invite_id')
-  if(!inviteId)redirect('/login?error='+encodeURIComponent('A valid church invitation is required to create a member account.'))
-  if(!firstName||!lastName)redirect(`/login?invite=${encodeURIComponent(inviteId)}&error=`+encodeURIComponent('First and last name are required to create your account.'))
-  if(password!==confirmPassword)redirect(`/login?invite=${encodeURIComponent(inviteId)}&error=`+encodeURIComponent('The two passwords do not match. Please type them again.'))
+  const invitePart=inviteId?`&invite=${encodeURIComponent(inviteId)}`:''
+  const fail=(en:string,es:string)=>redirect(loginUrl(lang,invitePart+'&error='+encodeURIComponent(lang==='es'?es:en)))
+  if(!inviteId)fail('A valid church invitation is required to create a member account.','Se requiere una invitación válida de la iglesia para crear una cuenta.')
+  if(!firstName||!lastName)fail('First and last name are required to create your account.','Se requieren nombre y apellido para crear tu cuenta.')
+  if(password!==confirmPassword)fail('The two passwords do not match. Please type them again.','Las dos contraseñas no coinciden. Escríbelas de nuevo.')
   const {data:valid,error:inviteError}=await supabase.rpc('validate_invite_email',{p_invite_id:inviteId,p_email:email})
-  if(inviteError||!valid)redirect(`/login?invite=${encodeURIComponent(inviteId)}&error=`+encodeURIComponent('This invitation is expired, already used, revoked, or belongs to a different email address.'))
+  if(inviteError||!valid)fail('This invitation is expired, already used, revoked, or belongs to a different email address.','Esta invitación venció, ya fue usada, fue cancelada o pertenece a otro correo electrónico.')
   const displayName=`${firstName} ${lastName}`.trim()
-  const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:`${siteUrl}/start?welcome=1`,data:{first_name:firstName,last_name:lastName,display_name:displayName,invite_id:inviteId,onboarding_completed:false}}})
-  if(error)redirect(`/login?invite=${encodeURIComponent(inviteId)}&error=`+encodeURIComponent(friendlyAuthEmailError(error.message)))
-  if(data.session)redirect('/start?welcome=1')
-  redirect('/login?message='+encodeURIComponent('Account created. We sent a confirmation email. If you do not see it, check Spam/Junk. After confirming, sign in with the password you created and we will guide you through Start Here.'))
+  const resetLang=lang==='es'?'&lang=es':''
+  const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:`${siteUrl}/start?welcome=1${resetLang}`,data:{first_name:firstName,last_name:lastName,display_name:displayName,invite_id:inviteId,onboarding_completed:false,preferred_language:lang}}})
+  if(error)redirect(loginUrl(lang,invitePart+'&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))
+  if(data.session)redirect(`/start?welcome=1${resetLang}`)
+  const message=lang==='es'
+    ? 'Cuenta creada. Enviamos un correo de confirmación. Revisa también Spam/Correo no deseado. Después de confirmar, inicia sesión con la contraseña que creaste y te guiaremos por Empieza Aquí.'
+    : 'Account created. We sent a confirmation email. If you do not see it, check Spam/Junk. After confirming, sign in with the password you created and we will guide you through Start Here.'
+  redirect(loginUrl(lang,'&message='+encodeURIComponent(message)))
 }
 
 export async function requestPasswordReset(formData:FormData){
   const supabase=await createClient()
+  const lang=langOf(formData)
   const email=text(formData,'reset_email').toLowerCase()
-  if(!email)redirect('/login?error='+encodeURIComponent('Enter your email address first.'))
-  const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:`${siteUrl}/auth/update-password`})
-  if(error)redirect('/login?error='+encodeURIComponent(friendlyAuthEmailError(error.message)))
-  redirect('/login?message='+encodeURIComponent('Password reset email sent. Check your Inbox and Spam/Junk folder, then open the newest reset link to choose a new password. If you need another email, wait at least one minute before requesting it.'))
+  if(!email)redirect(loginUrl(lang,'&error='+encodeURIComponent(lang==='es'?'Escribe primero tu correo electrónico.':'Enter your email address first.')))
+  const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:`${siteUrl}/auth/update-password${lang==='es'?'?lang=es':''}`})
+  if(error)redirect(loginUrl(lang,'&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))
+  const message=lang==='es'
+    ? 'Correo para cambiar la contraseña enviado. Revisa tu bandeja de entrada y Spam/Correo no deseado. Abre el enlace más reciente. Si necesitas otro correo, espera al menos un minuto.'
+    : 'Password reset email sent. Check your Inbox and Spam/Junk folder, then open the newest reset link to choose a new password. If you need another email, wait at least one minute before requesting it.'
+  redirect(loginUrl(lang,'&message='+encodeURIComponent(message)))
 }
