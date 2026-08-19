@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 
 const stages=['new_contact','invited','guest','bible_study','regular_attendee','baptized','holy_ghost','first_steps','connected','serving','inactive'] as const
 const interactionTypes=['call','text','visit','invitation','bible_study','service_attendance','prayer','follow_up','note'] as const
+const sourceTypes=['church_service','friendship_group','outreach','event','leader_entry','website','other'] as const
 const stageRank=new Map(stages.map((stage,index)=>[stage,index]))
 const text=(f:FormData,k:string)=>String(f.get(k)??'').trim()
 const nullable=(f:FormData,k:string)=>text(f,k)||null
@@ -48,7 +49,9 @@ export async function createOutreachContact(formData:FormData){
   followUp=followUp||afterHours(24)
   const requestedStage=text(formData,'stage')
   const initialStage=stages.includes(requestedStage as any)?requestedStage:'new_contact'
-  const payload={church_id:churchId,created_by:userId,assigned_to:nullable(formData,'assigned_to')||userId,first_name:firstName,last_name:nullable(formData,'last_name'),phone:nullable(formData,'phone'),email:nullable(formData,'email'),stage:initialStage,bible_study_interest:text(formData,'bible_study_interest')==='on',messaging_consent:text(formData,'messaging_consent')==='on',prayer_request:nullable(formData,'prayer_request'),follow_up_due_at:followUp,notes:nullable(formData,'notes')}
+  const requestedSource=text(formData,'source_type')
+  const sourceType=sourceTypes.includes(requestedSource as any)?requestedSource:'leader_entry'
+  const payload={church_id:churchId,created_by:userId,assigned_to:nullable(formData,'assigned_to')||userId,first_name:firstName,last_name:nullable(formData,'last_name'),phone:nullable(formData,'phone'),email:nullable(formData,'email'),stage:initialStage,bible_study_interest:text(formData,'bible_study_interest')==='on',messaging_consent:text(formData,'messaging_consent')==='on',prayer_request:nullable(formData,'prayer_request'),follow_up_due_at:followUp,notes:nullable(formData,'notes'),source_type:sourceType,source_label:nullable(formData,'source_label'),source_occurred_at:new Date().toISOString()}
   const {error}=await supabase.from('outreach_contacts').insert(payload)
   if(error){
     const message=error.code==='23505'?msg(formData,'This person may already be in Outreach. Check the existing pipeline before adding another record.','Esta persona puede que ya esté en Evangelismo. Revise la lista antes de crear otro registro.'):error.message
