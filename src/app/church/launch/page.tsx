@@ -30,26 +30,30 @@ export default async function ChurchLaunchPage(){
   const groupReady=(groups??0)>0
   const calendar=(events??0)>0
   const steps=[
-    {title:'Church identity',body:'Name, location and timezone define the tenant and keep schedules correct.',href:'/church/settings',done:identity,Icon:Church},
-    {title:'Admin redundancy',body:'Have at least two trusted pastor/church-admin accounts so one account cannot lock the church out.',href:'/church',done:adminReady,Icon:ShieldCheck},
-    {title:'Branding & welcome',body:'Add a church logo, accent color and welcome message so the tenant feels like the local church.',href:'/church/settings',done:branding,Icon:Palette},
-    {title:'Bring people in',body:'Use secure invites or staged CSV imports. Account creation remains email-bound and member-controlled.',href:'/church/import',done:people,Icon:FileUp},
-    {title:'Publish learning',body:'Give members at least one approved course/pathway to begin using the Learning Center.',href:'/learning',done:learning,Icon:GraduationCap},
-    {title:'Configure groups',body:'Set up Friendship Groups/communities, leaders, discovery details and private meeting information.',href:'/groups',done:groupReady,Icon:Users},
-    {title:'Publish the calendar',body:'Add at least one upcoming local event so calendar/RSVP/member reminders can be exercised.',href:'/calendar',done:calendar,Icon:CalendarDays},
-    {title:'Run Pilot Readiness',body:'Use the live readiness dashboard and clear required action items before the first controlled pilot.',href:'/church/readiness',done:false,Icon:Check}
+    {title:'1. Church basics',body:'Confirm your church name, city, state and timezone.',href:'/church/settings',done:identity,Icon:Church},
+    {title:'2. Add a backup admin',body:'Give one trusted leader admin access so the church is never dependent on one account.',href:'/church',done:adminReady,Icon:ShieldCheck},
+    {title:'3. Make it yours',body:'Add your logo, church color and a short welcome message.',href:'/church/settings',done:branding,Icon:Palette},
+    {title:'4. Add your first people',body:'Invite a few real pilot members. You can also import a list when you are ready.',href:'/church/invites',done:people,Icon:MailPlus},
+    {title:'5. Give members a next step',body:'Publish at least one class or discipleship course.',href:'/learning',done:learning,Icon:GraduationCap},
+    {title:'6. Add a group',body:'Create at least one Friendship Group, ministry or community.',href:'/groups',done:groupReady,Icon:Users},
+    {title:'7. Add an event',body:'Put one upcoming church event on the calendar so members can see what is next.',href:'/calendar',done:calendar,Icon:CalendarDays},
+    {title:'8. Check pilot readiness',body:'Run the final check before inviting your pilot group.',href:'/church/readiness',done:false,Icon:Check}
   ]
   const completed=steps.slice(0,7).filter(s=>s.done).length
   const pct=Math.round(completed/7*100)
+  const nextStep=steps.slice(0,7).find(s=>!s.done)??steps[7]
+  const NextIcon=nextStep.Icon
 
   return <main className="shell">
-    <header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??'Your Church'} • Launch Hub</div></div><div className="row"><Link className="ghost" href="/church/invites"><MailPlus size={13}/> Invitations</Link><Link className="ghost" href="/church">← Church Admin</Link></div></header>
-    <section className="launch-hero card"><div><div className="pill">CHURCH LAUNCH</div><h1>A repeatable path from empty tenant to pilot-ready church.</h1><p className="muted">The same process we can use for New Life Madera can eventually onboard Church #2, #20 or #2,000.</p></div><div className="launch-progress"><strong>{pct}%</strong><span>setup foundation</span><div className="launch-bar"><i style={{width:`${pct}%`}}/></div></div></section>
+    <header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??'Your Church'} • Church Builder</div></div><Link className="ghost" href="/church">← Church Admin</Link></header>
+    <section className="launch-hero card"><div><div className="pill">CHURCH BUILDER</div><h1>Set up your church one simple step at a time.</h1><p className="muted">You do not need to understand the technology. Complete the steps below and Kingdom Network will tell you what still needs attention.</p></div><div className="launch-progress"><strong>{pct}%</strong><span>{completed} of 7 setup steps ready</span><div className="launch-bar"><i style={{width:`${pct}%`}}/></div></div></section>
 
-    <section className="launch-grid">{steps.map((s,index)=>{const Icon=s.Icon;return <Link href={s.href} className={`card launch-step ${s.done?'done':''}`} key={s.title}><div className="launch-num">{s.done?<Check size={14}/>:index+1}</div><div className="launch-copy"><strong><Icon size={12}/> {s.title}</strong><span>{s.body}</span><div className="launch-status">{index===7?'Final review':s.done?'Ready / configured':'Needs setup or content'}</div></div></Link>})}</section>
+    <section className="card" style={{marginBottom:16}}><div className="pill">DO THIS NEXT</div><h2 style={{marginBottom:6}}><NextIcon size={18}/> {nextStep.title}</h2><p className="muted">{nextStep.body}</p><Link className="btn" href={nextStep.href}>Open this step →</Link></section>
 
-    <section className="launch-manual"><div className="section-heading"><div><div className="pill">PLATFORM-LEVEL CHECKS</div><h2>Do these once before a real member pilot.</h2></div></div><div className="manual-grid"><article className="card manual-launch-card"><div className="pill">AUTH</div><h3>Production Site URL / redirect</h3><p>Supabase Auth must confirm users back to the permanent production Kingdom Network domain rather than localhost.</p></article><article className="card manual-launch-card"><div className="pill">SECURITY</div><h3>Leaked-password protection</h3><p>Enable the Supabase Auth leaked-password protection setting. This remains the one standing Security Advisor warning.</p></article><article className="card manual-launch-card"><div className="pill">DEPLOY</div><h3>Stable production build</h3><p>Confirm the latest GitHub main branch deploys cleanly to one permanent public production URL after Vercel build throttling clears.</p></article></div></section>
+    <section className="launch-grid">{steps.map((s,index)=>{const Icon=s.Icon;return <Link href={s.href} className={`card launch-step ${s.done?'done':''}`} key={s.title}><div className="launch-num">{s.done?<Check size={14}/>:index+1}</div><div className="launch-copy"><strong><Icon size={12}/> {s.title}</strong><span>{s.body}</span><div className="launch-status">{index===7?'Final check':s.done?'Done':'Still needed'}</div></div></Link>})}</section>
 
-    <section className="card launch-footer"><div className="pill">NEXT PHASE</div><h2>After setup comes controlled real-world use.</h2><p className="small muted">Start with leadership and a small member group. Test account invitations, profile/privacy, Messages, Learning, Groups, Calendar, Prayer/Pastoral Care and mobile navigation with real behavior before inviting the whole church.</p></section>
+    <section className="launch-manual"><div className="section-heading"><div><div className="pill">PILOT NOTE</div><h2>Kingdom Network handles the technical side.</h2></div></div><div className="manual-grid"><article className="card manual-launch-card"><h3>No domain purchase needed yet</h3><p>Keep using the current pilot address while the product is being proven. A permanent domain and custom email can wait.</p></article><article className="card manual-launch-card"><h3>Start small</h3><p>Invite leadership and a few trusted members first. Fix anything confusing before opening access church-wide.</p></article><article className="card manual-launch-card"><h3>Need help?</h3><p>Use Kingdom Guide for plain-language help finding features and deciding what to configure next.</p><Link href="/guide">Open Kingdom Guide →</Link></article></div></section>
+
+    <section className="card launch-footer"><div className="pill">WHEN THE BAR IS FULL</div><h2>Run the pilot with real people.</h2><p className="small muted">Test invitations, sign in, password recovery, profiles, Messages, Learning, Groups, Calendar, Prayer/Pastoral Care and phone navigation before inviting the whole church.</p></section>
   </main>
 }
