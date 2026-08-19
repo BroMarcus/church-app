@@ -1,21 +1,22 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Award,Bell,BriefcaseBusiness,FileCheck2,HandHeart } from 'lucide-react'
+import { Award,Bell,BriefcaseBusiness,FileCheck2,HandHeart,Languages,MessageSquareWarning } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { markAllRead,markRead } from './actions'
+import { markAllRead,markRead,openNotification } from './actions'
 import './notifications.css'
 
 const icon=(type:string)=>{switch(type){case'team_assignment':return <BriefcaseBusiness size={17}/>;case'ministry_application':return <HandHeart size={17}/>;case'document_review':return <FileCheck2 size={17}/>;case'credential_earned':return <Award size={17}/>;default:return <Bell size={17}/>}}
 
-export default async function NotificationsPage(){
+export default async function NotificationsPage({searchParams}:{searchParams:Promise<{lang?:string}>}){
+  const params=await searchParams,es=params.lang==='es',t=(en:string,sp:string)=>es?sp:en,l=(path:string)=>es?`${path}${path.includes('?')?'&':'?'}lang=es`:path
   const supabase=await createClient()
-  const {data:claims}=await supabase.auth.getClaims()
-  const userId=claims?.claims?.sub
-  if(!userId)redirect('/login')
-  const {data:notifications}=await supabase.from('notifications').select('*').eq('user_id',userId).order('created_at',{ascending:false}).limit(100)
-  const unread=(notifications??[]).filter((n:any)=>!n.read_at).length
-  return <main className="shell"><header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">Notifications</div></div><Link className="ghost" href="/">← Home</Link></header>
-    <section className="card notifications-hero"><div><div className="pill">INBOX</div><h1>What needs your attention.</h1><p className="muted">Schedules, ministry updates, credentials and important account activity.</p></div>{unread>0&&<form action={markAllRead}><button className="ghost">Mark all read</button></form>}</section>
-    <section className="notification-list">{(notifications??[]).map((n:any)=><article className={`card notification-card ${n.read_at?'':'unread'}`} key={n.id}><div className="notification-copy"><div className="notification-icon">{icon(n.notification_type)}</div><div><h3>{!n.read_at&&<span className="unread-dot" style={{marginRight:7}}/>}{n.title}</h3>{n.body&&<p>{n.body}</p>}<div className="notification-meta">{String(n.notification_type).replaceAll('_',' ')} • {new Date(n.created_at).toLocaleString()}</div></div></div><div className="notification-actions">{n.href&&<Link className="ghost" href={n.href}>Open</Link>}{!n.read_at&&<form action={markRead}><input type="hidden" name="notification_id" value={n.id}/><button className="ghost">Mark read</button></form>}</div></article>)}{!notifications?.length&&<div className="card empty"><h3>You’re all caught up.</h3><p className="muted">Important Kingdom Network activity will appear here.</p></div>}</section>
+  const {data:claims}=await supabase.auth.getClaims();const userId=claims?.claims?.sub
+  if(!userId)redirect(l('/login'))
+  const {data:notifications}=await supabase.from('notifications').select('*').eq('user_id',userId).order('read_at',{ascending:true,nullsFirst:true}).order('created_at',{ascending:false}).limit(100)
+  const rows=notifications??[],unread=rows.filter((n:any)=>!n.read_at).length
+  const typeLabel=(v:string)=>v==='team_assignment'?t('Team assignment','Asignación de equipo'):v==='ministry_application'?t('Ministry application','Solicitud de ministerio'):v==='document_review'?t('Document review','Revisión de documento'):v==='credential_earned'?t('Credential earned','Credencial obtenida'):v.replaceAll('_',' ')
+  return <main className="shell"><header className="topbar"><div><Link href={l('/')} className="brand">Kingdom <span>Network</span></Link><div className="small muted">{t('Notifications','Notificaciones')}</div></div><div className="row"><Languages size={15}/><Link className="ghost" href="/notifications?lang=en">English</Link><Link className="ghost" href="/notifications?lang=es">Español</Link><Link className="ghost" href={l('/feedback')}><MessageSquareWarning size={14}/> {t('Feedback','Comentarios')}</Link><Link className="ghost" href={l('/')}>← {t('Home','Inicio')}</Link></div></header>
+    <section className="card notifications-hero"><div><div className="pill">{t('INBOX','BANDEJA')}</div><h1>{unread?t(`${unread} thing${unread===1?'':'s'} need your attention.`,`${unread} asunto${unread===1?'':'s'} necesita${unread===1?'':'n'} tu atención.`):t('You’re all caught up.','Estás al día.')}</h1><p className="muted">{t('Open a notification to go directly to the place that needs you.','Abre una notificación para ir directamente al lugar que necesita tu atención.')}</p></div>{unread>0&&<form action={markAllRead}><input type="hidden" name="lang" value={es?'es':'en'}/><button className="ghost">{t('Mark all read','Marcar todo leído')}</button></form>}</section>
+    <section className="notification-list">{rows.map((n:any)=><article className={`card notification-card ${n.read_at?'':'unread'}`} key={n.id}><div className="notification-copy"><div className="notification-icon">{icon(n.notification_type)}</div><div><h3>{!n.read_at&&<span className="unread-dot" style={{marginRight:7}}/>}{n.title}</h3>{n.body&&<p>{n.body}</p>}<div className="notification-meta">{typeLabel(String(n.notification_type))} • {new Date(n.created_at).toLocaleString(es?'es-US':'en-US')}</div></div></div><div className="notification-actions">{n.href&&<form action={openNotification}><input type="hidden" name="notification_id" value={n.id}/><input type="hidden" name="lang" value={es?'es':'en'}/><button className="btn">{t('Open','Abrir')}</button></form>}{!n.read_at&&<form action={markRead}><input type="hidden" name="notification_id" value={n.id}/><input type="hidden" name="lang" value={es?'es':'en'}/><button className="ghost">{t('Mark read','Marcar leído')}</button></form>}</div></article>)}{!rows.length&&<div className="card empty"><h3>{t('Nothing waiting.','No hay nada pendiente.')}</h3><p className="muted">{t('Important Kingdom Network activity will appear here.','La actividad importante de Kingdom Network aparecerá aquí.')}</p></div>}</section>
   </main>
 }
