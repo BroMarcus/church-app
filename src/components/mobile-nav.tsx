@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect,useState } from 'react'
 import { usePathname } from 'next/navigation'
-import { Bell,BookOpen,BriefcaseBusiness,CalendarDays,Church,FileText,GraduationCap,HandHeart,Home,Menu,MessageCircle,Megaphone,MessageSquareText,Sparkles,UserRound,Users,X } from 'lucide-react'
+import { Bell,BookOpen,BriefcaseBusiness,CalendarDays,Church,FileText,GraduationCap,HandHeart,Home,Menu,MessageCircle,Megaphone,MessageSquareText,Search,Sparkles,UserRound,Users,X } from 'lucide-react'
 import styles from './mobile-nav.module.css'
 
 const main=[['/','Home',Home],['/learning','Learn',GraduationCap],['/groups','Groups',Users],['/calendar','Calendar',CalendarDays]] as const
@@ -12,6 +12,7 @@ const memberMore=[
 ] as const
 const outreachMore=[['/outreach','Outreach',Megaphone]] as const
 const teamMore=[['/teams','Teams',BriefcaseBusiness]] as const
+const adminMore=[['/church/members','People Search',Search],['/church','Church Admin',Church]] as const
 
 type MobileNavProps={authenticated?:boolean;churchRole?:string|null;isGroupLeader?:boolean}
 
@@ -23,7 +24,8 @@ export function MobileNav({authenticated=false,churchRole=null,isGroupLeader=fal
   const role=churchRole??''
   const canOutreach=isGroupLeader||['group_leader','ministry_leader','minister','pastor','church_admin'].includes(role)
   const canTeams=['ministry_leader','minister','pastor','church_admin'].includes(role)
-  const more=[...memberMore,...(canOutreach?outreachMore:[]),...(canTeams?teamMore:[])]
+  const canAdmin=['pastor','church_admin'].includes(role)
+  const more=[...memberMore,...(canOutreach?outreachMore:[]),...(canTeams?teamMore:[]),...(canAdmin?adminMore:[])]
   const active=(href:string)=>href==='/'?pathname==='/':pathname===href||pathname.startsWith(href+'/')
   const moreActive=more.some(([href])=>active(href))
   return <><nav className={styles.nav} aria-label="Primary mobile navigation">{main.map(([href,label,Icon])=><Link className={`${styles.item} ${active(href)?styles.active:''}`} href={href} key={href}><Icon/><span>{label}</span></Link>)}<button className={`${styles.item} ${styles.more} ${moreActive||open?styles.active:''}`} onClick={()=>setOpen(v=>!v)} aria-expanded={open} aria-label="More Kingdom Network sections"><Menu/><span>More</span></button></nav><div className={`${styles.backdrop} ${open?styles.open:''}`} onClick={()=>setOpen(false)}>{open&&<div className={styles.sheet} onClick={e=>e.stopPropagation()}><div className={styles.sheetHead}><strong>Kingdom Network</strong><button className={styles.close} onClick={()=>setOpen(false)} aria-label="Close menu"><X size={17}/></button></div><div className={styles.grid}>{more.map(([href,label,Icon])=><Link className={`${styles.link} ${active(href)?styles.active:''}`} href={href} key={href}><Icon/><span>{label}</span></Link>)}</div></div>}</div><div className={styles.safeSpace}/></>
