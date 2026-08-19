@@ -12,7 +12,9 @@ async function auth(){const supabase=await createClient();const {data}=await sup
 export async function createMinistry(formData:FormData){
   const {supabase,userId}=await auth();const churchId=text(formData,'church_id'),name=text(formData,'name')
   const {data:actor}=await supabase.from('church_memberships').select('role').eq('church_id',churchId).eq('user_id',userId).eq('status','active').single()
-  if(!actor||!['ministry_leader','pastor','church_admin'].includes(actor.role))redirect('/serve')
+  const systemAccess=Boolean(actor&&['ministry_leader','pastor','church_admin'].includes(actor.role))
+  const {data:customAccess}=await supabase.rpc('current_user_has_church_permission',{p_church_id:churchId,p_permission_key:'manage_ministries'})
+  if(!systemAccess&&!customAccess)redirect('/serve')
   if(!name)redirect('/serve?error='+encodeURIComponent('Ministry name is required.'))
   const openings=text(formData,'openings')?Math.max(0,Number.parseInt(text(formData,'openings'),10)||0):null
   const {error}=await supabase.from('ministries').insert({church_id:churchId,name,description:text(formData,'description')||null,openings,active:checked(formData,'active')})
