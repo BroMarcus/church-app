@@ -13,6 +13,7 @@ const trainingStatuses=['not_complete','current','expired'] as const
 const value=(formData:FormData,key:string)=>String(formData.get(key)??'')
 const dateOrNull=(formData:FormData,key:string)=>{const v=value(formData,key);return v||null}
 const boolOrNull=(formData:FormData,key:string)=>{const v=value(formData,key);return v==='yes'?true:v==='no'?false:null}
+const langOf=(formData:FormData)=>value(formData,'lang')==='es'?'es':'en'
 
 async function requireChurchAdmin(churchId:string){
   const supabase=await createClient()
@@ -48,7 +49,9 @@ export async function updateMembership(formData:FormData){
 export async function updateMilestones(formData:FormData){
   const churchId=value(formData,'church_id')
   const targetUserId=value(formData,'user_id')
-  if(!churchId||!targetUserId)redirect('/church?error='+encodeURIComponent('Missing member record.'))
+  const lang=langOf(formData)
+  const base=`/church/members/${targetUserId}?lang=${lang}`
+  if(!churchId||!targetUserId)redirect(`/church?lang=${lang}&error=`+encodeURIComponent(lang==='es'?'Falta el registro del miembro.':'Missing member record.'))
   const {supabase,userId}=await requireChurchAdmin(churchId)
 
   const firstSteps=value(formData,'first_steps_status')
@@ -59,7 +62,7 @@ export async function updateMilestones(formData:FormData){
   const teacher=value(formData,'bible_study_teacher_status')
   const child=value(formData,'child_abuse_training_status')
   const harassment=value(formData,'sexual_harassment_training_status')
-  if(!progressStatuses.includes(firstSteps as any)||!progressStatuses.includes(salt as any)||!progressStatuses.includes(soul as any)||!progressStatuses.includes(timothys as any)||!progressStatuses.includes(school as any)||!teacherStatuses.includes(teacher as any)||!trainingStatuses.includes(child as any)||!trainingStatuses.includes(harassment as any))redirect(`/church/members/${targetUserId}?error=`+encodeURIComponent('Invalid milestone value.'))
+  if(!progressStatuses.includes(firstSteps as any)||!progressStatuses.includes(salt as any)||!progressStatuses.includes(soul as any)||!progressStatuses.includes(timothys as any)||!progressStatuses.includes(school as any)||!teacherStatuses.includes(teacher as any)||!trainingStatuses.includes(child as any)||!trainingStatuses.includes(harassment as any))redirect(`${base}&error=`+encodeURIComponent(lang==='es'?'Valor de hito inválido.':'Invalid milestone value.'))
 
   const payload={
     holy_ghost_received:boolOrNull(formData,'holy_ghost_received'),holy_ghost_date:dateOrNull(formData,'holy_ghost_date'),
@@ -75,6 +78,6 @@ export async function updateMilestones(formData:FormData){
     covenant_current:boolOrNull(formData,'covenant_current')??false,covenant_signed_at:dateOrNull(formData,'covenant_signed_at'),verified_by:userId,updated_at:new Date().toISOString()
   }
   const {error}=await supabase.from('member_milestones').update(payload).eq('church_id',churchId).eq('user_id',targetUserId)
-  if(error)redirect(`/church/members/${targetUserId}?error=`+encodeURIComponent(error.message))
-  revalidatePath(`/church/members/${targetUserId}`);revalidatePath('/church');redirect(`/church/members/${targetUserId}?saved=1`)
+  if(error)redirect(`${base}&error=`+encodeURIComponent(error.message))
+  revalidatePath(`/church/members/${targetUserId}`);revalidatePath('/church');redirect(`${base}&saved=1`)
 }
