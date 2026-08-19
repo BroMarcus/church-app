@@ -38,3 +38,14 @@ export async function updateMemberDetails(formData:FormData){
   revalidatePath(`/church/members/${targetUserId}`);revalidatePath('/church/member-records');revalidatePath('/directory');revalidatePath('/church/analytics')
   redirect(`${base}&details_saved=1`)
 }
+
+export async function updateMemberRelationship(formData:FormData){
+  const churchId=text(formData,'church_id'),targetUserId=text(formData,'user_id'),relationship=text(formData,'relationship_status'),lang=text(formData,'lang')==='es'?'es':'en'
+  const base=`/church/members/${targetUserId}?lang=${lang}`
+  if(!churchId||!targetUserId||!['guest','attendee','member','inactive'].includes(relationship))redirect(`${base}&error=${encodeURIComponent(lang==='es'?'Relación con la iglesia inválida.':'Invalid church relationship status.')}`)
+  const {supabase}=await requireRecordsManager(churchId)
+  const {error}=await supabase.rpc('update_member_relationship_status',{p_church_id:churchId,p_user_id:targetUserId,p_relationship_status:relationship})
+  if(error)redirect(`${base}&error=${encodeURIComponent(error.message)}`)
+  revalidatePath(`/church/members/${targetUserId}`);revalidatePath('/church/member-records');revalidatePath('/church/analytics');revalidatePath('/church')
+  redirect(`${base}&relationship_saved=1`)
+}
