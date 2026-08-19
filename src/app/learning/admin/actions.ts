@@ -9,6 +9,8 @@ const num=(f:FormData,k:string,fallback:number)=>{const n=Number(f.get(k));retur
 const slugify=(v:string)=>v.toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,70)||'course'
 const audiences=['new_convert','member','teacher_training','leadership','general']
 const stages=['new_convert','foundation','outreach','teaching','leadership','specialized']
+const isoDate=/^\d{4}-\d{2}-\d{2}$/
+const addDaysIso=(iso:string,days:number)=>{const [y,m,d]=iso.split('-').map(Number);const dt=new Date(Date.UTC(y,m-1,d+days));return dt.toISOString().slice(0,10)}
 
 async function manager(){
   const supabase=await createClient()
@@ -73,7 +75,7 @@ export async function createCourseSession(formData:FormData){
   const startsAt=text(formData,'starts_at')||null
   const instructorName=text(formData,'instructor_name')||null
   const notes=text(formData,'notes')||null
-  if(!courseId||!title||!/^\d{4}-\d{2}-\d{2}$/.test(sessionDate))redirect('/learning/admin?error='+encodeURIComponent('Class name and valid class date are required.'))
+  if(!courseId||!title||!isoDate.test(sessionDate))redirect('/learning/admin?error='+encodeURIComponent('Class name and valid class date are required.'))
   const {data:course}=await supabase.from('courses').select('id').eq('id',courseId).eq('church_id',churchId).single()
   if(!course)redirect('/learning/admin?error='+encodeURIComponent('Course not found.'))
   const requested=Array.from(new Set(formData.getAll('module_ids').map(v=>String(v).trim()).filter(Boolean)))
@@ -85,6 +87,33 @@ export async function createCourseSession(formData:FormData){
   const {error}=await supabase.from('course_sessions').insert({course_id:courseId,church_id:churchId,session_date:sessionDate,starts_at:startsAt,title,instructor_name:instructorName,module_ids:moduleIds,status:'scheduled',notes})
   if(error)redirect('/learning/admin?error='+encodeURIComponent(error.message))
   revalidatePath('/learning/admin');revalidatePath(`/learning/${courseId}`);redirect(`/learning/admin?session=1#course-${courseId}`)
+}
+
+export async function createWeeklyCourseSeries(formData:FormData){
+  const {supabase,churchId}=await manager()
+  const courseId=text(formData,'course_id')
+  const firstDate=text(formData,'first_date')
+  const startsAt=text(formData,'starts_at')||null
+  const instructorName=text(formData,'instructor_name')||null
+  if(!courseId||!isoDate.test(firstDate))redirect('/learning/admin?error='+encodeURIComponent('A valid first class date is required.'))
+  const {data:course}=await supabase.from('courses').select('id').eq('id',courseId).eq('church_id',churchId).single()
+  if(!course)redirect('/learning/admin?error='+encodeURIComponent('Course not found.'))
+  const {data:existing}=await supabase.from('course_sessions').select('id').eq('course_id',courseId).limit(1)
+  if(existing?.length)redirect(`/learning/admin?error=${encodeURIComponent('This course already has classroom sessions. Add extra meetings individually instead of generating a duplicate series.')}#course-${courseId}`)
+  const {data:modules,error:modulesError}=await supabase.from('course_modules').select('id,position,title').eq('course_id',courseId).order('position')
+  if(modulesError)redirect('/learning/admin?error='+encodeURIComponent(modulesError.message))
+  if(!modules?.length)redirect(`/learning/admin?error=${encodeURIComponent('Add course lessons before generating the weekly series.')}#course-${courseId}`)
+  const skipDates=new Set(text(formData,'skip_dates').split(/[\n,;]+/).map(v=>v.trim()).filter(v=>isoDate.test(v)))
+  let date=firstDate
+  const rows=modules.map((module:any)=>{
+    while(skipDates.has(date))date=addDaysIso(date,7)
+    const row={course_id:courseId,church_id:churchId,session_date:date,starts_at:startsAt,title:`${module.position}. ${module.title}`,instructor_name:instructorName,module_ids:[module.id],status:'scheduled'}
+    date=addDaysIso(date,7)
+    return row
+  })
+  const {error}=await supabase.from('course_sessions').insert(rows)
+  if(error)redirect('/learning/admin?error='+encodeURIComponent(error.message))
+  revalidatePath('/learning/admin');revalidatePath(`/learning/${courseId}`);redirect(`/learning/admin?series=1#course-${courseId}`)
 }
 
 export async function toggleCoursePublished(formData:FormData){
