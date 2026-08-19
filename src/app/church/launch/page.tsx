@@ -1,10 +1,18 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { CalendarDays,Check,Church,FileUp,GraduationCap,MailPlus,Palette,ShieldCheck,Users } from 'lucide-react'
+import { CalendarDays,Check,Church,GraduationCap,Languages,MailPlus,Palette,ShieldCheck,Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import './launch.css'
 
-export default async function ChurchLaunchPage(){
+const copy={
+  en:{admin:'← Church Admin',title:'Set up your church one simple step at a time.',subtitle:'You do not need to understand the technology. Complete the steps below and Kingdom Network will tell you what still needs attention.',next:'DO THIS NEXT',open:'Open this step →',ready:'setup steps ready',done:'Done',needed:'Still needed',final:'Final check',pilot:'PILOT NOTE',handles:'Kingdom Network handles the technical side.',domain:'No domain purchase needed yet',domainBody:'Keep using the current pilot address while the product is being proven. A permanent domain and custom email can wait.',small:'Start small',smallBody:'Invite leadership and a few trusted members first. Fix anything confusing before opening access church-wide.',help:'Need help?',helpBody:'Use Kingdom Guide for plain-language help finding features and deciding what to configure next.',guide:'Open Kingdom Guide →',when:'WHEN THE BAR IS FULL',run:'Run the pilot with real people.',runBody:'Test invitations, sign in, password recovery, profiles, Messages, Learning, Groups, Calendar, Prayer/Pastoral Care and phone navigation before inviting the whole church.',english:'English',spanish:'Español',church:'Your Church'},
+  es:{admin:'← Administración',title:'Configura tu iglesia paso a paso, de forma sencilla.',subtitle:'No necesitas entender la tecnología. Completa los pasos de abajo y Kingdom Network te dirá qué falta.',next:'HAZ ESTO AHORA',open:'Abrir este paso →',ready:'pasos de configuración listos',done:'Listo',needed:'Falta',final:'Revisión final',pilot:'NOTA DEL PILOTO',handles:'Kingdom Network se encarga de la parte técnica.',domain:'Todavía no necesitas comprar un dominio',domainBody:'Sigue usando la dirección actual del piloto mientras se demuestra el producto. El dominio permanente y el correo personalizado pueden esperar.',small:'Empieza con pocos',smallBody:'Invita primero al liderazgo y a unos pocos miembros de confianza. Corrige cualquier confusión antes de abrirlo a toda la iglesia.',help:'¿Necesitas ayuda?',helpBody:'Usa Kingdom Guide para encontrar funciones y decidir qué configurar después con instrucciones sencillas.',guide:'Abrir Kingdom Guide →',when:'CUANDO LA BARRA ESTÉ LLENA',run:'Prueba el piloto con personas reales.',runBody:'Prueba invitaciones, inicio de sesión, recuperación de contraseña, perfiles, Mensajes, Aprendizaje, Grupos, Calendario, Oración/Cuidado Pastoral y navegación en teléfono antes de invitar a toda la iglesia.',english:'English',spanish:'Español',church:'Tu Iglesia'}
+} as const
+
+export default async function ChurchLaunchPage({searchParams}:{searchParams:Promise<{lang?:string}>}){
+  const params=await searchParams
+  const lang=params.lang==='es'?'es':'en'
+  const t=copy[lang]
   const supabase=await createClient()
   const {data:claims}=await supabase.auth.getClaims()
   const userId=claims?.claims?.sub
@@ -29,7 +37,16 @@ export default async function ChurchLaunchPage(){
   const learning=(publishedCourses??0)>0
   const groupReady=(groups??0)>0
   const calendar=(events??0)>0
-  const steps=[
+  const steps=lang==='es'?[ 
+    {title:'1. Datos básicos de la iglesia',body:'Confirma el nombre, ciudad, estado y zona horaria.',href:'/church/settings',done:identity,Icon:Church},
+    {title:'2. Agrega un administrador de respaldo',body:'Dale acceso administrativo a un líder de confianza para no depender de una sola cuenta.',href:'/church',done:adminReady,Icon:ShieldCheck},
+    {title:'3. Hazlo tuyo',body:'Agrega el logo, color de la iglesia y un mensaje corto de bienvenida.',href:'/church/settings',done:branding,Icon:Palette},
+    {title:'4. Agrega a las primeras personas',body:'Invita a unos pocos miembros reales del piloto. También puedes importar una lista cuando estés listo.',href:'/church/invites',done:people,Icon:MailPlus},
+    {title:'5. Dale a los miembros un próximo paso',body:'Publica al menos una clase o curso de discipulado.',href:'/learning',done:learning,Icon:GraduationCap},
+    {title:'6. Agrega un grupo',body:'Crea al menos un Grupo de Amistad, ministerio o comunidad.',href:'/groups',done:groupReady,Icon:Users},
+    {title:'7. Agrega un evento',body:'Pon un próximo evento de la iglesia en el calendario.',href:'/calendar',done:calendar,Icon:CalendarDays},
+    {title:'8. Revisa si el piloto está listo',body:'Haz la revisión final antes de invitar al grupo piloto.',href:'/church/readiness',done:false,Icon:Check}
+  ]:[
     {title:'1. Church basics',body:'Confirm your church name, city, state and timezone.',href:'/church/settings',done:identity,Icon:Church},
     {title:'2. Add a backup admin',body:'Give one trusted leader admin access so the church is never dependent on one account.',href:'/church',done:adminReady,Icon:ShieldCheck},
     {title:'3. Make it yours',body:'Add your logo, church color and a short welcome message.',href:'/church/settings',done:branding,Icon:Palette},
@@ -45,15 +62,15 @@ export default async function ChurchLaunchPage(){
   const NextIcon=nextStep.Icon
 
   return <main className="shell">
-    <header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??'Your Church'} • Church Builder</div></div><Link className="ghost" href="/church">← Church Admin</Link></header>
-    <section className="launch-hero card"><div><div className="pill">CHURCH BUILDER</div><h1>Set up your church one simple step at a time.</h1><p className="muted">You do not need to understand the technology. Complete the steps below and Kingdom Network will tell you what still needs attention.</p></div><div className="launch-progress"><strong>{pct}%</strong><span>{completed} of 7 setup steps ready</span><div className="launch-bar"><i style={{width:`${pct}%`}}/></div></div></section>
+    <header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??t.church} • Church Builder</div></div><div className="row"><Languages size={15}/><Link className="ghost" href="/church/launch?lang=en">{t.english}</Link><Link className="ghost" href="/church/launch?lang=es">{t.spanish}</Link><Link className="ghost" href="/church">{t.admin}</Link></div></header>
+    <section className="launch-hero card"><div><div className="pill">CHURCH BUILDER</div><h1>{t.title}</h1><p className="muted">{t.subtitle}</p></div><div className="launch-progress"><strong>{pct}%</strong><span>{completed} of 7 {t.ready}</span><div className="launch-bar"><i style={{width:`${pct}%`}}/></div></div></section>
 
-    <section className="card" style={{marginBottom:16}}><div className="pill">DO THIS NEXT</div><h2 style={{marginBottom:6}}><NextIcon size={18}/> {nextStep.title}</h2><p className="muted">{nextStep.body}</p><Link className="btn" href={nextStep.href}>Open this step →</Link></section>
+    <section className="card" style={{marginBottom:16}}><div className="pill">{t.next}</div><h2 style={{marginBottom:6}}><NextIcon size={18}/> {nextStep.title}</h2><p className="muted">{nextStep.body}</p><Link className="btn" href={nextStep.href}>{t.open}</Link></section>
 
-    <section className="launch-grid">{steps.map((s,index)=>{const Icon=s.Icon;return <Link href={s.href} className={`card launch-step ${s.done?'done':''}`} key={s.title}><div className="launch-num">{s.done?<Check size={14}/>:index+1}</div><div className="launch-copy"><strong><Icon size={12}/> {s.title}</strong><span>{s.body}</span><div className="launch-status">{index===7?'Final check':s.done?'Done':'Still needed'}</div></div></Link>})}</section>
+    <section className="launch-grid">{steps.map((s,index)=>{const Icon=s.Icon;return <Link href={s.href} className={`card launch-step ${s.done?'done':''}`} key={s.title}><div className="launch-num">{s.done?<Check size={14}/>:index+1}</div><div className="launch-copy"><strong><Icon size={12}/> {s.title}</strong><span>{s.body}</span><div className="launch-status">{index===7?t.final:s.done?t.done:t.needed}</div></div></Link>})}</section>
 
-    <section className="launch-manual"><div className="section-heading"><div><div className="pill">PILOT NOTE</div><h2>Kingdom Network handles the technical side.</h2></div></div><div className="manual-grid"><article className="card manual-launch-card"><h3>No domain purchase needed yet</h3><p>Keep using the current pilot address while the product is being proven. A permanent domain and custom email can wait.</p></article><article className="card manual-launch-card"><h3>Start small</h3><p>Invite leadership and a few trusted members first. Fix anything confusing before opening access church-wide.</p></article><article className="card manual-launch-card"><h3>Need help?</h3><p>Use Kingdom Guide for plain-language help finding features and deciding what to configure next.</p><Link href="/guide">Open Kingdom Guide →</Link></article></div></section>
+    <section className="launch-manual"><div className="section-heading"><div><div className="pill">{t.pilot}</div><h2>{t.handles}</h2></div></div><div className="manual-grid"><article className="card manual-launch-card"><h3>{t.domain}</h3><p>{t.domainBody}</p></article><article className="card manual-launch-card"><h3>{t.small}</h3><p>{t.smallBody}</p></article><article className="card manual-launch-card"><h3>{t.help}</h3><p>{t.helpBody}</p><Link href={`/guide${lang==='es'?'?lang=es':''}`}>{t.guide}</Link></article></div></section>
 
-    <section className="card launch-footer"><div className="pill">WHEN THE BAR IS FULL</div><h2>Run the pilot with real people.</h2><p className="small muted">Test invitations, sign in, password recovery, profiles, Messages, Learning, Groups, Calendar, Prayer/Pastoral Care and phone navigation before inviting the whole church.</p></section>
+    <section className="card launch-footer"><div className="pill">{t.when}</div><h2>{t.run}</h2><p className="small muted">{t.runBody}</p></section>
   </main>
 }
