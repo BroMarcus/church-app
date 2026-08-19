@@ -10,7 +10,6 @@ const copy={
 } as const
 
 type TimedItem={id:string;label:string;kind:string;starts:number}
-const localKey=(iso:string,timeZone:string)=>new Intl.DateTimeFormat('en-CA',{timeZone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(iso))
 
 export default async function MySchedulePage({searchParams}:{searchParams:Promise<{lang?:string}>}){
   const query=await searchParams
@@ -46,7 +45,11 @@ export default async function MySchedulePage({searchParams}:{searchParams:Promis
   const timed:TimedItem[]=[]
   for(const a of assignments??[])timed.push({id:`assignment:${a.id}`,label:a.title,kind:lang==='es'?'Asignación':'Assignment',starts:new Date(a.call_time||a.starts_at).getTime()})
   for(const e of goingEvents)timed.push({id:`event:${e.id}`,label:e.title,kind:lang==='es'?'Evento':'Event',starts:new Date(e.starts_at).getTime()})
-  for(const s of sessions){if(!s.starts_at)continue;const parts=localKey(new Date().toISOString(),timeZone).slice(0,0);void parts;const {data:utc}=await supabase.rpc('church_local_datetime_to_utc',{p_church_id:membership.church_id,p_local_datetime:`${s.session_date}T${String(s.starts_at).slice(0,5)}`});if(utc)timed.push({id:`class:${s.id}`,label:s.title||(Array.isArray(s.courses)?s.courses[0]?.title:s.courses?.title)||'Class',kind:lang==='es'?'Clase':'Class',starts:new Date(utc as string).getTime()})}
+  for(const s of sessions){
+    if(!s.starts_at)continue
+    const {data:utc}=await supabase.rpc('church_local_datetime_to_utc',{p_church_id:membership.church_id,p_local_datetime:`${s.session_date}T${String(s.starts_at).slice(0,5)}`})
+    if(utc)timed.push({id:`class:${s.id}`,label:s.title||(Array.isArray(s.courses)?s.courses[0]?.title:s.courses?.title)||'Class',kind:lang==='es'?'Clase':'Class',starts:new Date(utc as string).getTime()})
+  }
   timed.sort((a,b)=>a.starts-b.starts)
   const conflicts:{a:TimedItem;b:TimedItem}[]=[]
   for(let i=0;i<timed.length;i++)for(let j=i+1;j<timed.length;j++){const delta=timed[j].starts-timed[i].starts;if(delta>90*60*1000)break;if(timed[i].id.split(':')[0]!==timed[j].id.split(':')[0])conflicts.push({a:timed[i],b:timed[j]})}
