@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { BarChart3,BookOpen,HandHeart,Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { HealthTrends } from './health-trends'
 import './analytics.css'
 
 const pct=(n:number,d:number)=>d?Math.round((n/d)*100):0
@@ -81,6 +82,8 @@ export default async function ChurchAnalyticsPage(){
     <section className="analytics-hero card"><div><div className="pill">CHURCH HEALTH</div><h1>See where people are connecting and growing.</h1><p className="muted">Operational and discipleship signals designed to help leadership know where follow-up is needed.</p></div><div className="hero-stat"><BarChart3 size={22}/><span>Live from current church records</span></div></section>
 
     <section className="health-grid"><div className="card health-card"><strong>{total}</strong><span>Active members</span></div><div className="card health-card"><strong>{grouped}</strong><span>Group connected</span></div><div className="card health-card"><strong>{learnersCompleted}</strong><span>Completed a course</span></div><div className="card health-card"><strong>{serving}</strong><span>Serving / accepted</span></div></section>
+
+    <HealthTrends churchId={churchId}/>
 
     <div className="analytics-layout">
     <section className="card analytics-panel"><div className="pill">30-DAY MINISTRY PULSE</div><h2>What Friendship Groups are reporting</h2><p className="small muted">These numbers update from submitted Friendship Group reports. They are ministry-report totals, separate from verified individual member milestones.</p><div className="stage-list"><div className="stage-row"><span>Meetings reported</span><strong>{reportMeetings}</strong></div><div className="stage-row"><span>Total attendance entries</span><strong>{reportAttendance}</strong></div><div className="stage-row"><span>First-time guests</span><strong>{reportGuests}</strong></div><div className="stage-row"><span>Active Bible studies reported</span><strong>{reportStudies}</strong></div><div className="stage-row"><span>Baptisms reported</span><strong>{reportBaptisms}</strong></div><div className="stage-row"><span>Holy Ghost received reported</span><strong>{reportHolyGhost}</strong></div></div><div className="analytics-note">A reported baptism or Holy Ghost experience raises the ministry pulse immediately. Leadership can then verify the named person's individual Journey record when known.</div></section>
