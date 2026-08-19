@@ -65,6 +65,28 @@ export async function addLesson(formData:FormData){
   revalidatePath('/learning/admin');revalidatePath(`/learning/${courseId}`);redirect('/learning/admin?lesson=1')
 }
 
+export async function createCourseSession(formData:FormData){
+  const {supabase,churchId}=await manager()
+  const courseId=text(formData,'course_id')
+  const title=text(formData,'title')
+  const sessionDate=text(formData,'session_date')
+  const startsAt=text(formData,'starts_at')||null
+  const instructorName=text(formData,'instructor_name')||null
+  const notes=text(formData,'notes')||null
+  if(!courseId||!title||!/^\d{4}-\d{2}-\d{2}$/.test(sessionDate))redirect('/learning/admin?error='+encodeURIComponent('Class name and valid class date are required.'))
+  const {data:course}=await supabase.from('courses').select('id').eq('id',courseId).eq('church_id',churchId).single()
+  if(!course)redirect('/learning/admin?error='+encodeURIComponent('Course not found.'))
+  const requested=Array.from(new Set(formData.getAll('module_ids').map(v=>String(v).trim()).filter(Boolean)))
+  let moduleIds:string[]=[]
+  if(requested.length){
+    const {data:owned}=await supabase.from('course_modules').select('id').eq('course_id',courseId).in('id',requested)
+    moduleIds=(owned??[]).map((m:any)=>m.id)
+  }
+  const {error}=await supabase.from('course_sessions').insert({course_id:courseId,church_id:churchId,session_date:sessionDate,starts_at:startsAt,title,instructor_name:instructorName,module_ids:moduleIds,status:'scheduled',notes})
+  if(error)redirect('/learning/admin?error='+encodeURIComponent(error.message))
+  revalidatePath('/learning/admin');revalidatePath(`/learning/${courseId}`);redirect(`/learning/admin?session=1#course-${courseId}`)
+}
+
 export async function toggleCoursePublished(formData:FormData){
   const {supabase,churchId}=await manager()
   const courseId=text(formData,'course_id');const published=text(formData,'published')==='1'
