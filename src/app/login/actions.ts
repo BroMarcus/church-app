@@ -7,6 +7,7 @@ const text=(f:FormData,k:string)=>String(f.get(k)??'').trim()
 const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
 const langOf=(f:FormData)=>text(f,'lang')==='es'?'es':'en'
 const loginUrl=(lang:string,extra='')=>`/login?lang=${lang}${extra}`
+const callbackUrl=(lang:'en'|'es',mode:'signup'|'recovery',next:string)=>`${siteUrl}/auth/callback?lang=${lang}&mode=${mode}&next=${encodeURIComponent(next)}`
 
 function friendlyAuthEmailError(message:string,lang:'en'|'es'){
   const normalized=message.toLowerCase()
@@ -64,13 +65,13 @@ export async function signup(formData:FormData){
   const {data:valid,error:inviteError}=await supabase.rpc('validate_invite_email',{p_invite_id:inviteId,p_email:email})
   if(inviteError||!valid)fail('This invitation is expired, already used, revoked, or belongs to a different email address.','Esta invitación venció, ya fue usada, fue cancelada o pertenece a otro correo electrónico.')
   const displayName=`${firstName} ${lastName}`.trim()
-  const resetLang=lang==='es'?'&lang=es':''
-  const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:`${siteUrl}/start?welcome=1${resetLang}`,data:{first_name:firstName,last_name:lastName,display_name:displayName,invite_id:inviteId,onboarding_completed:false,preferred_language:lang}}})
+  const startPath=`/start?welcome=1${lang==='es'?'&lang=es':''}`
+  const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath),data:{first_name:firstName,last_name:lastName,display_name:displayName,invite_id:inviteId,onboarding_completed:false,preferred_language:lang}}})
   if(error)redirect(loginUrl(lang,invitePart+'&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))
-  if(data.session)redirect(`/start?welcome=1${resetLang}`)
+  if(data.session)redirect(startPath)
   const message=lang==='es'
-    ? 'Cuenta creada. Enviamos un correo de confirmación. Revisa también Spam/Correo no deseado. Después de confirmar, inicia sesión con la contraseña que creaste y te guiaremos por Empieza Aquí.'
-    : 'Account created. We sent a confirmation email. If you do not see it, check Spam/Junk. After confirming, sign in with the password you created and we will guide you through Start Here.'
+    ? 'Cuenta creada. Enviamos un correo de confirmación. Revisa también Spam/Correo no deseado. Abre el correo más reciente; después te llevaremos directamente a Empieza Aquí.'
+    : 'Account created. We sent a confirmation email. Check Spam/Junk too. Open the newest email; after confirmation we will take you directly to Start Here.'
   redirect(loginUrl(lang,'&message='+encodeURIComponent(message)))
 }
 
@@ -79,11 +80,11 @@ export async function requestPasswordReset(formData:FormData){
   const lang=langOf(formData)
   const email=text(formData,'reset_email').toLowerCase()
   if(!email)redirect(loginUrl(lang,'&error='+encodeURIComponent(lang==='es'?'Escribe primero tu correo electrónico.':'Enter your email address first.')))
-  const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:`${siteUrl}/auth/update-password${lang==='es'?'?lang=es':''}`})
+  const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:callbackUrl(lang,'recovery',`/auth/update-password?lang=${lang}`)})
   if(error)redirect(loginUrl(lang,'&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))
   const message=lang==='es'
-    ? 'Correo para cambiar la contraseña enviado. Revisa tu bandeja de entrada y Spam/Correo no deseado. Abre el enlace más reciente. Si necesitas otro correo, espera al menos un minuto.'
-    : 'Password reset email sent. Check your Inbox and Spam/Junk folder, then open the newest reset link to choose a new password. If you need another email, wait at least one minute before requesting it.'
+    ? 'Correo para cambiar la contraseña enviado. Revisa Recibidos y Spam/Correo no deseado. Abre solamente el enlace más reciente.'
+    : 'Password reset email sent. Check Inbox and Spam/Junk, then open only the newest reset link.'
   redirect(loginUrl(lang,'&message='+encodeURIComponent(message)))
 }
 
@@ -92,10 +93,11 @@ export async function resendConfirmation(formData:FormData){
   const lang=langOf(formData)
   const email=text(formData,'reset_email').toLowerCase()
   if(!email)redirect(loginUrl(lang,'&error='+encodeURIComponent(lang==='es'?'Escribe primero tu correo electrónico.':'Enter your email address first.')))
-  const {error}=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:`${siteUrl}/start?welcome=1${lang==='es'?'&lang=es':''}`}})
+  const startPath=`/start?welcome=1${lang==='es'?'&lang=es':''}`
+  const {error}=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath)}})
   if(error)redirect(loginUrl(lang,'&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))
   const message=lang==='es'
-    ? 'Correo de confirmación enviado otra vez. Abre solamente el correo más reciente y revisa Spam/Correo no deseado si no aparece. Espera al menos un minuto antes de pedir otro.'
-    : 'Confirmation email sent again. Open only the newest email and check Spam/Junk if you do not see it. Wait at least one minute before requesting another.'
+    ? 'Correo de confirmación enviado otra vez. Abre solamente el correo más reciente y revisa Spam/Correo no deseado si no aparece.'
+    : 'Confirmation email sent again. Open only the newest email and check Spam/Junk if you do not see it.'
   redirect(loginUrl(lang,'&message='+encodeURIComponent(message)))
 }
