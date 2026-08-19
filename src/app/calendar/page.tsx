@@ -25,7 +25,8 @@ export default async function CalendarPage({searchParams}:{searchParams:Promise<
   const {data:membership}=await supabase.from('church_memberships').select('church_id,role,churches(name,district_id,timezone)').eq('user_id',userId).eq('status','active').limit(1).single()
   if(!membership?.church_id)redirect('/')
   const church:any=Array.isArray(membership.churches)?membership.churches[0]:membership.churches,timeZone=church?.timezone||'UTC'
-  const canManage=['ministry_leader','minister','pastor','church_admin'].includes(membership.role),isAdmin=['pastor','church_admin'].includes(membership.role)
+  const {data:customCalendarAccess}=await supabase.rpc('current_user_has_church_permission',{p_church_id:membership.church_id,p_permission_key:'manage_calendar'})
+  const canManage=['ministry_leader','minister','pastor','church_admin'].includes(membership.role)||Boolean(customCalendarAccess),isAdmin=['pastor','church_admin'].includes(membership.role)
   const [{data:events},{data:rsvps}]=await Promise.all([
     supabase.from('events').select('*').gte('starts_at',new Date(Date.now()-24*60*60*1000).toISOString()).order('starts_at').limit(80),
     supabase.from('event_rsvps').select('event_id,user_id,response')
