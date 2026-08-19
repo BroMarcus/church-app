@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { CalendarDays,CheckCircle2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { createWeeklyCourseSeries } from '../actions'
+import '../studio.css'
 
 export default async function WeeklySeriesSetup({searchParams}:{searchParams:Promise<{course?:string;error?:string}>}){
   const query=await searchParams
