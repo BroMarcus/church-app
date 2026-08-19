@@ -1,6 +1,4 @@
-import { type EmailOtpType } from '@supabase/supabase-js'
 import { NextRequest,NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 
 const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
 
@@ -18,14 +16,16 @@ function safeNext(raw:string|null){
 export async function GET(request:NextRequest){
   const {searchParams}=new URL(request.url)
   const tokenHash=searchParams.get('token_hash')
-  const type=searchParams.get('type') as EmailOtpType|null
+  const type=searchParams.get('type')
   const next=safeNext(searchParams.get('next'))
 
-  if(tokenHash&&type){
-    const supabase=await createClient()
-    const {error}=await supabase.auth.verifyOtp({token_hash:tokenHash,type})
-    if(!error)return NextResponse.redirect(new URL(next,siteUrl))
+  if(!tokenHash||!type){
+    return NextResponse.redirect(new URL('/login?error=Unable%20to%20open%20that%20account%20link',siteUrl))
   }
 
-  return NextResponse.redirect(new URL('/login?error=Unable%20to%20confirm%20account',siteUrl))
+  const verifyUrl=new URL('/auth/verify',siteUrl)
+  verifyUrl.searchParams.set('token_hash',tokenHash)
+  verifyUrl.searchParams.set('type',type)
+  verifyUrl.searchParams.set('next',next)
+  return NextResponse.redirect(verifyUrl)
 }
