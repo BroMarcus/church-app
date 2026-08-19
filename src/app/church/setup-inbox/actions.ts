@@ -1,0 +1,73 @@
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
+
+const cleanTitle=(fileName:string)=>fileName.replace(/\.[^.]+$/,'').replace(/[_-]+/g,' ').replace(/\s+/g,' ').trim()
+const slugify=(v:string)=>v.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,60)
+
+async function actor(){
+  const supabase=await createClient()
+  const {data:claims}=await supabase.auth.getClaims()
+  const userId=claims?.claims?.sub
+  if(!userId) return {supabase,userId:null,membership:null}
+  const {data:membership}=await supabase.from('church_memberships').select('church_id,role').eq('user_id',userId).eq('status','active').limit(1).single()
+  return {supabase,userId,membership}
+}
+
+function buildPlan(row:any){
+  const name=cleanTitle(row.file_name||'Uploaded material')
+  const text=`${row.file_name||''} ${row.notes||''}`.toLowerCase()
+  const category=row.category||'unsorted'
+  const guessed=category==='unsorted' ? (
+    /lesson|class|curriculum|manual|discipleship|first steps|study/.test(text)?'curriculum':
+    /logo|brand|letterhead/.test(text)?'branding':
+    /calendar|schedule|event/.test(text)?'calendar':
+    /certificate|credential/.test(text)?'certificates':
+    /policy|procedure|handbook/.test(text)?'policies':
+    /form|application|checklist/.test(text)?'forms':'resource'
+  ):category
+  const plans:any={
+    curriculum:{kind:'course_draft',destination:'Learning Center',title:`Create a draft course from “${name}”`,summary:'Create an unpublished course shell, keep the original file attached to the setup record, and leave lesson extraction/review for the next step.',confidence:'medium',approveLabel:'Create draft course'},
+    branding:{kind:'branding_review',destination:'Church Settings / Media',title:`Review “${name}” for church branding`,summary:'Keep the file private in Setup Inbox and route it to branding review before changing any live logo or colors.',confidence:'high',approveLabel:'Mark ready for branding'},
+    calendar:{kind:'calendar_review',destination:'Calendar',title:`Review “${name}” for events`,summary:'Route this material to Calendar review. No live events will be created until dates and details are confirmed.',confidence:'medium',approveLabel:'Mark ready for calendar'},
+    forms:{kind:'workflow_review',destination:'Forms & Workflows',title:`Review “${name}” as a form/workflow`,summary:'Prepare this file for conversion into a reusable church form or checklist after leadership review.',confidence:'high',approveLabel:'Mark ready for forms'},
+    policies:{kind:'policy_review',destination:'Leadership / Policies',title:`Review “${name}” as church policy`,summary:'Keep the source intact and route it for leadership approval before exposing it to members.',confidence:'high',approveLabel:'Mark ready for policy review'},
+    certificates:{kind:'certificate_review',destination:'Documents / Certificates',title:`Review “${name}” as a certificate or credential`,summary:'Route this file to the document/certificate workflow. No credential will be issued automatically.',confidence:'high',approveLabel:'Mark ready for documents'},
+    leadership:{kind:'leadership_review',destination:'Leadership Records',title:`Review “${name}” for leadership use`,summary:'Route this material to leadership records or training after pastor/admin approval.',confidence:'high',approveLabel:'Mark ready for leadership'},
+    media:{kind:'media_review',destination:'Media Library',title:`Review “${name}” for the Media Library`,summary:'Prepare this media asset for later publishing; it stays private until approved.',confidence:'high',approveLabel:'Mark ready for media'},
+    resource:{kind:'resource_review',destination:'Kingdom Guide / Resource Library',title:`Review “${name}” as a trusted resource`,summary:'Route this file to resource review so authority, visibility, topic and current/legacy status can be set before members see it.',confidence:'low',approveLabel:'Mark ready for resources'}
+  }
+  return plans[guessed]||plans.resource
+}
+
+export async function generateSetupPlan(formData:FormData){
+  const id=String(formData.get('id')||''),lang=String(formData.get('lang')||'en')
+  const {supabase,userId,membership}=await actor()
+  if(!userId||!membership?.church_id||!['pastor','church_admin'].includes(membership.role))redirect('/')
+  const {data:row}=await supabase.from('church_setup_uploads').select('*').eq('id',id).eq('church_id',membership.church_id).single()
+  if(!row)redirect(`/church/setup-inbox${lang==='es'?'?lang=es':''}`)
+  const plan=buildPlan(row)
+  await supabase.from('church_setup_uploads').update({review_plan:plan,review_confidence:plan.confidence,reviewed_at:new Date().toISOString(),status:'reviewing',suggested_destination:plan.destination}).eq('id',id).eq('church_id',membership.church_id)
+  revalidatePath('/church/setup-inbox')
+}
+
+export async function approveSetupPlan(formData:FormData){
+  const id=String(formData.get('id')||''),lang=String(formData.get('lang')||'en')
+  const {supabase,userId,membership}=await actor()
+  if(!userId||!membership?.church_id||!['pastor','church_admin'].includes(membership.role))redirect('/')
+  const {data:row}=await supabase.from('church_setup_uploads').select('*').eq('id',id).eq('church_id',membership.church_id).single()
+  if(!row?.review_plan)return
+  const plan:any=row.review_plan
+  let createdId:string|null=null,createdType:string|null=null
+  if(plan.kind==='course_draft'){
+    const title=cleanTitle(row.file_name||'New Course')
+    const slug=`${slugify(title)||'course'}-${String(row.id).slice(0,8)}`
+    const {data:course,error}=await supabase.from('courses').insert({church_id:membership.church_id,title,slug,description:`Draft created from Setup Inbox source: ${row.file_name}. Review and build lessons before publishing.`,category:'discipleship',published:false,created_by:userId}).select('id').single()
+    if(!error&&course?.id){createdId=course.id;createdType='course'}
+  }
+  await supabase.from('church_setup_uploads').update({status:'ready',approved_at:new Date().toISOString(),created_record_id:createdId,created_record_type:createdType}).eq('id',id).eq('church_id',membership.church_id)
+  revalidatePath('/church/setup-inbox')
+  revalidatePath('/learning')
+}
