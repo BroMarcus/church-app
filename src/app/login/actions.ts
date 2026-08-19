@@ -56,29 +56,37 @@ export async function login(formData:FormData){
 export async function signup(formData:FormData){
   const supabase=await createClient()
   const lang=langOf(formData)
-  const email=text(formData,'email').toLowerCase(),password=String(formData.get('password')??''),confirmPassword=String(formData.get('confirm_password')??''),firstName=text(formData,'first_name'),lastName=text(formData,'last_name'),inviteId=text(formData,'invite_id')
-  const invitePart=inviteId?`&invite=${encodeURIComponent(inviteId)}`:''
-  const fail=(en:string,es:string)=>redirect(loginUrl(lang,invitePart+'&mode=signup&error='+encodeURIComponent(lang==='es'?es:en)))
+  const email=text(formData,'email').toLowerCase(),password=String(formData.get('password')??''),confirmPassword=String(formData.get('confirm_password')??''),firstName=text(formData,'first_name'),lastName=text(formData,'last_name'),inviteId=text(formData,'invite_id'),churchSlug=text(formData,'church_slug').toLowerCase()
+  const contextPart=`${inviteId?`&invite=${encodeURIComponent(inviteId)}`:''}${churchSlug?`&church=${encodeURIComponent(churchSlug)}`:''}`
+  const fail=(en:string,es:string)=>redirect(loginUrl(lang,contextPart+'&mode=signup&error='+encodeURIComponent(lang==='es'?es:en)))
   if(!firstName||!lastName)fail('First and last name are required to create your account.','Se requieren nombre y apellido para crear tu cuenta.')
   if(!email)fail('Enter your email address.','Escribe tu correo electrónico.')
   if(password.length<8)fail('Your password must be at least 8 characters.','Tu contraseña debe tener por lo menos 8 caracteres.')
   if(password!==confirmPassword)fail('The two passwords do not match. Please type them again.','Las dos contraseñas no coinciden. Escríbelas de nuevo.')
 
   let publicSignup=false
+  let publicSignupChurchId:string|null=null
   if(inviteId){
     const {data:valid,error:inviteError}=await supabase.rpc('validate_invite_email',{p_invite_id:inviteId,p_email:email})
     if(inviteError||!valid)fail('This invitation is expired, already used, revoked, or belongs to a different email address.','Esta invitación venció, ya fue usada, fue cancelada o pertenece a otro correo electrónico.')
   }else{
-    const {data:status}=await supabase.rpc('get_public_signup_status')
-    const row=Array.isArray(status)?status[0]:status
-    if(!row?.open)fail('Public pilot signup is temporarily unavailable.','El registro público del piloto no está disponible temporalmente.')
+    if(churchSlug){
+      const {data:status}=await supabase.rpc('get_public_signup_status_for_church',{p_church_slug:churchSlug})
+      const row:any=Array.isArray(status)?status[0]:status
+      if(!row?.open)fail('Public signup for this church is temporarily unavailable.','El registro público para esta iglesia no está disponible temporalmente.')
+      publicSignupChurchId=row.church_id??null
+    }else{
+      const {data:status}=await supabase.rpc('get_public_signup_status')
+      const row=Array.isArray(status)?status[0]:status
+      if(!row?.open)fail('Public pilot signup is temporarily unavailable.','El registro público del piloto no está disponible temporalmente.')
+    }
     publicSignup=true
   }
 
   const displayName=`${firstName} ${lastName}`.trim()
   const startPath=`/start?welcome=1${lang==='es'?'&lang=es':''}`
-  const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath),data:{first_name:firstName,last_name:lastName,display_name:displayName,invite_id:inviteId||null,public_signup:publicSignup,onboarding_completed:false,preferred_language:lang}}})
-  if(error)redirect(loginUrl(lang,invitePart+'&mode=signup&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))
+  const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath),data:{first_name:firstName,last_name:lastName,display_name:displayName,invite_id:inviteId||null,public_signup:publicSignup,public_signup_church_id:publicSignupChurchId,onboarding_completed:false,preferred_language:lang}}})
+  if(error)redirect(loginUrl(lang,contextPart+'&mode=signup&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))
   if(data.user&&Array.isArray(data.user.identities)&&data.user.identities.length===0){
     const message=lang==='es'
       ? 'Ese correo ya tiene una cuenta. Inicia sesión con tu contraseña existente o usa “Olvidé mi contraseña” si no la recuerdas.'
@@ -89,7 +97,7 @@ export async function signup(formData:FormData){
   const message=lang==='es'
     ? 'Cuenta creada. Enviamos un correo de confirmación. Revisa también Spam/Correo no deseado. Abre el correo más reciente; después te llevaremos directamente a Empieza Aquí.'
     : 'Account created. We sent a confirmation email. Check Spam/Junk too. Open the newest email; after confirmation we will take you directly to Start Here.'
-  redirect(loginUrl(lang,'&mode=signin&message='+encodeURIComponent(message)))
+  redirect(loginUrl(lang,contextPart+'&mode=signin&message='+encodeURIComponent(message)))
 }
 
 export async function requestPasswordReset(formData:FormData){
