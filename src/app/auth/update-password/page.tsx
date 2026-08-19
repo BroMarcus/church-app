@@ -15,7 +15,7 @@ export default function UpdatePasswordPage(){
   const [ready,setReady]=useState(false)
   const [password,setPassword]=useState('')
   const [confirm,setConfirm]=useState('')
-  const [message,setMessage]=useState(copy.en.opening)
+  const [message,setMessage]=useState<string>(copy.en.opening)
   const [busy,setBusy]=useState(false)
   const t=copy[lang]
 
