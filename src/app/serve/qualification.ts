@@ -5,6 +5,7 @@ export function checkRequirement(r:Requirement,m:any,activeMember:boolean){
   if(r.requirement_type==='holy_ghost')return m?.holy_ghost_received===true
   if(r.requirement_type==='baptism')return m?.baptized===true
   if(r.requirement_type==='covenant')return m?.covenant_current===true
+  if(r.requirement_type==='bible_study_teacher')return m?.bible_study_teacher_status==='approved'
   if(r.requirement_type==='course'){
     const map:Record<string,string>={first_steps:'first_steps_status',salt_series:'salt_series_status',soul_winning:'soul_winning_status',timothys:'timothys_status',school_pastors:'school_pastors_status'}
     const value=m?.[map[r.requirement_key??'']]
