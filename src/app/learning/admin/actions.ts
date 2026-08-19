@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 
 const text=(f:FormData,k:string)=>String(f.get(k)??'').trim()
 const num=(f:FormData,k:string,fallback:number)=>{const n=Number(f.get(k));return Number.isFinite(n)?n:fallback}
+const clampScore=(value:number,min=0)=>Math.max(min,Math.min(100,value))
 const slugify=(v:string)=>v.toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,70)||'course'
 const audiences=['new_convert','member','teacher_training','leadership','general']
 const stages=['new_convert','foundation','outreach','teaching','leadership','specialized']
@@ -32,7 +33,7 @@ export async function createCourse(formData:FormData){
   const audience=audiences.includes(text(formData,'audience_level'))?text(formData,'audience_level'):'general'
   const stage=stages.includes(text(formData,'pathway_stage'))?text(formData,'pathway_stage'):'foundation'
   const translationKey=text(formData,'translation_key')||null
-  const {error}=await supabase.from('courses').insert({church_id:churchId,title,slug,description:text(formData,'description')||null,category:text(formData,'category')||'discipleship',estimated_minutes:num(formData,'estimated_minutes',0)||null,passing_score:Math.max(0,Math.min(100,num(formData,'passing_score',80))),badge_name:text(formData,'badge_name')||null,published:false,created_by:userId,language_code:languageCode,audience_level:audience,translation_key:translationKey,pathway_stage:stage,pathway_order:Math.max(0,num(formData,'pathway_order',100)),curriculum_version:text(formData,'curriculum_version')||'1.0',source_revision:text(formData,'source_revision')||null})
+  const {error}=await supabase.from('courses').insert({church_id:churchId,title,slug,description:text(formData,'description')||null,category:text(formData,'category')||'discipleship',estimated_minutes:num(formData,'estimated_minutes',0)||null,passing_score:clampScore(num(formData,'passing_score',80),80),badge_name:text(formData,'badge_name')||null,published:false,created_by:userId,language_code:languageCode,audience_level:audience,translation_key:translationKey,pathway_stage:stage,pathway_order:Math.max(0,num(formData,'pathway_order',100)),curriculum_version:text(formData,'curriculum_version')||'1.0',source_revision:text(formData,'source_revision')||null})
   if(error)redirect('/learning/admin?error='+encodeURIComponent(error.message))
   revalidatePath('/learning/admin');redirect('/learning/admin?created=1')
 }
@@ -45,7 +46,7 @@ export async function updateCourseSettings(formData:FormData){
   const audience=audiences.includes(text(formData,'audience_level'))?text(formData,'audience_level'):'general'
   const stage=stages.includes(text(formData,'pathway_stage'))?text(formData,'pathway_stage'):'foundation'
   const {error}=await supabase.from('courses').update({
-    title:text(formData,'title'),description:text(formData,'description')||null,category:text(formData,'category')||'discipleship',estimated_minutes:num(formData,'estimated_minutes',0)||null,passing_score:Math.max(0,Math.min(100,num(formData,'passing_score',80))),badge_name:text(formData,'badge_name')||null,language_code:languageCode,audience_level:audience,translation_key:text(formData,'translation_key')||null,pathway_stage:stage,pathway_order:Math.max(0,num(formData,'pathway_order',100)),curriculum_version:text(formData,'curriculum_version')||'1.0',source_revision:text(formData,'source_revision')||null
+    title:text(formData,'title'),description:text(formData,'description')||null,category:text(formData,'category')||'discipleship',estimated_minutes:num(formData,'estimated_minutes',0)||null,passing_score:clampScore(num(formData,'passing_score',80),80),badge_name:text(formData,'badge_name')||null,language_code:languageCode,audience_level:audience,translation_key:text(formData,'translation_key')||null,pathway_stage:stage,pathway_order:Math.max(0,num(formData,'pathway_order',100)),curriculum_version:text(formData,'curriculum_version')||'1.0',source_revision:text(formData,'source_revision')||null
   }).eq('id',courseId).eq('church_id',churchId)
   if(error)redirect('/learning/admin?error='+encodeURIComponent(error.message))
   revalidatePath('/learning');revalidatePath('/learning/admin');revalidatePath(`/learning/${courseId}`);redirect('/learning/admin?settings=1')
@@ -90,6 +91,32 @@ export async function createCourseSession(formData:FormData){
 export async function toggleCoursePublished(formData:FormData){
   const {supabase,churchId}=await manager()
   const courseId=text(formData,'course_id');const published=text(formData,'published')==='1'
+  if(published){
+    const [{data:modules},{data:assessments}]=await Promise.all([
+      supabase.from('course_modules').select('id').eq('course_id',courseId),
+      supabase.from('course_assessments').select('id,title,assessment_type,module_id,passing_score,required,published').eq('course_id',courseId)
+    ])
+    const requiredPublished=(assessments??[]).filter((a:any)=>a.required&&a.published)
+    const requiredIds=requiredPublished.map((a:any)=>a.id)
+    let questionRows:any[]=[]
+    if(requiredIds.length){
+      const result=await supabase.from('assessment_questions').select('assessment_id').in('assessment_id',requiredIds)
+      questionRows=result.data??[]
+    }
+    const countBy=new Map<string,number>()
+    for(const row of questionRows)countBy.set(row.assessment_id,(countBy.get(row.assessment_id)??0)+1)
+    const issues:string[]=[]
+    if(!(modules??[]).length)issues.push('Add at least one lesson before publishing.')
+    const finals=requiredPublished.filter((a:any)=>a.assessment_type==='final_exam')
+    if(!finals.length)issues.push('Add and publish a required final exam before publishing the course.')
+    for(const assessment of requiredPublished){
+      const count=countBy.get(assessment.id)??0
+      if(Number(assessment.passing_score)<80)issues.push(`${assessment.title}: required assessments must require at least 80%.`)
+      if(assessment.assessment_type==='final_exam'&&(count<20||count>25))issues.push(`${assessment.title}: final exams must contain 20–25 questions.`)
+      else if(assessment.module_id&&(count<5||count>10))issues.push(`${assessment.title}: required checkpoint tests must contain 5–10 questions.`)
+    }
+    if(issues.length)redirect('/learning/admin?error='+encodeURIComponent(issues.join(' ')))
+  }
   const {error}=await supabase.from('courses').update({published}).eq('id',courseId).eq('church_id',churchId)
   if(error)redirect('/learning/admin?error='+encodeURIComponent(error.message))
   revalidatePath('/learning');revalidatePath('/learning/admin');revalidatePath(`/learning/${courseId}`);redirect('/learning/admin?published=1')
@@ -102,8 +129,12 @@ export async function createAssessment(formData:FormData){
   const {data:course}=await supabase.from('courses').select('id').eq('id',courseId).eq('church_id',churchId).single()
   if(!course)redirect('/learning/admin?error='+encodeURIComponent('Course not found.'))
   const moduleId=text(formData,'module_id')||null
+  const assessmentType=text(formData,'assessment_type')||'lesson_quiz'
+  const required=formData.get('required')==='on'
+  const requestedScore=num(formData,'passing_score',80)
+  const passingScore=clampScore(requestedScore,required||assessmentType==='final_exam'?80:0)
   const maxRaw=text(formData,'max_attempts');const maxAttempts=maxRaw?Math.max(1,Number(maxRaw)):null
-  const {error}=await supabase.from('course_assessments').insert({course_id:courseId,module_id:moduleId,title,assessment_type:text(formData,'assessment_type')||'lesson_quiz',passing_score:Math.max(0,Math.min(100,num(formData,'passing_score',80))),max_attempts:maxAttempts,required:formData.get('required')==='on',published:formData.get('published')==='on',created_by:userId})
+  const {error}=await supabase.from('course_assessments').insert({course_id:courseId,module_id:moduleId,title,assessment_type:assessmentType,passing_score:passingScore,max_attempts:maxAttempts,required,published:formData.get('published')==='on',created_by:userId})
   if(error)redirect('/learning/admin?error='+encodeURIComponent(error.message))
   revalidatePath('/learning/admin');revalidatePath(`/learning/${courseId}`);redirect('/learning/admin?assessment=1')
 }
@@ -120,6 +151,13 @@ export async function addQuestion(formData:FormData){
     else correct=text(formData,'correct_answer').trim()
   }
   if(!assessmentId||!prompt||correct==null)redirect('/learning/admin?error='+encodeURIComponent('Question and correct answer are required.'))
+  const [{data:assessment},{count}]=await Promise.all([
+    supabase.from('course_assessments').select('assessment_type,module_id,required').eq('id',assessmentId).single(),
+    supabase.from('assessment_questions').select('*',{count:'exact',head:true}).eq('assessment_id',assessmentId)
+  ])
+  if(!assessment)redirect('/learning/admin?error='+encodeURIComponent('Assessment not found.'))
+  const maxQuestions=assessment.assessment_type==='final_exam'?25:assessment.required&&assessment.module_id?10:null
+  if(maxQuestions!=null&&(count??0)>=maxQuestions)redirect('/learning/admin?error='+encodeURIComponent(`This assessment already has the maximum ${maxQuestions} questions allowed by the learning standard.`))
   const {error}=await supabase.rpc('create_assessment_question',{p_assessment_id:assessmentId,p_question_type:type,p_prompt:prompt,p_options:options,p_correct_answer:correct,p_points:Math.max(1,num(formData,'points',1)),p_explanation:text(formData,'explanation')||null})
   if(error)redirect('/learning/admin?error='+encodeURIComponent(error.message))
   revalidatePath('/learning/admin');redirect('/learning/admin?question=1')
