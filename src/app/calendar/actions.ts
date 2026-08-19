@@ -37,5 +37,40 @@ export async function setRsvp(formData:FormData){
   if(!['interested','going','not_going'].includes(response))redirect(withLang('/calendar?error='+encodeURIComponent(lang==='es'?'Respuesta inválida.':'Invalid RSVP.'),lang))
   const {error}=await supabase.from('event_rsvps').upsert({event_id:eventId,user_id:userId,response,updated_at:new Date().toISOString()},{onConflict:'event_id,user_id'})
   if(error)redirect(withLang('/calendar?error='+encodeURIComponent(error.message),lang))
-  revalidatePath('/calendar');revalidatePath('/');redirect(withLang('/calendar?rsvp=1',lang))
+  revalidatePath('/calendar');revalidatePath('/calendar/my');revalidatePath('/');redirect(withLang('/calendar?rsvp=1',lang))
+}
+
+export async function createMemberTask(formData:FormData){
+  const {supabase,userId}=await auth();const lang=text(formData,'lang'),churchId=text(formData,'church_id'),title=text(formData,'title'),assignedTo=text(formData,'assigned_to')||userId,dueLocal=text(formData,'due_at'),priority=text(formData,'priority')||'normal'
+  const back=text(formData,'back')||'/calendar/my'
+  if(!churchId||!title||!['low','normal','high'].includes(priority))redirect(withLang(`${back}?error=${encodeURIComponent(lang==='es'?'Tarea inválida.':'Invalid task.')}`,lang))
+  let dueAt:string|null=null
+  if(dueLocal){const result=await supabase.rpc('church_local_datetime_to_utc',{p_church_id:churchId,p_local_datetime:dueLocal});if(result.error||!result.data)redirect(withLang(`${back}?error=${encodeURIComponent(result.error?.message||(lang==='es'?'Fecha inválida.':'Invalid due date.'))}`,lang));dueAt=result.data as string}
+  const {error}=await supabase.from('member_tasks').insert({church_id:churchId,assigned_to:assignedTo,created_by:userId,title,notes:text(formData,'notes')||null,due_at:dueAt,priority})
+  if(error)redirect(withLang(`${back}?error=${encodeURIComponent(error.message)}`,lang))
+  revalidatePath('/calendar/my');revalidatePath('/calendar/manage');revalidatePath('/today');revalidatePath('/prophet');redirect(withLang(`${back}?task_created=1`,lang))
+}
+
+export async function setMemberTaskStatus(formData:FormData){
+  const {supabase}=await auth();const lang=text(formData,'lang'),taskId=text(formData,'task_id'),status=text(formData,'status'),back=text(formData,'back')||'/calendar/my'
+  if(!taskId||!['open','in_progress','completed','cancelled'].includes(status))redirect(withLang(`${back}?error=${encodeURIComponent(lang==='es'?'Estado de tarea inválido.':'Invalid task status.')}`,lang))
+  const {error}=await supabase.from('member_tasks').update({status}).eq('id',taskId)
+  if(error)redirect(withLang(`${back}?error=${encodeURIComponent(error.message)}`,lang))
+  revalidatePath('/calendar/my');revalidatePath('/calendar/manage');revalidatePath('/today');revalidatePath('/prophet');redirect(withLang(`${back}?task_saved=1`,lang))
+}
+
+export async function submitTimeOff(formData:FormData){
+  const {supabase,userId}=await auth();const lang=text(formData,'lang'),churchId=text(formData,'church_id'),starts=text(formData,'starts_on'),ends=text(formData,'ends_on'),back=text(formData,'back')||'/calendar/my'
+  if(!churchId||!starts||!ends||ends<starts)redirect(withLang(`${back}?error=${encodeURIComponent(lang==='es'?'Rango de fechas inválido.':'Invalid date range.')}`,lang))
+  const {error}=await supabase.from('member_time_off').insert({church_id:churchId,user_id:userId,starts_on:starts,ends_on:ends,notes:text(formData,'notes')||null})
+  if(error)redirect(withLang(`${back}?error=${encodeURIComponent(error.message)}`,lang))
+  revalidatePath('/calendar/my');revalidatePath('/calendar/manage');redirect(withLang(`${back}?time_off=1`,lang))
+}
+
+export async function reviewTimeOff(formData:FormData){
+  const {supabase}=await auth();const lang=text(formData,'lang'),requestId=text(formData,'request_id'),status=text(formData,'status')
+  if(!requestId||!['approved','declined'].includes(status))redirect(withLang('/calendar/manage?error='+encodeURIComponent(lang==='es'?'Revisión inválida.':'Invalid review.'),lang))
+  const {error}=await supabase.from('member_time_off').update({status}).eq('id',requestId)
+  if(error)redirect(withLang('/calendar/manage?error='+encodeURIComponent(error.message),lang))
+  revalidatePath('/calendar/manage');revalidatePath('/calendar/my');redirect(withLang('/calendar/manage?reviewed=1',lang))
 }
