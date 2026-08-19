@@ -25,6 +25,18 @@ async function requireChurchAdmin(churchId:string){
   return {supabase,userId}
 }
 
+async function requireMemberRecordManager(churchId:string){
+  const supabase=await createClient()
+  const {data:claimsData}=await supabase.auth.getClaims()
+  const userId=claimsData?.claims?.sub
+  if(!userId)redirect('/login')
+  const {data:actor}=await supabase.from('church_memberships').select('role,status').eq('church_id',churchId).eq('user_id',userId).eq('status','active').single()
+  if(!actor)redirect('/')
+  const {data:customAccess}=await supabase.rpc('current_user_has_church_permission',{p_church_id:churchId,p_permission_key:'manage_members'})
+  if(!['pastor','church_admin'].includes(actor.role)&&!customAccess)redirect('/')
+  return {supabase,userId}
+}
+
 export async function updateMembership(formData:FormData){
   const membershipId=value(formData,'membership_id')
   const role=value(formData,'role')
@@ -66,8 +78,11 @@ export async function updateMilestones(formData:FormData){
   const targetUserId=value(formData,'user_id')
   const lang=langOf(formData)
   const base=`/church/members/${targetUserId}?lang=${lang}`
-  if(!churchId||!targetUserId)redirect(`/church?lang=${lang}&error=`+encodeURIComponent(lang==='es'?'Falta el registro del miembro.':'Missing member record.'))
-  const {supabase,userId}=await requireChurchAdmin(churchId)
+  if(!churchId||!targetUserId)redirect(`/church/member-records?lang=${lang}&error=`+encodeURIComponent(lang==='es'?'Falta el registro del miembro.':'Missing member record.'))
+  const {supabase,userId}=await requireMemberRecordManager(churchId)
+
+  const {data:targetMembership}=await supabase.from('church_memberships').select('user_id').eq('church_id',churchId).eq('user_id',targetUserId).maybeSingle()
+  if(!targetMembership)redirect(`/church/member-records?lang=${lang}&error=`+encodeURIComponent(lang==='es'?'El miembro no pertenece a esta iglesia.':'Member does not belong to this church.'))
 
   const firstSteps=value(formData,'first_steps_status')
   const salt=value(formData,'salt_series_status')
@@ -80,6 +95,7 @@ export async function updateMilestones(formData:FormData){
   if(!progressStatuses.includes(firstSteps as any)||!progressStatuses.includes(salt as any)||!progressStatuses.includes(soul as any)||!progressStatuses.includes(timothys as any)||!progressStatuses.includes(school as any)||!teacherStatuses.includes(teacher as any)||!trainingStatuses.includes(child as any)||!trainingStatuses.includes(harassment as any))redirect(`${base}&error=`+encodeURIComponent(lang==='es'?'Valor de hito inválido.':'Invalid milestone value.'))
 
   const payload={
+    church_id:churchId,user_id:targetUserId,
     holy_ghost_received:boolOrNull(formData,'holy_ghost_received'),holy_ghost_date:dateOrNull(formData,'holy_ghost_date'),
     baptized:boolOrNull(formData,'baptized'),baptism_date:dateOrNull(formData,'baptism_date'),
     first_steps_status:firstSteps,first_steps_completed_at:dateOrNull(formData,'first_steps_completed_at'),
@@ -92,7 +108,7 @@ export async function updateMilestones(formData:FormData){
     sexual_harassment_training_status:harassment,sexual_harassment_completed_at:dateOrNull(formData,'sexual_harassment_completed_at'),sexual_harassment_expires_at:dateOrNull(formData,'sexual_harassment_expires_at'),
     covenant_current:boolOrNull(formData,'covenant_current')??false,covenant_signed_at:dateOrNull(formData,'covenant_signed_at'),verified_by:userId,updated_at:new Date().toISOString()
   }
-  const {error}=await supabase.from('member_milestones').update(payload).eq('church_id',churchId).eq('user_id',targetUserId)
+  const {error}=await supabase.from('member_milestones').upsert(payload,{onConflict:'church_id,user_id'})
   if(error)redirect(`${base}&error=`+encodeURIComponent(error.message))
-  revalidatePath(`/church/members/${targetUserId}`);revalidatePath('/church');redirect(`${base}&saved=1`)
+  revalidatePath(`/church/members/${targetUserId}`);revalidatePath('/church/member-records');revalidatePath('/church/analytics');revalidatePath('/journey');revalidatePath('/church');redirect(`${base}&saved=1`)
 }
