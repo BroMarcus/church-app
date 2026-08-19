@@ -65,9 +65,36 @@ export async function applyToMinistry(formData:FormData){
 }
 
 export async function reviewApplication(formData:FormData){
-  const lang=langOf(formData),{supabase,userId}=await auth(lang),id=text(formData,'application_id'),status=text(formData,'status')
+  const lang=langOf(formData),{supabase,userId}=await auth(lang),id=text(formData,'application_id'),status=text(formData,'status'),override=checked(formData,'qualification_override'),overrideReason=text(formData,'qualification_override_reason')
   if(!['qualified','interview','accepted','declined'].includes(status))redirect(serveUrl(lang,'&error='+encodeURIComponent(lang==='es'?'Estado de solicitud inválido.':'Invalid application status.')))
-  const {error}=await supabase.from('ministry_applications').update({status,review_note:text(formData,'review_note')||null,reviewed_by:userId,reviewed_at:new Date().toISOString()}).eq('id',id)
+  const {data:application}=await supabase.from('ministry_applications').select('id,ministry_id,user_id').eq('id',id).single()
+  if(!application)redirect(serveUrl(lang,'&error='+encodeURIComponent(lang==='es'?'No encontramos la solicitud.':'Application not found.')))
+  const {data:ministry}=await supabase.from('ministries').select('church_id').eq('id',application.ministry_id).single()
+  if(!ministry?.church_id)redirect(serveUrl(lang,'&error='+encodeURIComponent(lang==='es'?'No encontramos el ministerio.':'Ministry not found.')))
+  const [{data:requirements},{data:milestones},{data:membership}]=await Promise.all([
+    supabase.from('ministry_requirements').select('*').eq('ministry_id',application.ministry_id),
+    supabase.from('member_milestones').select('*').eq('church_id',ministry.church_id).eq('user_id',application.user_id).maybeSingle(),
+    supabase.from('church_memberships').select('status').eq('church_id',ministry.church_id).eq('user_id',application.user_id).maybeSingle()
+  ])
+  const q=qualification((requirements??[]) as any[],milestones,membership?.status==='active')
+  const requiresQualification=['qualified','accepted'].includes(status)
+  if(requiresQualification&&!q.qualified&&!override){
+    const missing=q.missing.map((r:any)=>r.label).join(', ')
+    redirect(serveUrl(lang,'&error='+encodeURIComponent(lang==='es'?`Aún faltan requisitos: ${missing}. Para hacer una excepción intencional, marca la anulación y explica la razón.`:`Requirements are still unmet: ${missing}. To make an intentional exception, use the override and document why.`)))
+  }
+  if(requiresQualification&&!q.qualified&&override&&overrideReason.length<5)redirect(serveUrl(lang,'&error='+encodeURIComponent(lang==='es'?'Explica la razón de la excepción con al menos 5 caracteres.':'Document the override reason with at least 5 characters.')))
+  const usingOverride=requiresQualification&&!q.qualified&&override
+  const {error}=await supabase.from('ministry_applications').update({
+    status,
+    qualification_score:q.score,
+    review_note:text(formData,'review_note')||null,
+    reviewed_by:userId,
+    reviewed_at:new Date().toISOString(),
+    qualification_override:usingOverride,
+    qualification_override_reason:usingOverride?overrideReason:null,
+    qualification_override_by:usingOverride?userId:null,
+    qualification_override_at:usingOverride?new Date().toISOString():null
+  }).eq('id',id)
   if(error)redirect(serveUrl(lang,'&error='+encodeURIComponent(error.message)))
   revalidatePath('/serve');redirect(serveUrl(lang,'&reviewed=1'))
 }
