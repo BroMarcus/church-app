@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { updateMilestones } from '../../actions'
 import { LearningScorecard } from './learning-scorecard'
 import { BibleStudyPracticum } from './bible-study-practicum'
+import { MemberDetailsForm } from './member-details-form'
 import '../../church.css'
 
 const progress={en:[['not_started','Not started'],['in_progress','In progress'],['completed','Completed'],['waived','Waived']],es:[['not_started','No iniciado'],['in_progress','En progreso'],['completed','Completado'],['waived','Exento']]} as const
@@ -19,7 +20,7 @@ const statusLabel=(status:string,lang:'en'|'es')=>{const en:Record<string,string
 function SelectField({label,name,value,options}:{label:string;name:string;value:string;options:readonly(readonly[string,string])[]}){return <label className="record-field"><span>{label}</span><select name={name} defaultValue={value}>{options.map(([v,l])=><option value={v} key={v}>{l}</option>)}</select></label>}
 function DateField({label,name,value}:{label:string;name:string;value?:string|null}){return <label className="record-field"><span>{label}</span><input type="date" name={name} defaultValue={value??''}/></label>}
 
-export default async function MemberRecordPage({params,searchParams}:{params:Promise<{userId:string}>;searchParams:Promise<{saved?:string;practicum?:string;error?:string;lang?:string}>}){
+export default async function MemberRecordPage({params,searchParams}:{params:Promise<{userId:string}>;searchParams:Promise<{saved?:string;details_saved?:string;practicum?:string;error?:string;lang?:string}>}){
   const [{userId:targetUserId},query]=await Promise.all([params,searchParams])
   const lang: 'en'|'es'=query.lang==='es'?'es':'en'
   const es=lang==='es'
@@ -35,7 +36,7 @@ export default async function MemberRecordPage({params,searchParams}:{params:Pro
   const {data:membership}=await supabase.from('church_memberships').select('id,role,status,joined_at,created_at').eq('church_id',actor.church_id).eq('user_id',targetUserId).single()
   if(!membership)redirect(`/church/member-records?lang=${lang}&error=`+encodeURIComponent(es?'Miembro no encontrado en esta iglesia.':'Member not found in this church.'))
   const [{data:profile},{data:details},{data:milestones}]=await Promise.all([
-    supabase.from('profiles').select('first_name,last_name,display_name,bio').eq('id',targetUserId).maybeSingle(),
+    supabase.from('profiles').select('first_name,last_name,display_name,bio,contact_email').eq('id',targetUserId).maybeSingle(),
     supabase.from('member_private_details').select('email,phone,address_line1,address_line2,city,state,postal_code,birthday,marriage_anniversary').eq('user_id',targetUserId).maybeSingle(),
     supabase.from('member_milestones').select('*').eq('church_id',actor.church_id).eq('user_id',targetUserId).maybeSingle()
   ])
@@ -49,13 +50,14 @@ export default async function MemberRecordPage({params,searchParams}:{params:Pro
     <header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??(es?'Tu Iglesia':'Your Church')} • {es?'Registro verificado de miembro':'Verified Member Record'}</div></div><div className="row"><Link className="ghost" href={`/church/member-records?lang=${lang}`}>← {es?'Registros':'Records'}</Link><Link className="ghost" href={`/church/members/${targetUserId}?lang=${es?'en':'es'}`}>{es?'English':'Español'}</Link><Link className="ghost" href="/">{es?'Inicio':'Home'}</Link></div></header>
 
     <section className="record-hero card"><div className="member-main"><div className="avatar record-avatar">{name.slice(0,1).toUpperCase()}</div><div><div className="pill">{es?'REGISTRO DE MIEMBRO':'MEMBER RECORD'}</div><h1>{name}</h1><p className="muted">{roleLabel(membership.role,lang)} • {statusLabel(membership.status,lang)}</p></div></div><div className="record-score"><strong>{completed}/5</strong><span>{es?'hitos principales de capacitación completados':'core training milestones completed'}</span></div></section>
-    {query.saved&&<div className="notice success">{es?'Registro verificado guardado.':'Verified member record saved.'}</div>}{query.practicum&&<div className="notice success">{es?'Evaluación práctica de maestro de estudio bíblico guardada.':'Bible Study Teacher practicum scorecard saved.'}</div>}{query.error&&<div className="notice error">{query.error}</div>}
+    {query.saved&&<div className="notice success">{es?'Registro verificado guardado.':'Verified member record saved.'}</div>}{query.details_saved&&<div className="notice success">{es?'Contacto y perfil guardados.':'Contact and profile details saved.'}</div>}{query.practicum&&<div className="notice success">{es?'Evaluación práctica de maestro de estudio bíblico guardada.':'Bible Study Teacher practicum scorecard saved.'}</div>}{query.error&&<div className="notice error">{query.error}</div>}
 
+    <MemberDetailsForm churchId={actor.church_id} userId={targetUserId} profile={profile} details={details} lang={lang}/>
     <LearningScorecard userId={targetUserId} churchId={actor.church_id} lang={lang}/>
     <BibleStudyPracticum userId={targetUserId} churchId={actor.church_id} lang={lang}/>
 
     <div className="record-layout"><aside>
-      <section className="card record-side"><div className="pill">{es?'CONTACTO':'CONTACT'}</div><h3>{es?'Información del miembro':'Member information'}</h3><dl><dt>Email</dt><dd>{details?.email||(es?'No agregado':'Not added')}</dd><dt>{es?'Teléfono':'Phone'}</dt><dd>{details?.phone||(es?'No agregado':'Not added')}</dd><dt>{es?'Dirección':'Address'}</dt><dd>{address}</dd><dt>{es?'Cumpleaños':'Birthday'}</dt><dd>{fmt(details?.birthday,lang)}</dd><dt>{es?'Aniversario':'Anniversary'}</dt><dd>{fmt(details?.marriage_anniversary,lang)}</dd></dl></section>
+      <section className="card record-side"><div className="pill">{es?'CONTACTO':'CONTACT'}</div><h3>{es?'Información del miembro':'Member information'}</h3><dl><dt>Email</dt><dd>{profile?.contact_email||details?.email||(es?'No agregado':'Not added')}</dd><dt>{es?'Teléfono':'Phone'}</dt><dd>{details?.phone||(es?'No agregado':'Not added')}</dd><dt>{es?'Dirección':'Address'}</dt><dd>{address}</dd><dt>{es?'Cumpleaños':'Birthday'}</dt><dd>{fmt(details?.birthday,lang)}</dd><dt>{es?'Aniversario':'Anniversary'}</dt><dd>{fmt(details?.marriage_anniversary,lang)}</dd></dl></section>
       <section className="card record-side"><div className="pill">{es?'ACCESO':'ACCESS'}</div><h3>{es?'Membresía de iglesia':'Church membership'}</h3><dl><dt>{es?'Rol':'Role'}</dt><dd>{roleLabel(membership.role,lang)}</dd><dt>{es?'Estado':'Status'}</dt><dd>{statusLabel(membership.status,lang)}</dd><dt>{es?'Se unió':'Joined'}</dt><dd>{fmt(membership.joined_at,lang)}</dd></dl><p className="small muted">{es?'Este rol de acceso solo puede ser cambiado por un pastor o administrador de iglesia.':'This security/access role can only be changed by a pastor or church admin.'}</p></section>
     </aside>
 
