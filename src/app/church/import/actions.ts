@@ -10,7 +10,7 @@ const emailOk=(v:string)=>!v||/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
 const outreachStages=new Set(['new_contact','invited','guest','bible_study','regular_attendee','baptized','holy_ghost','first_steps','connected','serving','inactive'])
 const inviteRoles=new Set(['member','group_leader','ministry_leader','minister'])
 const pick=(r:CsvRecord,...keys:string[])=>{for(const k of keys){if(r[k])return r[k]}return ''}
-const fail=(message:string)=>redirect('/church/import?error='+encodeURIComponent(message))
+const fail=(message:string):never=>redirect('/church/import?error='+encodeURIComponent(message))
 
 async function admin(){
   const supabase=await createClient()
@@ -62,8 +62,9 @@ export async function stageChurchImport(formData:FormData){
   const {supabase,userId,churchId}=await admin()
   const dataset=text(formData,'dataset_type')
   if(!['outreach','member_invites'].includes(dataset))fail('Choose a valid import type.')
-  const file=formData.get('file')
-  if(!(file instanceof File)||!file.name)fail('Choose a CSV file.')
+  const entry=formData.get('file')
+  if(!(entry instanceof File)||!entry.name)fail('Choose a CSV file.')
+  const file=entry as File
   if(file.size>5*1024*1024)fail('CSV must be 5 MB or smaller.')
   if(!file.name.toLowerCase().endsWith('.csv'))fail('Import files must use the .csv extension.')
   let parsed:{headers:string[];records:CsvRecord[]}
@@ -71,23 +72,24 @@ export async function stageChurchImport(formData:FormData){
     const message=['CSV contains an unclosed quoted field.','Every CSV column needs a header.','CSV contains duplicate column headers after normalization.'].includes(String(e?.message))?String(e.message):'Unable to parse CSV.'
     fail(message)
   }
-  if(!parsed.records.length)fail('The CSV has no data rows.')
-  if(parsed.records.length>2500)fail('Import up to 2,500 rows per batch. Split larger files into multiple imports.')
+  if(!parsed!.records.length)fail('The CSV has no data rows.')
+  if(parsed!.records.length>2500)fail('Import up to 2,500 rows per batch. Split larger files into multiple imports.')
   const seen=new Set<string>()
-  const staged=parsed.records.map((raw,index)=>{const row=canonicalize(dataset,raw);const error=validate(dataset,row,seen);return {row_number:index+2,row_data:row,row_status:error?'invalid':'ready',validation_error:error||null}})
+  const staged=parsed!.records.map((raw,index)=>{const row=canonicalize(dataset,raw);const error=validate(dataset,row,seen);return {row_number:index+2,row_data:row,row_status:error?'invalid':'ready',validation_error:error||null}})
   const ready=staged.filter(r=>r.row_status==='ready').length,invalid=staged.length-ready
   const {data:batch,error:batchError}=await supabase.from('church_import_batches').insert({church_id:churchId,uploaded_by:userId,dataset_type:dataset,filename:file.name,total_rows:staged.length,ready_rows:ready,invalid_rows:invalid}).select('id').single()
   if(batchError||!batch){if(batchError)console.error('stageChurchImport batch failed',{code:batchError.code,message:batchError.message});fail('Unable to create import batch. Please try again.')}
+  const batchId=batch!.id
   for(let i=0;i<staged.length;i+=500){
-    const chunk=staged.slice(i,i+500).map(r=>({...r,batch_id:batch.id}))
+    const chunk=staged.slice(i,i+500).map(r=>({...r,batch_id:batchId}))
     const {error}=await supabase.from('church_import_rows').insert(chunk)
     if(error){
       console.error('stageChurchImport rows failed',{code:error.code,message:error.message})
-      await supabase.from('church_import_batches').delete().eq('id',batch.id)
+      await supabase.from('church_import_batches').delete().eq('id',batchId)
       fail('Unable to save the import rows. Please try again.')
     }
   }
-  revalidatePath('/church/import');redirect(`/church/import/${batch.id}`)
+  revalidatePath('/church/import');redirect(`/church/import/${batchId}`)
 }
 
 export async function processChurchImport(formData:FormData){
