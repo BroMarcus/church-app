@@ -47,6 +47,20 @@ test('public church join uses fixed bilingual error codes and never renders raw 
   assert.doesNotMatch(actions,/[&?]error=\$\{encodeURIComponent/)
 })
 
+test('Join and Start Here recover from unexpected failures in the selected language',async()=>{
+  const joinError=await read('src/app/join/[slug]/error.tsx')
+  const startError=await read('src/app/start/error.tsx')
+  for(const source of [joinError,startError]){
+    assert.match(source,/useSearchParams/)
+    assert.match(source,/params\.get\('lang'\)==='es'/)
+    assert.match(source,/console\.error/)
+    assert.match(source,/onClick=\{reset\}/)
+    assert.match(source,/mode=signin/)
+  }
+  assert.match(joinError,/No pudimos abrir esta página de la iglesia/)
+  assert.match(startError,/No pudimos cargar tus primeros pasos/)
+})
+
 test('Start Here uses fixed status codes for onboarding and existing-account join results',async()=>{
   const page=await read('src/app/start/page.tsx')
   const actions=await read('src/app/start/actions.ts')
