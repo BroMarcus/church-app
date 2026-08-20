@@ -37,14 +37,16 @@ test('login UI prevents duplicate auth and email submissions',async()=>{
   assert.match(page,/PendingAction/)
   assert.match(submit,/useFormStatus/)
   assert.match(submit,/disabled=\{status\.pending\}/)
-  assert.match(action,/disabled=\{status\.pending\}/)
+  assert.match(action,/disabled=\{status\.pending\|\|cooling\}/)
+  assert.match(action,/localStorage\.setItem\(storageKey,String\(until\)\)/)
+  assert.match(action,/cooldownSeconds\*1000/)
 })
 
 test('password recovery lands in browser reset page instead of server callback',async()=>{
   const actions=await read('src/app/login/actions.ts')
   const updatePage=await read('src/app/auth/update-password/page.tsx')
   assert.match(actions,/const recoveryUrl=.*\/auth\/update-password/)
-  assert.match(actions,/resetPasswordForEmail\(email,\{redirectTo:recoveryUrl\(lang\)\}\)/)
+  assert.match(actions,/resetPasswordForEmail\(email,\{redirectTo:recoveryUrl\(lang,next\)\}\)/)
   assert.doesNotMatch(actions,/resetPasswordForEmail\(email,\{redirectTo:callbackUrl/)
   assert.match(updatePage,/exchangeCodeForSession\(code\)/)
   assert.match(updatePage,/onAuthStateChange/)
@@ -52,10 +54,12 @@ test('password recovery lands in browser reset page instead of server callback',
   assert.match(updatePage,/updateUser\(\{password\}\)/)
 })
 
-test('auth callback rejects protocol-relative redirect destinations',async()=>{
+test('auth callback rejects cross-origin and protocol-relative redirect destinations',async()=>{
   const source=await read('src/app/auth/callback/route.ts')
-  assert.match(source,/raw\.startsWith\('\/'\).*?!raw\.startsWith\('\/\/'\)/s)
-  assert.match(source,/requested\.origin===canonical\.origin/)
+  assert.match(source,/const canonical=new URL\(siteUrl\)/)
+  assert.match(source,/const requested=new URL\(raw,canonical\)/)
+  assert.match(source,/if\(requested\.origin!==canonical\.origin\)return fallback/)
+  assert.match(source,/allowedAuthDestination\(local\)\?local:fallback/)
 })
 
 test('private invite flow cannot preassign pastor or church admin',async()=>{
