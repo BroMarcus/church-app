@@ -45,7 +45,9 @@ test('new control tool server code contains no explicit any escapes',async()=>{
     'src/app/calendar/shared/page.tsx',
     'src/app/groups/[groupId]/roster/actions.ts',
     'src/app/groups/[groupId]/roster/page.tsx',
-    'src/app/rosters/page.tsx'
+    'src/app/rosters/page.tsx',
+    'src/app/content/actions.ts',
+    'src/app/content/page.tsx'
   ]
   for(const file of files){
     const source=await read(file)
@@ -57,12 +59,15 @@ test('control tools never redirect raw database error messages to members or lea
   const teamActions=await read('src/app/teams/manage/actions.ts')
   const scheduleActions=await read('src/app/calendar/manage/actions.ts')
   const groupRosterActions=await read('src/app/groups/[groupId]/roster/actions.ts')
+  const contentActions=await read('src/app/content/actions.ts')
   assert.doesNotMatch(teamActions,/encodeURIComponent\(error\.message\)/)
   assert.doesNotMatch(scheduleActions,/encodeURIComponent\(error\.message\)/)
   assert.doesNotMatch(groupRosterActions,/encodeURIComponent\(error\.message\)/)
+  assert.doesNotMatch(contentActions,/encodeURIComponent\(error\.message\)/)
   assert.match(teamActions,/console\.error\('createTeam failed'/)
   assert.match(scheduleActions,/console\.error\('createSchedule failed'/)
   assert.match(groupRosterActions,/console\.error\('addRosterMember failed'/)
+  assert.match(contentActions,/console\.error\('createContentLesson failed'/)
 })
 
 test('shared scheduling has conflict detection and documented intentional overrides',async()=>{
@@ -103,4 +108,34 @@ test('Friendship Group roll sheet respects contact privacy and shows recent atte
   assert.match(actions,/update_group_member_status/)
   assert.match(actions,/only one active Friendship Group/)
   assert.doesNotMatch(page,/member_private_details/)
+})
+
+test('Content Studio gives create and edit tools for church-owned content',async()=>{
+  const page=await read('src/app/content/page.tsx')
+  const actions=await read('src/app/content/actions.ts')
+  for(const phrase of ['Create course','Edit course','Create lesson','Edit lesson','Create classroom session','Edit class','Create event','Edit event','Create assessment draft','Edit assessment'])assert.match(page,new RegExp(phrase))
+  for(const action of ['createContentCourse','updateContentCourse','createContentLesson','updateContentLesson','createContentClass','updateContentClass','createContentEvent','updateContentEvent','createContentAssessment','updateContentAssessment','createContentQuestion','updateContentQuestion'])assert.match(actions,new RegExp(`export async function ${action}`))
+  assert.match(page,/AssetUploader/)
+  assert.match(page,/EventFlyerUploader/)
+})
+
+test('assessment question editing preserves private answer keys unless intentionally replaced',async()=>{
+  const migration=await read('supabase/migrations/20260820152500_secure_assessment_question_edit.sql')
+  const page=await read('src/app/content/page.tsx')
+  assert.match(migration,/private\.assessment_answer_keys/)
+  assert.match(migration,/if p_correct_answer is not null then/)
+  assert.match(migration,/private\.has_church_role/)
+  assert.match(migration,/manage_learning/)
+  assert.match(migration,/revoke all on function private\.update_assessment_question_impl/)
+  assert.match(page,/leave blank to keep the existing answer key/)
+  assert.doesNotMatch(page,/assessment_answer_keys/)
+})
+
+test('Content Studio event editing validates local church time and does not expose raw database errors',async()=>{
+  const actions=await read('src/app/content/actions.ts')
+  assert.match(actions,/church_local_datetime_to_utc/)
+  assert.match(actions,/endsAt&&new Date\(endsAt\)<new Date\(startsAt\)/)
+  assert.match(actions,/basic_public_listing/)
+  assert.match(actions,/registration_url/)
+  assert.doesNotMatch(actions,/redirect\([^\n]*error\.message/)
 })
