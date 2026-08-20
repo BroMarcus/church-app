@@ -5,7 +5,7 @@ create or replace function private.tag_new_membership_relationship_source()
 returns trigger
 language plpgsql
 security definer
-set search_path to 'public', 'private', 'auth'
+set search_path to ''
 as $function$
 declare
   v_meta jsonb;
@@ -19,7 +19,10 @@ begin
     return new;
   end if;
 
-  select raw_user_meta_data into v_meta from auth.users where id=new.user_id;
+  select u.raw_user_meta_data into v_meta
+  from auth.users u
+  where u.id=new.user_id;
+
   if coalesce(v_meta->>'public_signup','false')='true' then
     new.relationship_source:='public_join';
     new.relationship_verified_at:=null;
@@ -31,9 +34,9 @@ begin
       v_invite_id:=null;
     end;
     if v_invite_id is not null then
-      select created_by into v_creator
-      from public.church_invites
-      where id=v_invite_id and church_id=new.church_id;
+      select i.created_by into v_creator
+      from public.church_invites i
+      where i.id=v_invite_id and i.church_id=new.church_id;
       new.relationship_source:='private_invite';
       new.relationship_verified_at:=now();
       new.relationship_verified_by:=v_creator;
