@@ -3,7 +3,7 @@ create or replace function private.update_assessment_question_impl(
   p_question_type text,
   p_prompt text,
   p_options jsonb,
-  p_correct_answer jsonb,
+  p_correct_answer jsonb default null,
   p_points integer default 1,
   p_explanation text default null
 ) returns void
@@ -40,9 +40,11 @@ begin
 
   if not found then raise exception 'Question not found'; end if;
 
-  insert into private.assessment_answer_keys(question_id,correct_answer)
-  values(p_question_id,p_correct_answer)
-  on conflict(question_id) do update set correct_answer=excluded.correct_answer;
+  if p_correct_answer is not null then
+    insert into private.assessment_answer_keys(question_id,correct_answer)
+    values(p_question_id,p_correct_answer)
+    on conflict(question_id) do update set correct_answer=excluded.correct_answer;
+  end if;
 end $$;
 
 create or replace function public.update_assessment_question(
@@ -50,7 +52,7 @@ create or replace function public.update_assessment_question(
   p_question_type text,
   p_prompt text,
   p_options jsonb,
-  p_correct_answer jsonb,
+  p_correct_answer jsonb default null,
   p_points integer default 1,
   p_explanation text default null
 ) returns void
