@@ -55,3 +55,13 @@ test('Setup Inbox fails closed instead of marking curriculum ready after course 
   assert.match(page,/Nada se marcó como listo\. Inténtalo de nuevo\./)
   assert.match(page,/name="lang" value=\{lang\}/)
 })
+
+test('Setup Inbox uploader hides provider errors and always releases the busy state',async()=>{
+  const source=await read('src/app/church/setup-inbox/setup-uploader.tsx')
+  assert.doesNotMatch(source,/setStatus\(upload\.error\.message\)/)
+  assert.doesNotMatch(source,/setStatus\(insert\.error\.message\)/)
+  assert.match(source,/finally\{setSaving\(false\)\}/)
+  assert.match(source,/notice \$\{status\.kind\}/)
+  assert.match(source,/The file could not be uploaded\. Try again\./)
+  assert.match(source,/No se pudo subir el archivo\. Inténtalo de nuevo\./)
+})
