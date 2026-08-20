@@ -147,3 +147,25 @@ test('My Profile has bilingual loading and safe retry states',async()=>{
   assert.match(error,/No se cambió nada en tu perfil/)
   assert.match(error,/onClick=\{\(\)=>reset\(\)\}/)
 })
+
+test('Friendship Groups has bilingual loading and safe retry states',async()=>{
+  const loading=await read('src/app/groups/loading.tsx')
+  const error=await read('src/app/groups/error.tsx')
+  assert.match(loading,/aria-busy="true"/)
+  assert.match(loading,/Cargando tus grupos/)
+  assert.match(error,/role="alert"/)
+  assert.match(error,/Your group memberships and attendance information were not changed/)
+  assert.match(error,/Tus membresías de grupo y tu información de asistencia no fueron modificadas/)
+  assert.match(error,/onClick=\{\(\)=>reset\(\)\}/)
+})
+
+test('Calendar has bilingual loading and safe retry states',async()=>{
+  const loading=await read('src/app/calendar/loading.tsx')
+  const error=await read('src/app/calendar/error.tsx')
+  assert.match(loading,/aria-busy="true"/)
+  assert.match(loading,/Cargando el calendario de tu iglesia/)
+  assert.match(error,/role="alert"/)
+  assert.match(error,/Your event responses and calendar information were not changed/)
+  assert.match(error,/Tus respuestas a eventos y la información de tu calendario no fueron modificadas/)
+  assert.match(error,/onClick=\{\(\)=>reset\(\)\}/)
+})
