@@ -55,6 +55,12 @@ test('private invite flow cannot preassign pastor or church admin',async()=>{
   assert.match(page,/never preassigned by invitation/)
 })
 
+test('database invite RPC also blocks pastor and church admin preassignment',async()=>{
+  const source=await read('supabase/migrations/20260820013700_disallow_privileged_invite_role_preassignment.sql')
+  assert.match(source,/v_role not in \('member','group_leader','ministry_leader','minister'\)/)
+  assert.match(source,/Privileged pastor\/admin roles must be assigned after the account is verified/)
+})
+
 test('Kingdom Guide uses live approved resource schema and excludes unfinished material',async()=>{
   const source=await read('src/app/guide/page.tsx')
   for(const field of ['approved_for_members','ministry_area','source_year','topic_tags','scripture_refs','archive_status','source_label','source_scope','official_source','library_kind','organization_status']) assert.match(source,new RegExp(field))
