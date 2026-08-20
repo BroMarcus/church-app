@@ -10,9 +10,12 @@ const copy={
   es:{opening:'Abriendo tu enlace seguro…',invalid:'Este enlace no es válido o ya venció. Solicita un correo nuevo para cambiar tu contraseña.',choose:'Escribe una contraseña nueva abajo.',invalidBack:'Este enlace no es válido o ya venció. Vuelve a Iniciar sesión y solicita un correo nuevo.',short:'La contraseña debe tener al menos 8 caracteres.',mismatch:'Las dos contraseñas no coinciden.',failed:'No pudimos cambiar la contraseña. Solicita un correo nuevo e inténtalo otra vez.',updated:'Contraseña actualizada. Volviendo a Iniciar sesión…',success:'Contraseña actualizada. Inicia sesión con tu nueva contraseña.',title:'Cambiar tu contraseña',newPassword:'Nueva contraseña',again:'Escríbela otra vez',showPassword:'Mostrar contraseña',hidePassword:'Ocultar contraseña',updating:'Actualizando…',update:'Actualizar contraseña',back:'Volver a Iniciar sesión'}
 } as const
 
+const safeJoinNext=(value:string|null)=>value?.startsWith('/join/')&&!value.startsWith('//')&&!value.includes('..')?value:''
+
 export default function UpdatePasswordPage(){
   const router=useRouter()
   const [lang,setLang]=useState<'en'|'es'>('en')
+  const [joinNext,setJoinNext]=useState('')
   const [ready,setReady]=useState(false)
   const [password,setPassword]=useState('')
   const [confirm,setConfirm]=useState('')
@@ -26,7 +29,9 @@ export default function UpdatePasswordPage(){
     const check=async()=>{
       const url=new URL(window.location.href)
       const nextLang=url.searchParams.get('lang')==='es'?'es':'en'
+      const next=safeJoinNext(url.searchParams.get('next'))
       setLang(nextLang)
+      setJoinNext(next)
       const c=copy[nextLang]
       setMessage(c.opening)
       try{
@@ -55,8 +60,9 @@ export default function UpdatePasswordPage(){
     const {data:listener}=supabase.auth.onAuthStateChange((event,session)=>{
       if(!mounted)return
       if((event==='PASSWORD_RECOVERY'||event==='SIGNED_IN')&&session){
-        const nextLang=new URL(window.location.href).searchParams.get('lang')==='es'?'es':'en'
-        setLang(nextLang);setReady(true);setMessage(copy[nextLang].choose)
+        const url=new URL(window.location.href)
+        const nextLang=url.searchParams.get('lang')==='es'?'es':'en'
+        setLang(nextLang);setJoinNext(safeJoinNext(url.searchParams.get('next')));setReady(true);setMessage(copy[nextLang].choose)
       }
     })
     return()=>{mounted=false;listener.subscription.unsubscribe()}
@@ -78,7 +84,8 @@ export default function UpdatePasswordPage(){
       setMessage(t.updated)
       const {error:signOutError}=await supabase.auth.signOut()
       if(signOutError)console.error('post-reset sign out failed',{message:signOutError.message})
-      router.replace(`/login?lang=${lang}&message=${encodeURIComponent(t.success)}`)
+      const nextPart=joinNext?`&next=${encodeURIComponent(joinNext)}`:''
+      router.replace(`/login?lang=${lang}&mode=signin${nextPart}&message=${encodeURIComponent(t.success)}`)
     }catch(error){
       console.error('password update request failed',{message:error instanceof Error?error.message:String(error)})
       setMessage(t.failed)
@@ -87,5 +94,6 @@ export default function UpdatePasswordPage(){
     }
   }
 
-  return <main className="login-wrap"><div className="login card"><div className="pill">KINGDOM NETWORK</div><h1>{t.title}</h1><div className={`notice ${ready?'success':'error'}`} role="status" aria-live="polite">{message}</div>{ready&&<form onSubmit={save}><PasswordField name="password" label={t.newPassword} minLength={8} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><PasswordField name="confirm_password" label={t.again} minLength={8} autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><button className="btn" type="submit" disabled={busy}>{busy?t.updating:t.update}</button></form>}<p className="small muted" style={{marginTop:16}}><a href={`/login?lang=${lang}&mode=signin`}>{t.back}</a></p></div></main>
+  const nextPart=joinNext?`&next=${encodeURIComponent(joinNext)}`:''
+  return <main className="login-wrap"><div className="login card"><div className="pill">KINGDOM NETWORK</div><h1>{t.title}</h1><div className={`notice ${ready?'success':'error'}`} role="status" aria-live="polite">{message}</div>{ready&&<form onSubmit={save}><PasswordField name="password" label={t.newPassword} minLength={8} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><PasswordField name="confirm_password" label={t.again} minLength={8} autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><button className="btn" type="submit" disabled={busy}>{busy?t.updating:t.update}</button></form>}<p className="small muted" style={{marginTop:16}}><a href={`/login?lang=${lang}&mode=signin${nextPart}`}>{t.back}</a></p></div></main>
 }
