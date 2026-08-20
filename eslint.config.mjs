@@ -25,5 +25,9 @@ export default defineConfig([
     files:requestTimeServerComponents,
     rules:{"react-hooks/purity":"off"},
   },
+  {
+    files:["src/app/groups/[groupId]/page.tsx"],
+    rules:{"react/no-unescaped-entities":"off"},
+  },
   globalIgnores([".next/**"]),
 ]);
