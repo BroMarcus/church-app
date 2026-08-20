@@ -1,0 +1,58 @@
+name: Kingdom Network Human QA Walkthrough
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kingdom-network-human-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  human-qa:
+    if: github.head_ref == 'qa/full-human-walkthrough-2026-08-20' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout QA branch
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install app dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Install disposable browser runner
+        run: npm install --no-save --package-lock=false playwright@1.57.0
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run human-style QA walkthrough
+        env:
+          QA_BASE_URL: https://kingdom-network.vercel.app
+          QA_PASSWORD: KN-QA-2026!R7x9-Mock
+        run: node qa/full-human-walkthrough.mjs
+
+      - name: Print QA summary
+        if: always()
+        run: |
+          if [ -f qa-artifacts/summary.md ]; then cat qa-artifacts/summary.md; fi
+
+      - name: Upload QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kingdom-network-human-qa
+          path: qa-artifacts/
+          if-no-files-found: warn
+          retention-days: 7
