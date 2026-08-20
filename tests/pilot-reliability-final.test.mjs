@@ -84,6 +84,27 @@ test('password reset always releases busy state and keeps errors member-safe',as
   assert.match(source,/mode=signin/)
 })
 
+test('password recovery preserves a safe church-join return path end to end',async()=>{
+  const page=await read('src/app/login/page.tsx')
+  const actions=await read('src/app/login/actions.ts')
+  const reset=await read('src/app/auth/update-password/page.tsx')
+  assert.match(page,/name="next" value=\{joinNext\}/)
+  assert.match(actions,/const recoveryUrl=.*safeJoinNext/)
+  assert.match(actions,/resetPasswordForEmail\(email,\{redirectTo:recoveryUrl\(lang,next\)\}\)/)
+  assert.match(actions,/const startPath=next\|\|`\/start\?welcome=1/)
+  assert.match(reset,/const safeJoinNext=/)
+  assert.match(reset,/setJoinNext\(next\)/)
+  assert.match(reset,/router\.replace\(`\/login\?lang=\$\{lang\}&mode=signin\$\{nextPart\}/)
+  assert.match(reset,/href=\{`\/login\?lang=\$\{lang\}&mode=signin\$\{nextPart\}`\}/)
+})
+
+test('login bounds status messages and exposes them accessibly',async()=>{
+  const source=await read('src/app/login/page.tsx')
+  assert.match(source,/const boundedStatus=.*slice\(0,320\)/)
+  assert.match(source,/role="alert"/)
+  assert.match(source,/role="status" aria-live="polite"/)
+})
+
 test('login warns returning users not to create duplicate accounts in both languages',async()=>{
   const source=await read('src/app/login/page.tsx')
   assert.match(source,/do not create another account/)
