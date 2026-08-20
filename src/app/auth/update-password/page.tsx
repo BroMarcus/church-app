@@ -13,12 +13,14 @@ const copy={
 export default function UpdatePasswordPage(){
   const router=useRouter()
   const [lang,setLang]=useState<'en'|'es'>('en')
+  const [inviteId,setInviteId]=useState('')
   const [ready,setReady]=useState(false)
   const [password,setPassword]=useState('')
   const [confirm,setConfirm]=useState('')
   const [message,setMessage]=useState<string>(copy.en.opening)
   const [busy,setBusy]=useState(false)
   const t=copy[lang]
+  const invitePart=inviteId?`&invite=${encodeURIComponent(inviteId)}`:''
 
   useEffect(()=>{
     const supabase=createClient()
@@ -26,7 +28,9 @@ export default function UpdatePasswordPage(){
     const check=async()=>{
       const url=new URL(window.location.href)
       const nextLang=url.searchParams.get('lang')==='es'?'es':'en'
+      const nextInvite=url.searchParams.get('invite')??''
       setLang(nextLang)
+      setInviteId(nextInvite)
       const c=copy[nextLang]
       setMessage(c.opening)
       const code=url.searchParams.get('code')
@@ -45,8 +49,9 @@ export default function UpdatePasswordPage(){
     const {data:listener}=supabase.auth.onAuthStateChange((event,session)=>{
       if(!mounted)return
       if((event==='PASSWORD_RECOVERY'||event==='SIGNED_IN')&&session){
-        const nextLang=new URL(window.location.href).searchParams.get('lang')==='es'?'es':'en'
-        setLang(nextLang);setReady(true);setMessage(copy[nextLang].choose)
+        const url=new URL(window.location.href)
+        const nextLang=url.searchParams.get('lang')==='es'?'es':'en'
+        setLang(nextLang);setInviteId(url.searchParams.get('invite')??'');setReady(true);setMessage(copy[nextLang].choose)
       }
     })
     return()=>{mounted=false;listener.subscription.unsubscribe()}
@@ -63,8 +68,8 @@ export default function UpdatePasswordPage(){
     if(error){setMessage(t.failed);setBusy(false);return}
     setMessage(t.updated)
     await supabase.auth.signOut()
-    router.replace(`/login?lang=${lang}&mode=signin&message=${encodeURIComponent(t.success)}`)
+    router.replace(`/login?lang=${lang}&mode=signin${invitePart}&message=${encodeURIComponent(t.success)}`)
   }
 
-  return <main className="login-wrap"><div className="login card"><div className="pill">KINGDOM NETWORK</div><h1>{t.title}</h1><div className={`notice ${ready?'success':'error'}`}>{message}</div>{ready&&<form onSubmit={save}><PasswordField name="password" label={t.newPassword} minLength={8} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} disabled={busy} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><PasswordField name="confirm_password" label={t.again} minLength={8} autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} disabled={busy} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><button className="btn" type="submit" disabled={busy} aria-busy={busy}>{busy?t.updating:t.update}</button></form>}<p className="small muted" style={{marginTop:16}}><a href={`/login?lang=${lang}&mode=signin`}>{t.back}</a></p></div></main>
+  return <main className="login-wrap"><div className="login card"><div className="pill">KINGDOM NETWORK</div><h1>{t.title}</h1><div className={`notice ${ready?'success':'error'}`}>{message}</div>{ready&&<form onSubmit={save}><PasswordField name="password" label={t.newPassword} minLength={8} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} disabled={busy} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><PasswordField name="confirm_password" label={t.again} minLength={8} autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} disabled={busy} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><button className="btn" type="submit" disabled={busy} aria-busy={busy}>{busy?t.updating:t.update}</button></form>}<p className="small muted" style={{marginTop:16}}><a href={`/login?lang=${lang}&mode=signin${invitePart}`}>{t.back}</a></p></div></main>
 }
