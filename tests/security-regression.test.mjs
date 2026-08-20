@@ -16,10 +16,45 @@ test('production dependency manifest contains no floating latest versions',async
   }
 })
 
+test('public auth routes bypass session refresh middleware',async()=>{
+  const source=await read('src/lib/supabase/proxy.ts')
+  for(const route of ['/login','/auth/callback','/auth/confirm','/auth/verify','/auth/update-password']) assert.match(source,new RegExp(route.replaceAll('/','\\/')))
+  assert.match(source,/publicAuthPrefixes\.some/)
+  assert.match(source,/return NextResponse\.next\(\{request\}\)/)
+})
+
+test('login UI prevents duplicate auth and email submissions',async()=>{
+  const page=await read('src/app/login/page.tsx')
+  const submit=await read('src/app/login/pending-submit.tsx')
+  const action=await read('src/app/login/pending-action.tsx')
+  assert.match(page,/PendingSubmit/)
+  assert.match(page,/PendingAction/)
+  assert.match(submit,/useFormStatus/)
+  assert.match(submit,/disabled=\{status\.pending\}/)
+  assert.match(action,/disabled=\{status\.pending\}/)
+})
+
 test('auth callback rejects protocol-relative redirect destinations',async()=>{
   const source=await read('src/app/auth/callback/route.ts')
   assert.match(source,/raw\.startsWith\('\/'\).*?!raw\.startsWith\('\/\/'\)/s)
   assert.match(source,/requested\.origin===canonical\.origin/)
+})
+
+test('private invite flow cannot preassign pastor or church admin',async()=>{
+  const action=await read('src/app/church/invite-person/actions.ts')
+  const page=await read('src/app/church/invite-person/page.tsx')
+  assert.match(action,/allowedInviteRoles=new Set\(\['member','group_leader','ministry_leader','minister'\]\)/)
+  assert.match(action,/!allowedInviteRoles\.has\(requestedRole\)/)
+  assert.doesNotMatch(page,/\['church_admin'.*'Church admin'/s)
+  assert.match(page,/never preassigned by invitation/)
+})
+
+test('Kingdom Guide uses live approved resource schema and excludes unfinished material',async()=>{
+  const source=await read('src/app/guide/page.tsx')
+  for(const field of ['approved_for_members','ministry_area','source_year','topic_tags','scripture_refs','archive_status','source_label','source_scope','official_source','library_kind','organization_status']) assert.match(source,new RegExp(field))
+  assert.match(source,/\.eq\('approved_for_members',true\)/)
+  assert.match(source,/\.not\('archive_status','in','\(draft,retired\)'\)/)
+  for(const stale of ['member_visible','resource_year','scripture_references','authority_level','source_authority']) assert.doesNotMatch(source,new RegExp(stale))
 })
 
 test('learning progress action validates course, module, membership and enrollment',async()=>{
