@@ -70,3 +70,36 @@ test('backup admin promotion is limited to active verified church members',async
   assert.match(actions,/console\.error\('backup admin promotion failed'/)
   assert.doesNotMatch(actions,/encodeURIComponent\(error\.message\)/)
 })
+
+test('Kingdom Guide has bilingual loading and safe retry states',async()=>{
+  const loading=await read('src/app/guide/loading.tsx')
+  const error=await read('src/app/guide/error.tsx')
+  assert.match(loading,/aria-busy="true"/)
+  assert.match(loading,/Preparando tu ayuda/)
+  assert.match(error,/role="alert"/)
+  assert.match(error,/No information was changed/)
+  assert.match(error,/No se cambió ninguna información/)
+  assert.match(error,/onClick=\{\(\)=>reset\(\)\}/)
+})
+
+test('Start Here has bilingual loading and safe retry states',async()=>{
+  const loading=await read('src/app/start/loading.tsx')
+  const error=await read('src/app/start/error.tsx')
+  assert.match(loading,/aria-busy="true"/)
+  assert.match(loading,/Preparando tus primeros pasos/)
+  assert.match(error,/role="alert"/)
+  assert.match(error,/Your account and progress were not changed/)
+  assert.match(error,/Tu cuenta y tu progreso no fueron modificados/)
+  assert.match(error,/onClick=\{\(\)=>reset\(\)\}/)
+})
+
+test('Church Builder has bilingual loading and safe retry states',async()=>{
+  const loading=await read('src/app/church/launch/loading.tsx')
+  const error=await read('src/app/church/launch/error.tsx')
+  assert.match(loading,/aria-busy="true"/)
+  assert.match(loading,/Revisando qué necesita tu iglesia después/)
+  assert.match(error,/role="alert"/)
+  assert.match(error,/Nothing in your church setup was changed/)
+  assert.match(error,/No se cambió nada en la configuración de tu iglesia/)
+  assert.match(error,/onClick=\{\(\)=>reset\(\)\}/)
+})
