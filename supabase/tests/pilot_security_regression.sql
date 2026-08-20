@@ -11,6 +11,8 @@ select
   (select cm.user_id from public.church_memberships cm where cm.status='active' and cm.role='member' order by cm.created_at limit 1) as member_a,
   (select u.id from auth.users u where not exists (select 1 from public.church_memberships cm where cm.user_id=u.id and cm.status='active') order by u.created_at desc limit 1) as user_b;
 
+grant select on kn_test_ctx to authenticated;
+
 -- Fail early if the test environment cannot supply safe identities.
 do $$
 begin
