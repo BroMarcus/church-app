@@ -38,7 +38,11 @@ export async function login(formData:FormData){
     else if(normalized.includes('email not confirmed')) message=lang==='es'
       ? 'Tu correo todavía no está confirmado. Abre el correo de confirmación más reciente que te enviamos y confirma tu cuenta antes de iniciar sesión.'
       : 'Your email is not confirmed yet. Open the newest confirmation email we sent and confirm your account before signing in.'
-    console.error('login failed',{message:error.message})
+    // Invalid credentials and unconfirmed email are normal member mistakes, not
+    // production incidents. Keep unexpected auth failures visible to monitoring.
+    if(!normalized.includes('invalid login credentials')&&!normalized.includes('email not confirmed')){
+      console.error('login failed',{message:error.message})
+    }
     redirect(loginUrl(lang,'&mode=signin&error='+encodeURIComponent(message)))
   }
   const userId=data.user?.id
