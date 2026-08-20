@@ -18,7 +18,7 @@ export default async function ChurchAnalyticsPage(){
   if(!membership?.church_id||!['pastor','church_admin'].includes(membership.role))redirect('/')
   const churchId=membership.church_id
   const church:any=Array.isArray(membership.churches)?membership.churches[0]:membership.churches
-  const now=new Date(),nowIso=now.toISOString(),thirtyDaysAgo=new Date(now.getTime()-30*24*60*60*1000).toISOString().slice(0,10)
+  const now=new Date(),nowMs=now.getTime(),nowIso=now.toISOString(),thirtyDaysAgo=new Date(nowMs-30*24*60*60*1000).toISOString().slice(0,10)
 
   const [{data:members},{data:milestones},{data:groups},{data:outreach},{data:courses},{data:applications},{data:teamAssignments},{count:openCare},{count:pendingDocs},{count:pendingMilestones},{data:campaigns}]=await Promise.all([
     supabase.from('church_memberships').select('user_id').eq('church_id',churchId).eq('status','active'),
@@ -57,7 +57,7 @@ export default async function ChurchAnalyticsPage(){
 
   const stages=['new_contact','invited','guest','bible_study','regular_attendee','baptized','holy_ghost','first_steps','connected','serving']
   const stageCounts=new Map<string,number>();for(const s of stages)stageCounts.set(s,0);for(const o of outreach??[])if(stageCounts.has((o as any).stage))stageCounts.set((o as any).stage,(stageCounts.get((o as any).stage)??0)+1)
-  const overdue=(outreach??[]).filter((o:any)=>o.follow_up_due_at&&new Date(o.follow_up_due_at).getTime()<Date.now()&&!['inactive','serving'].includes(o.stage)).length,pendingApps=(applications??[]).filter((a:any)=>['submitted','under_review'].includes(a.status)).length
+  const overdue=(outreach??[]).filter((o:any)=>o.follow_up_due_at&&new Date(o.follow_up_due_at).getTime()<nowMs&&!['inactive','serving'].includes(o.stage)).length,pendingApps=(applications??[]).filter((a:any)=>['submitted','under_review'].includes(a.status)).length
   const responded=new Set((teamResponses??[]).map((r:any)=>r.assignment_id)),teamDue=Math.max(0,teamIds.length-responded.size)
   const campaignGoal=(campaigns??[]).reduce((s:number,c:any)=>s+Number(c.goal_amount||0),0),campaignRaised=(campaigns??[]).reduce((s:number,c:any)=>s+Number(c.raised_amount||0),0)
   const attention=[['Pastoral care',openCare??0,'/help'],['Overdue outreach',overdue,'/outreach'],['Milestones to verify',pendingMilestones??0,'/church/milestone-review'],['Documents awaiting review',pendingDocs??0,'/documents'],['Ministry applications',pendingApps,'/serve'],['Team confirmations',teamDue,'/teams']] as const
