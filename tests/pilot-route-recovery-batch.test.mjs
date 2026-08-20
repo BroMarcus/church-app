@@ -10,6 +10,7 @@ const routes = [
   ['notifications','Notifications / Notificaciones'],
   ['account/security','Account Security / Seguridad de la cuenta'],
   ['account/privacy','Privacy / Privacidad'],
+  ['account/data','My Data / Mis datos'],
   ['fundraising','Fundraising / Recaudación de fondos'],
   ['feedback','Feedback / Comentarios'],
   ['directory','Member Directory / Directorio de miembros'],
