@@ -14,7 +14,46 @@ test('password update blocks duplicate submissions and returns to sign in',async
   assert.match(source,/if\(busy\)return/)
   assert.match(source,/disabled=\{busy\}/)
   assert.match(source,/aria-busy=\{busy\}/)
-  assert.match(source,/mode=signin&message=/)
+  assert.match(source,/mode=signin/)
+})
+
+test('password recovery preserves a pending church invitation',async()=>{
+  const actions=await read('src/app/login/actions.ts')
+  const updatePassword=await read('src/app/auth/update-password/page.tsx')
+  assert.match(actions,/recoveryUrl=\(lang:'en'\|'es',inviteId=''/)
+  assert.match(actions,/redirectTo:recoveryUrl\(lang,inviteId\)/)
+  assert.match(updatePassword,/setInviteId\(nextInvite\)/)
+  assert.match(updatePassword,/mode=signin\$\{invitePart\}/)
+})
+
+test('existing accounts can securely redeem a retained church invitation after sign in',async()=>{
+  const actions=await read('src/app/login/actions.ts')
+  const loginPage=await read('src/app/login/page.tsx')
+  const migration=await read('supabase/migrations/20260820053000_existing_account_invite_redemption.sql')
+
+  assert.match(loginPage,/name="invite_id" value=\{params\.invite/)
+  assert.match(loginPage,/connect this church to your existing account automatically/)
+  assert.match(loginPage,/Conectaremos esta iglesia a tu cuenta existente automáticamente/)
+  assert.match(actions,/redeem_invite_for_current_user/)
+  assert.match(actions,/existing account invite redemption failed/)
+  assert.match(actions,/invitePart\+'&mode=signin&message='/)
+
+  assert.match(migration,/v_user_id uuid := auth\.uid\(\)/)
+  assert.match(migration,/lower\(trim\(v_invite\.email\)\)<>v_email/)
+  assert.match(migration,/v_invite\.revoked_at is not null/)
+  assert.match(migration,/v_invite\.redeemed_at is not null/)
+  assert.match(migration,/v_invite\.expires_at<=now\(\)/)
+  assert.match(migration,/v_invite\.role not in \('member','group_leader','ministry_leader','minister'\)/)
+  assert.match(migration,/already has a church membership record/)
+  assert.match(migration,/'private_invite',now\(\),v_invite\.created_by/)
+  assert.match(migration,/revoke all on function public\.redeem_invite_for_current_user\(uuid\) from anon/)
+  assert.match(migration,/grant execute on function public\.redeem_invite_for_current_user\(uuid\) to authenticated/)
+})
+
+test('explicit invitation relationship source is not overwritten by old auth metadata',async()=>{
+  const migration=await read('supabase/migrations/20260820053000_existing_account_invite_redemption.sql')
+  assert.match(migration,/if new\.relationship_source is distinct from 'legacy_backfill' then/)
+  assert.match(migration,/return new;/)
 })
 
 test('church-specific signup hides raw auth failures',async()=>{
