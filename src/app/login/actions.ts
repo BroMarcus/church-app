@@ -8,6 +8,7 @@ const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel
 const langOf=(f:FormData)=>text(f,'lang')==='es'?'es':'en'
 const loginUrl=(lang:string,extra='')=>`/login?lang=${lang}${extra}`
 const callbackUrl=(lang:'en'|'es',mode:'signup'|'recovery',next:string)=>`${siteUrl}/auth/callback?lang=${lang}&mode=${mode}&next=${encodeURIComponent(next)}`
+const recoveryUrl=(lang:'en'|'es')=>`${siteUrl}/auth/update-password?lang=${lang}`
 
 function friendlyAuthEmailError(message:string,lang:'en'|'es'){
   const normalized=message.toLowerCase()
@@ -102,7 +103,9 @@ export async function requestPasswordReset(formData:FormData){
   const lang=langOf(formData)
   const email=text(formData,'reset_email').toLowerCase()
   if(!email)redirect(loginUrl(lang,'&mode=signin&error='+encodeURIComponent(lang==='es'?'Escribe primero tu correo electrónico.':'Enter your email address first.')))
-  const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:callbackUrl(lang,'recovery',`/auth/update-password?lang=${lang}`)})
+  // Password recovery must land in the browser. Supabase may return the recovery
+  // session in the URL fragment, which a server Route Handler cannot read.
+  const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:recoveryUrl(lang)})
   if(error){console.error('requestPasswordReset failed',{message:error.message});redirect(loginUrl(lang,'&mode=signin&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))}
   const message=lang==='es'
     ? 'Correo para cambiar la contraseña enviado. Revisa Recibidos y Spam/Correo no deseado. Abre solamente el enlace más reciente.'
