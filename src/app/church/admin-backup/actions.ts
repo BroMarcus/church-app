@@ -10,7 +10,7 @@ const message=(lang:'en'|'es',en:string,es:string)=>lang==='es'?es:en
 
 export async function promoteBackupAdmin(formData:FormData){
   const targetMembershipId=value(formData,'membership_id')
-  const lang:valueofLang=value(formData,'lang')==='es'?'es':'en'
+  const lang:'en'|'es'=value(formData,'lang')==='es'?'es':'en'
   const confirmed=value(formData,'confirm_admin')==='yes'
   const back='/church/admin-backup'
   const supabase=await createClient()
@@ -45,5 +45,3 @@ export async function promoteBackupAdmin(formData:FormData){
   revalidatePath('/church')
   redirect(withLang(`${back}?saved=1`,lang))
 }
-
-type valueofLang='en'|'es'
