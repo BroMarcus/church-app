@@ -26,9 +26,8 @@ const safeErr=(courseId:string,message:string)=>redirect(back(courseId,`?error=$
 const parseSections=(raw:string,title:string)=>{
   const chunks=raw.split(/\n\s*---\s*\n/g).map(v=>v.trim()).filter(Boolean)
   if(!chunks.length)return[]
-  return chunks.slice(0,20).map((chunk,i)=>{const lines=chunk.split(/\r?\n/);const first=String(lines.shift()??'').trim();const heading=first.length<=120&&lines.length?first:`${title} — Section ${i+1}`;const body=first===heading?lines.join('\n').trim():chunk;return{heading,body}}).filter(s=>s.body)
+  return chunks.slice(0,20).map((chunk,i)=>{const lines=chunk.split(/\r?\n/);const first=String(lines.shift()??'').trim();const hasHeading=first.length<=120&&lines.length>0;return{heading:hasHeading?first:`${title} — Section ${i+1}`,body:hasHeading?lines.join('\n').trim():chunk}}).filter(s=>s.body)
 }
-const serializeSections=(content:any)=>Array.isArray(content?.sections)?content.sections.map((s:any)=>`${String(s?.heading??'Section')}\n${String(s?.body??'')}`).join('\n---\n'):String(content?.body??'')
 
 export async function updateLesson(formData:FormData){
   const courseId=text(formData,'course_id'),moduleId=text(formData,'module_id'),title=text(formData,'title')
@@ -39,8 +38,8 @@ export async function updateLesson(formData:FormData){
   const sections=parseSections(text(formData,'sections_text'),title)
   if(!sections.length)safeErr(courseId,'Add at least one lesson section with content.')
   const current:any=module!.content&&typeof module!.content==='object'?module!.content:{}
-  const content={...current,summary:text(formData,'summary')||'',sections,body:undefined}
-  delete (content as any).body
+  const content={...current,summary:text(formData,'summary')||'',sections}
+  delete content.body
   const {error}=await supabase.from('course_modules').update({title,content,position:Math.max(1,num(formData,'position',1))}).eq('id',moduleId).eq('course_id',courseId)
   if(error){console.error('updateLesson failed',{message:error.message});safeErr(courseId,'We could not save that lesson.')}
   revalidatePath(back(courseId));revalidatePath(`/learning/${courseId}`);revalidatePath(`/learning/${courseId}/lesson/${moduleId}`);redirect(back(courseId,'?lesson_saved=1'))
@@ -106,19 +105,26 @@ function questionPayload(formData:FormData){
   return{type,prompt,points,explanation,options,correct}
 }
 
+export async function createQuestion(formData:FormData){
+  const courseId=text(formData,'course_id'),assessmentId=text(formData,'assessment_id');if(!courseId||!assessmentId)safeErr(courseId,'Assessment not found.')
+  const {supabase}=await manager(courseId);const p=questionPayload(formData);if(!p.prompt||p.correct==null)safeErr(courseId,'Question and correct answer are required.')
+  const {data:owned}=await supabase.from('course_assessments').select('id').eq('id',assessmentId).eq('course_id',courseId).maybeSingle();if(!owned)safeErr(courseId,'Assessment not found.')
+  const {error}=await supabase.rpc('create_assessment_question',{p_assessment_id:assessmentId,p_question_type:p.type,p_prompt:p.prompt,p_options:p.options,p_correct_answer:p.correct,p_points:p.points,p_explanation:p.explanation})
+  if(error){console.error('createQuestion failed',{message:error.message});safeErr(courseId,'We could not add that question. Check the 5–10 checkpoint / 20–25 final-exam limits.')}
+  revalidatePath(back(courseId));redirect(back(courseId,'?question_created=1'))
+}
+
 export async function updateQuestion(formData:FormData){
   const courseId=text(formData,'course_id'),questionId=text(formData,'question_id');if(!courseId||!questionId)safeErr(courseId,'Question not found.')
-  await manager(courseId);const p=questionPayload(formData);if(!p.prompt||p.correct==null)safeErr(courseId,'Question and correct answer are required.')
-  const supabase=await createClient();const {error}=await supabase.rpc('update_assessment_question',{p_question_id:questionId,p_question_type:p.type,p_prompt:p.prompt,p_options:p.options,p_correct_answer:p.correct,p_points:p.points,p_explanation:p.explanation})
+  const {supabase}=await manager(courseId);const p=questionPayload(formData);if(!p.prompt||p.correct==null)safeErr(courseId,'Question and correct answer are required.')
+  const {error}=await supabase.rpc('update_assessment_question',{p_question_id:questionId,p_question_type:p.type,p_prompt:p.prompt,p_options:p.options,p_correct_answer:p.correct,p_points:p.points,p_explanation:p.explanation})
   if(error){console.error('updateQuestion failed',{message:error.message});safeErr(courseId,error.message.includes('attempted')?'This assessment already has learner attempts. Create a new assessment version instead of rewriting history.':'We could not save that question.')}
   revalidatePath(back(courseId));redirect(back(courseId,'?question_saved=1'))
 }
 
 export async function deleteQuestion(formData:FormData){
   const courseId=text(formData,'course_id'),questionId=text(formData,'question_id');if(!courseId||!questionId)safeErr(courseId,'Question not found.')
-  await manager(courseId);const supabase=await createClient();const {error}=await supabase.rpc('delete_assessment_question',{p_question_id:questionId})
+  const {supabase}=await manager(courseId);const {error}=await supabase.rpc('delete_assessment_question',{p_question_id:questionId})
   if(error){console.error('deleteQuestion failed',{message:error.message});safeErr(courseId,error.message.includes('attempted')?'This question is part of learner history and cannot be deleted. Create a new assessment version instead.':'We could not delete that question.')}
   revalidatePath(back(courseId));redirect(back(courseId,'?question_deleted=1'))
 }
-
-export {serializeSections}
