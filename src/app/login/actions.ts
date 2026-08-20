@@ -133,7 +133,19 @@ export async function resendConfirmation(formData:FormData){
   const invitePart=inviteId?`&invite=${encodeURIComponent(inviteId)}`:''
   if(!email)redirect(loginUrl(lang,invitePart+'&mode=signin&error='+encodeURIComponent(lang==='es'?'Escribe primero tu correo electrónico.':'Enter your email address first.')))
   const startPath=`/start?welcome=1${lang==='es'?'&lang=es':''}`
-  const {error}=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath)}})
+  let confirmationNext=startPath
+  if(inviteId){
+    // A brand-new invited user has already redeemed the invite in handle_new_user,
+    // so only preserve an invite that is still valid for an older existing account.
+    const {data:validInvite}=await supabase.rpc('validate_invite_email',{p_invite_id:inviteId,p_email:email})
+    if(validInvite){
+      const confirmedMessage=lang==='es'
+        ? 'Correo confirmado. Inicia sesión con este correo para conectar la invitación a tu cuenta.'
+        : 'Email confirmed. Sign in with this email to connect the invitation to your account.'
+      confirmationNext=loginUrl(lang,invitePart+'&mode=signin&message='+encodeURIComponent(confirmedMessage))
+    }
+  }
+  const {error}=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:callbackUrl(lang,'signup',confirmationNext)}})
   if(error){console.error('resendConfirmation failed',{message:error.message});redirect(loginUrl(lang,invitePart+'&mode=signin&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))}
   const message=lang==='es'
     ? 'Correo de confirmación enviado otra vez. Abre solamente el correo más reciente y revisa Spam/Correo no deseado si no aparece.'
