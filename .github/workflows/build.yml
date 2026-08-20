@@ -28,21 +28,59 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - name: Install dependencies
+        id: install
+        continue-on-error: true
         run: npm ci --no-audit --no-fund
       - name: Security regression tests
+        id: tests
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
         run: npm test
       - name: Lint
+        id: lint
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
         run: npm run lint
       - name: Build
+        id: build
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
         run: npm run build
-      - name: Publish release-gate status
-        if: github.event_name == 'push'
+      - name: Publish release-gate statuses
+        if: always() && github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
+          INSTALL: ${{ steps.install.outcome }}
+          TESTS: ${{ steps.tests.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+          BUILD: ${{ steps.build.outcome }}
         run: |
+          publish() {
+            context="$1"
+            outcome="$2"
+            if [ "$outcome" = "success" ]; then state=success; else state=failure; fi
+            gh api --method POST \
+              -H "Accept: application/vnd.github+json" \
+              "/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -f state="$state" \
+              -f context="kingdom-network/${context}" \
+              -f description="${context}: ${outcome}"
+          }
+          publish install "$INSTALL"
+          publish security-tests "$TESTS"
+          publish lint "$LINT"
+          publish build "$BUILD"
+          if [ "$INSTALL" = success ] && [ "$TESTS" = success ] && [ "$LINT" = success ] && [ "$BUILD" = success ]; then
+            overall=success
+            description='install, security tests, lint, and build passed'
+          else
+            overall=failure
+            description="install=${INSTALL}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
+          fi
           gh api --method POST \
             -H "Accept: application/vnd.github+json" \
             "/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -f state=success \
+            -f state="$overall" \
             -f context='kingdom-network/release-gate' \
-            -f description='npm ci, security tests, lint, and build passed'
+            -f description="$description"
+          [ "$overall" = success ]
