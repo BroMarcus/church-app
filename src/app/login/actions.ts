@@ -9,6 +9,7 @@ const langOf=(f:FormData)=>text(f,'lang')==='es'?'es':'en'
 const loginUrl=(lang:string,extra='')=>`/login?lang=${lang}${extra}`
 const callbackUrl=(lang:'en'|'es',mode:'signup'|'recovery',next:string)=>`${siteUrl}/auth/callback?lang=${lang}&mode=${mode}&next=${encodeURIComponent(next)}`
 const recoveryUrl=(lang:'en'|'es')=>`${siteUrl}/auth/update-password?lang=${lang}`
+const safeJoinNext=(value:string)=>value.startsWith('/join/')&&!value.startsWith('//')&&!value.includes('..')?value:''
 
 function friendlyAuthEmailError(message:string,lang:'en'|'es'){
   const normalized=message.toLowerCase()
@@ -24,7 +25,8 @@ function friendlyAuthEmailError(message:string,lang:'en'|'es'){
 
 export async function login(formData:FormData){
   const supabase=await createClient()
-  const lang=langOf(formData)
+  const lang=langOf(formData),next=safeJoinNext(text(formData,'next'))
+  const nextPart=next?`&next=${encodeURIComponent(next)}`:''
   const email=text(formData,'email').toLowerCase(),password=String(formData.get('password')??'')
   const {data,error}=await supabase.auth.signInWithPassword({email,password})
   if(error){
@@ -43,8 +45,9 @@ export async function login(formData:FormData){
     if(!normalized.includes('invalid login credentials')&&!normalized.includes('email not confirmed')){
       console.error('login failed',{message:error.message})
     }
-    redirect(loginUrl(lang,'&mode=signin&error='+encodeURIComponent(message)))
+    redirect(loginUrl(lang,'&mode=signin'+nextPart+'&error='+encodeURIComponent(message)))
   }
+  if(next)redirect(next)
   const userId=data.user?.id
   if(userId){
     const onboardingState=data.user?.user_metadata?.onboarding_completed
