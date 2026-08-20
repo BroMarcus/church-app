@@ -63,6 +63,19 @@ test('existing accounts can securely redeem a retained church invitation after s
   assert.match(migration,/grant execute on function public\.redeem_invite_for_current_user\(uuid\) to authenticated/)
 })
 
+test('internal security-definer readiness helpers are removed from direct API execution',async()=>{
+  const migration=await read('supabase/migrations/20260820053000_existing_account_invite_redemption.sql')
+  for(const signature of [
+    'church_pilot_readiness_base\\(uuid\\)',
+    'church_growth_funnel_readiness\\(uuid\\)',
+    'church_member_relationship_readiness\\(uuid\\)',
+    'church_health_snapshot_base\\(uuid,integer\\)'
+  ]){
+    assert.match(migration,new RegExp(`revoke all on function public\\.${signature} from authenticated`))
+    assert.match(migration,new RegExp(`revoke all on function public\\.${signature} from anon`))
+  }
+})
+
 test('explicit invitation relationship source is not overwritten by old auth metadata',async()=>{
   const migration=await read('supabase/migrations/20260820053000_existing_account_invite_redemption.sql')
   assert.match(migration,/if new\.relationship_source is distinct from 'legacy_backfill' then/)
@@ -81,6 +94,17 @@ test('existing-account church signup guidance does not imply automatic membershi
   assert.match(source,/church admin can add that account without creating another one/)
   assert.match(source,/un administrador puede añadir tu cuenta sin crear otra/)
   assert.match(source,/mode=signin&message=/)
+})
+
+test('login keeps invalid invitation guidance honest and mobile email entry predictable',async()=>{
+  const source=await read('src/app/login/page.tsx')
+  assert.match(source,/invalidOpen:/)
+  assert.match(source,/invalidClosed:/)
+  assert.match(source,/const invalidInviteMessage=publicOpen\?t\.invalidOpen:t\.invalidClosed/)
+  assert.match(source,/autoCapitalize:'none'/)
+  assert.match(source,/spellCheck:false/)
+  assert.match(source,/role="alert"/)
+  assert.match(source,/role="status"/)
 })
 
 test('Kingdom Guide resource search is accent tolerant and language preserving',async()=>{
