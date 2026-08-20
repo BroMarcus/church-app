@@ -69,8 +69,10 @@ test('password reset always releases busy state and keeps errors member-safe',as
   const source=await read('src/app/auth/update-password/page.tsx')
   assert.match(source,/finally\{\s*setBusy\(false\)\s*\}/s)
   assert.match(source,/password update failed/)
-  assert.match(source,/role="status" aria-live="polite"/)
+  assert.match(source,/role=\{completed\?'status':'alert'\}/)
+  assert.match(source,/aria-live="polite"/)
   assert.match(source,/type="submit" disabled=\{busy\}/)
+  assert.match(source,/setCompleted\(true\)/)
 })
 
 test('password recovery preserves a safe church-join return path end to end',async()=>{
@@ -80,8 +82,10 @@ test('password recovery preserves a safe church-join return path end to end',asy
   assert.match(page,/name="next" value=\{joinNext\}/)
   assert.match(actions,/const recoveryUrl=.*safeJoinNext/)
   assert.match(actions,/resetPasswordForEmail\(email,\{redirectTo:recoveryUrl\(lang,next\)\}\)/)
-  assert.match(reset,/const safeJoinNext=/)
+  assert.match(reset,/function safeJoinNext/)
+  assert.match(reset,/new URL\(value,base\)/)
   assert.match(reset,/setJoinNext\(next\)/)
+  assert.match(reset,/signInHref=`\/login\?lang=\$\{lang\}&mode=signin\$\{nextPart\}`/)
 })
 
 test('login renders only allowlisted bilingual status codes, not arbitrary query text',async()=>{
