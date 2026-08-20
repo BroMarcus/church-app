@@ -36,3 +36,11 @@ test('Church Builder remains pastor/admin only and preserves Spanish route conte
   assert.match(source,/const l=\(path:string\)=>lang==='es'/)
   assert.match(source,/\/church\/launch\?lang=es/)
 })
+
+test('church settings does not expose raw database errors to pastors or admins',async()=>{
+  const source=await read('src/app/church/settings/actions.ts')
+  assert.doesNotMatch(source,/encodeURIComponent\(error\.message\)/)
+  assert.match(source,/console\.error\('updateChurchSettings failed'/)
+  assert.match(source,/We could not save the changes\. Try again\./)
+  assert.match(source,/No se pudieron guardar los cambios\. Inténtalo de nuevo\./)
+})
