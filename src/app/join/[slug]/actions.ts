@@ -6,17 +6,11 @@ import { createClient } from '@/lib/supabase/server'
 const text=(f:FormData,k:string)=>String(f.get(k)??'').trim()
 const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
 
-function joinSignupError(message:string,lang:'en'|'es'){
+function joinSignupErrorCode(message:string){
   const lower=message.toLowerCase()
-  if(lower.includes('rate limit')||lower.includes('security purposes')||lower.includes('over_email_send_rate_limit'))return lang==='es'
-    ? 'Se solicitaron demasiados correos de confirmación. Espera aproximadamente un minuto e inténtalo una sola vez más.'
-    : 'Too many confirmation emails were requested. Wait about one minute, then try once more.'
-  if(lower.includes('password'))return lang==='es'
-    ? 'No pudimos usar esa contraseña. Usa por lo menos 8 caracteres e intenta nuevamente.'
-    : 'We could not use that password. Use at least 8 characters and try again.'
-  return lang==='es'
-    ? 'No pudimos crear tu cuenta en este momento. Revisa tu correo y contraseña e inténtalo otra vez.'
-    : 'We could not create your account right now. Check your email and password and try again.'
+  if(lower.includes('rate limit')||lower.includes('security purposes')||lower.includes('over_email_send_rate_limit'))return 'email_rate_limit'
+  if(lower.includes('password'))return 'password_rejected'
+  return 'signup_failed'
 }
 
 export async function joinChurch(formData:FormData){
@@ -25,16 +19,16 @@ export async function joinChurch(formData:FormData){
   const slug=text(formData,'church_slug').toLowerCase()
   const email=text(formData,'email').toLowerCase(),phone=text(formData,'phone'),firstName=text(formData,'first_name'),lastName=text(formData,'last_name')
   const password=String(formData.get('password')??''),confirm=String(formData.get('confirm_password')??'')
-  const fail=(en:string,es:string)=>redirect(`/join/${encodeURIComponent(slug)}?lang=${lang}&error=${encodeURIComponent(lang==='es'?es:en)}`)
-  if(!slug)fail('Church link is missing.','Falta el enlace de la iglesia.')
-  if(!firstName||!lastName)fail('First and last name are required.','Se requieren nombre y apellido.')
-  if(!email)fail('Enter your email address.','Escribe tu correo electrónico.')
-  if(password.length<8)fail('Your password must be at least 8 characters.','Tu contraseña debe tener por lo menos 8 caracteres.')
-  if(password!==confirm)fail('The passwords do not match.','Las contraseñas no coinciden.')
+  const fail=(code:string)=>redirect(`/join/${encodeURIComponent(slug)}?lang=${lang}&error_code=${encodeURIComponent(code)}`)
+  if(!slug)fail('missing_church')
+  if(!firstName||!lastName)fail('missing_name')
+  if(!email)fail('missing_email')
+  if(password.length<8)fail('weak_password')
+  if(password!==confirm)fail('password_mismatch')
 
   const {data:statusData,error:statusError}=await supabase.rpc('get_public_signup_status_for_church',{p_church_slug:slug})
   const church:any=Array.isArray(statusData)?statusData[0]:statusData
-  if(statusError||!church?.church_id||!church?.open)fail('This church is not accepting public signups right now.','Esta iglesia no está aceptando registros públicos en este momento.')
+  if(statusError||!church?.church_id||!church?.open)fail('signup_closed')
 
   const startPath=`/start?welcome=1${lang==='es'?'&lang=es':''}`
   const callback=`${siteUrl}/auth/callback?lang=${lang}&mode=signup&next=${encodeURIComponent(startPath)}`
@@ -46,23 +40,22 @@ export async function joinChurch(formData:FormData){
   })
   if(error){
     console.error('public church signup failed',{churchSlug:slug,message:error.message})
-    const friendly=joinSignupError(error.message,lang)
-    fail(friendly,friendly)
+    fail(joinSignupErrorCode(error.message))
   }
   if(data.user&&Array.isArray(data.user.identities)&&data.user.identities.length===0){
     const next=`/join/${encodeURIComponent(slug)}?lang=${lang}`
-    redirect(`/login?lang=${lang}&mode=signin&next=${encodeURIComponent(next)}&message=${encodeURIComponent(lang==='es'?'Ese correo ya tiene una cuenta. Inicia sesión; después podrás unirte a esta iglesia con tu cuenta existente.':'That email already has an account. Sign in; then you can join this church with your existing account.')}`)
+    redirect(`/login?lang=${lang}&mode=signin&next=${encodeURIComponent(next)}&message_code=join_account_exists`)
   }
   if(data.session)redirect(startPath)
-  redirect(`/login?lang=${lang}&mode=signin&message=${encodeURIComponent(lang==='es'?`Cuenta creada para ${church.church_name}. Revisa tu correo y confirma la cuenta; después irás a Empieza Aquí.`:`Account created for ${church.church_name}. Check your email and confirm the account; then you’ll go to Start Here.`)}`)
+  redirect(`/login?lang=${lang}&mode=signin&message_code=join_account_created`)
 }
 
 export async function joinExistingChurch(formData:FormData){
   const supabase=await createClient()
   const lang:'en'|'es'=text(formData,'lang')==='es'?'es':'en'
   const slug=text(formData,'church_slug').toLowerCase()
-  const fail=(en:string,es:string)=>redirect(`/join/${encodeURIComponent(slug)}?lang=${lang}&error=${encodeURIComponent(lang==='es'?es:en)}`)
-  if(!slug)fail('Church link is missing.','Falta el enlace de la iglesia.')
+  const fail=(code:string)=>redirect(`/join/${encodeURIComponent(slug)}?lang=${lang}&error_code=${encodeURIComponent(code)}`)
+  if(!slug)fail('missing_church')
 
   const {data:claims}=await supabase.auth.getClaims()
   if(!claims?.claims?.sub){
@@ -79,14 +72,11 @@ export async function joinExistingChurch(formData:FormData){
   })
   if(error){
     const msg=error.message.toLowerCase()
-    if(msg.includes('capacity'))fail('This church’s public pilot is currently full.','El piloto público de esta iglesia está lleno en este momento.')
-    if(msg.includes('previous church access'))fail('Your previous access to this church is inactive. Ask a church administrator to restore it.','Tu acceso anterior a esta iglesia está inactivo. Pide a un administrador de la iglesia que lo restaure.')
+    if(msg.includes('capacity'))fail('capacity_full')
+    if(msg.includes('previous church access'))fail('inactive_access')
     console.error('existing-account church join failed',{churchSlug:slug,message:error.message})
-    fail('We could not connect your account to this church yet.','Todavía no pudimos conectar tu cuenta con esta iglesia.')
+    fail('join_failed')
   }
   const row:any=Array.isArray(data)?data[0]:data
-  const message=lang==='es'
-    ? row?.already_member?'Tu cuenta ya estaba conectada con esta iglesia.':'Tu cuenta existente ya está conectada con esta iglesia.'
-    : row?.already_member?'Your account was already connected to this church.':'Your existing account is now connected to this church.'
-  redirect(`/start?lang=${lang}&message=${encodeURIComponent(message)}`)
+  redirect(`/start?lang=${lang}&message_code=${row?.already_member?'already_joined':'joined_existing'}`)
 }
