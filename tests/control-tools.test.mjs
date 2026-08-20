@@ -27,8 +27,10 @@ test('shared schedule RLS keeps church isolation and allows schedule participant
 test('control tools preserve history instead of deleting roster or schedule assignments',async()=>{
   const teamActions=await read('src/app/teams/manage/actions.ts')
   const scheduleActions=await read('src/app/calendar/manage/actions.ts')
+  const groupRosterActions=await read('src/app/groups/[groupId]/roster/actions.ts')
   assert.doesNotMatch(teamActions,/\.delete\s*\(/)
   assert.doesNotMatch(scheduleActions,/\.delete\s*\(/)
+  assert.doesNotMatch(groupRosterActions,/\.delete\s*\(/)
   assert.match(teamActions,/member_status:'active'/)
   assert.match(scheduleActions,/assignment_status:'removed'/)
   assert.match(scheduleActions,/status:'cancelled'/)
@@ -40,7 +42,10 @@ test('new control tool server code contains no explicit any escapes',async()=>{
     'src/app/teams/manage/page.tsx',
     'src/app/calendar/manage/actions.ts',
     'src/app/calendar/manage/page.tsx',
-    'src/app/calendar/shared/page.tsx'
+    'src/app/calendar/shared/page.tsx',
+    'src/app/groups/[groupId]/roster/actions.ts',
+    'src/app/groups/[groupId]/roster/page.tsx',
+    'src/app/rosters/page.tsx'
   ]
   for(const file of files){
     const source=await read(file)
@@ -51,10 +56,13 @@ test('new control tool server code contains no explicit any escapes',async()=>{
 test('control tools never redirect raw database error messages to members or leaders',async()=>{
   const teamActions=await read('src/app/teams/manage/actions.ts')
   const scheduleActions=await read('src/app/calendar/manage/actions.ts')
+  const groupRosterActions=await read('src/app/groups/[groupId]/roster/actions.ts')
   assert.doesNotMatch(teamActions,/encodeURIComponent\(error\.message\)/)
   assert.doesNotMatch(scheduleActions,/encodeURIComponent\(error\.message\)/)
+  assert.doesNotMatch(groupRosterActions,/encodeURIComponent\(error\.message\)/)
   assert.match(teamActions,/console\.error\('createTeam failed'/)
   assert.match(scheduleActions,/console\.error\('createSchedule failed'/)
+  assert.match(groupRosterActions,/console\.error\('addRosterMember failed'/)
 })
 
 test('shared scheduling has conflict detection and documented intentional overrides',async()=>{
@@ -70,6 +78,7 @@ test('leader control screens follow the simple roster then schedule workflow',as
   const teams=await read('src/app/teams/manage/page.tsx')
   const schedules=await read('src/app/calendar/manage/page.tsx')
   const shared=await read('src/app/calendar/shared/page.tsx')
+  const rosterHub=await read('src/app/rosters/page.tsx')
   assert.match(teams,/Teams, roles and people/)
   assert.match(teams,/Open schedules/)
   assert.match(schedules,/1 • PICK A SCHEDULE/)
@@ -77,4 +86,21 @@ test('leader control screens follow the simple roster then schedule workflow',as
   assert.match(schedules,/3 • WHO IS DOING WHAT/)
   assert.match(shared,/See the whole lineup together/)
   assert.match(shared,/assignment_status','scheduled'/)
+  assert.match(rosterHub,/Rosters without the paperwork/)
+  assert.match(rosterHub,/teams\/manage/)
+  assert.match(rosterHub,/groups\/\$\{group\.id\}\/roster/)
+})
+
+test('Friendship Group roll sheet respects contact privacy and shows recent attendance',async()=>{
+  const page=await read('src/app/groups/[groupId]/roster/page.tsx')
+  const actions=await read('src/app/groups/[groupId]/roster/actions.ts')
+  assert.match(page,/show_contact_email/)
+  assert.match(page,/Not shared/)
+  assert.match(page,/group_report_attendance/)
+  assert.match(page,/attendance_status/)
+  assert.match(page,/updateRosterMember/)
+  assert.match(page,/addRosterMember/)
+  assert.match(actions,/update_group_member_status/)
+  assert.match(actions,/only one active Friendship Group/)
+  assert.doesNotMatch(page,/member_private_details/)
 })
