@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 
-export default function ChurchJoinError({reset}:{error:Error&{digest?:string};reset:()=>void}){
+export default function ChurchJoinError({reset}:{reset:()=>void}){
   return <main className="login-wrap">
     <div className="login card" role="alert">
       <div className="pill">KINGDOM NETWORK</div>
