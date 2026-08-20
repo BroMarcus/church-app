@@ -44,3 +44,14 @@ test('church settings does not expose raw database errors to pastors or admins',
   assert.match(source,/We could not save the changes\. Try again\./)
   assert.match(source,/No se pudieron guardar los cambios\. Inténtalo de nuevo\./)
 })
+
+test('Setup Inbox fails closed instead of marking curriculum ready after course creation failure',async()=>{
+  const actions=await read('src/app/church/setup-inbox/actions.ts')
+  const page=await read('src/app/church/setup-inbox/page.tsx')
+  assert.match(actions,/if\(error\|\|!course\?\.id\).*redirect\(inbox\(lang,'approve'\)\)/s)
+  assert.match(actions,/const \{error:updateError\}=await supabase\.from\('church_setup_uploads'\)\.update/)
+  assert.match(actions,/if\(updateError\).*redirect\(inbox\(lang,'approve'\)\)/s)
+  assert.match(page,/Nothing was marked ready\. Try again\./)
+  assert.match(page,/Nada se marcó como listo\. Inténtalo de nuevo\./)
+  assert.match(page,/name="lang" value=\{lang\}/)
+})
