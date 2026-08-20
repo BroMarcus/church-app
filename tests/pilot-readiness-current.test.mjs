@@ -26,6 +26,16 @@ test('password recovery preserves a pending church invitation',async()=>{
   assert.match(updatePassword,/mode=signin\$\{invitePart\}/)
 })
 
+test('confirmation resend preserves only an invitation still awaiting an existing account',async()=>{
+  const actions=await read('src/app/login/actions.ts')
+  assert.match(actions,/let confirmationNext=startPath/)
+  assert.match(actions,/validate_invite_email.*p_invite_id:inviteId,p_email:email/)
+  assert.match(actions,/if\(validInvite\)/)
+  assert.match(actions,/Email confirmed\. Sign in with this email to connect the invitation to your account/)
+  assert.match(actions,/Correo confirmado\. Inicia sesión con este correo para conectar la invitación a tu cuenta/)
+  assert.match(actions,/callbackUrl\(lang,'signup',confirmationNext\)/)
+})
+
 test('existing accounts can securely redeem a retained church invitation after sign in',async()=>{
   const actions=await read('src/app/login/actions.ts')
   const loginPage=await read('src/app/login/page.tsx')
