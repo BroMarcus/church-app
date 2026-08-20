@@ -19,7 +19,10 @@ export async function promoteBackupAdmin(formData:FormData){
   if(!targetMembershipId)fail('Choose a person first.','Selecciona una persona primero.')
 
   const {data:target}=await supabase.from('church_memberships').select('id,church_id,user_id,role,status,relationship_status').eq('id',targetMembershipId).single()
-  if(!target?.church_id)fail('That membership could not be found.','No se encontró esa membresía.')
+  if(!target?.church_id){
+    fail('That membership could not be found.','No se encontró esa membresía.')
+    return
+  }
 
   const {data:actor}=await supabase.from('church_memberships').select('role,status').eq('church_id',target.church_id).eq('user_id',userId).eq('status','active').single()
   if(!actor||!['pastor','church_admin'].includes(actor.role))redirect(lang==='es'?'/?lang=es':'/')
