@@ -22,6 +22,6 @@ for (const [route,label] of routes) {
     assert.match(error, /role="alert"/)
     assert.match(error, /minHeight:44/)
     assert.match(error, /Try again \/ Intentar de nuevo/)
-    assert.match(error, /No .* was changed|No se modificó/)
+    assert.match(error, />No [^<]+\. \/ No se [^<]+\.<\/p>/)
   })
 }
