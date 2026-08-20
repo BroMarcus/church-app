@@ -13,6 +13,7 @@ const routes = [
   ['fundraising','Fundraising / Recaudación de fondos'],
   ['feedback','Feedback / Comentarios'],
   ['directory','Member Directory / Directorio de miembros'],
+  ['documents','Documents / Documentos'],
 ]
 
 for (const [route,label] of routes) {
