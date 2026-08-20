@@ -132,7 +132,8 @@ test('assessment question editing preserves private answer keys unless intention
   assert.match(migration,/assessment_attempts/)
   assert.match(bridge,/revoke all on function private\.update_assessment_question_impl/)
   assert.match(bridge,/grant execute on function private\.update_assessment_question_impl[^\n]*authenticated/)
-  assert.match(page,/leave blank to keep the existing answer key/)
+  assert.match(page,/new correct answer/i)
+  assert.match(page,/blank to keep the existing answer key/i)
   assert.doesNotMatch(page,/assessment_answer_keys/)
 })
 
