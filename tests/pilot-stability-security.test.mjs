@@ -57,3 +57,16 @@ test('church signup route has visible loading and safe retry states',async()=>{
   assert.match(error,/No se cambió ninguna cuenta ni registro de iglesia/)
   assert.match(error,/\/login\?mode=signin/)
 })
+
+test('backup admin promotion is limited to active verified church members',async()=>{
+  const page=await read('src/app/church/admin-backup/page.tsx')
+  const actions=await read('src/app/church/admin-backup/actions.ts')
+  assert.match(page,/\.eq\('relationship_status','member'\)/)
+  assert.match(page,/Only active formal members/)
+  assert.match(page,/miembros formales activos/)
+  assert.match(actions,/target\.relationship_status!=='member'/)
+  assert.match(actions,/Only a verified church member can become a backup admin/)
+  assert.match(actions,/\.eq\('relationship_status','member'\)/)
+  assert.match(actions,/console\.error\('backup admin promotion failed'/)
+  assert.doesNotMatch(actions,/encodeURIComponent\(error\.message\)/)
+})
