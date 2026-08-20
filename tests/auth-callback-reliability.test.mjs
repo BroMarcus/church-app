@@ -4,13 +4,16 @@ import {readFile} from 'node:fs/promises'
 
 const read=(path)=>readFile(new URL(`../${path}`,import.meta.url),'utf8')
 
-test('auth callback limits continuation routes to pilot-safe destinations',async()=>{
+test('auth callback normalizes and limits continuation routes to pilot-safe destinations',async()=>{
   const source=await read('src/app/auth/callback/route.ts')
   assert.match(source,/function allowedAuthDestination/)
   assert.match(source,/path\.startsWith\('\/join\/'\)/)
   assert.match(source,/path\.startsWith\('\/start\?'\)/)
   assert.match(source,/path\.startsWith\('\/auth\/update-password\?'\)/)
-  assert.match(source,/requested\.origin===canonical\.origin&&allowedAuthDestination\(local\)/)
+  assert.match(source,/const requested=new URL\(raw,canonical\)/)
+  assert.match(source,/requested\.origin!==canonical\.origin/)
+  assert.match(source,/return allowedAuthDestination\(local\)\?local:fallback/)
+  assert.doesNotMatch(source,/raw\.startsWith\('\/'\).*allowedAuthDestination\(raw\)/s)
 })
 
 test('auth callback failures return members to sign-in with safe bilingual guidance',async()=>{
