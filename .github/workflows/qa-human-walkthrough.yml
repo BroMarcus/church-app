@@ -16,7 +16,7 @@ jobs:
   human-qa:
     if: github.head_ref == 'qa/full-human-walkthrough-2026-08-20' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - name: Checkout QA branch
         uses: actions/checkout@v4
@@ -37,22 +37,22 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Run human-style QA walkthrough
+      - name: Run bounded human-style QA walkthrough
         env:
           QA_BASE_URL: https://kingdom-network.vercel.app
           QA_PASSWORD: KN-QA-2026!R7x9-Mock
-        run: node qa/full-human-walkthrough.mjs
+        run: node qa/full-human-walkthrough-v2.mjs
 
       - name: Print QA summary
         if: always()
         run: |
-          if [ -f qa-artifacts/summary.md ]; then cat qa-artifacts/summary.md; fi
+          if [ -f qa-artifacts-v2/summary.md ]; then cat qa-artifacts-v2/summary.md; fi
 
       - name: Upload QA evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: kingdom-network-human-qa
-          path: qa-artifacts/
+          name: kingdom-network-human-qa-v2
+          path: qa-artifacts-v2/
           if-no-files-found: warn
           retention-days: 7
