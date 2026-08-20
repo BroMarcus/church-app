@@ -87,22 +87,34 @@ begin
     where user_id=v_user;
   end if;
 
+  -- Prefer a contact already linked to this account so the join path never
+  -- creates a second Outreach record for the same person in the same church.
   select o.id
     into v_outreach_id
   from public.outreach_contacts o
-  where o.church_id=v_church.id
-    and o.member_user_id is null
-    and (
-      (o.email is not null and lower(trim(o.email))=lower(trim(v_email)))
-      or (
-        length(v_phone_digits)>=7
-        and length(regexp_replace(coalesce(o.phone,''),'[^0-9]','','g'))>=7
-        and regexp_replace(coalesce(o.phone,''),'[^0-9]','','g')=v_phone_digits
-      )
-    )
-  order by case when o.email is not null and lower(trim(o.email))=lower(trim(v_email)) then 0 else 1 end,o.updated_at desc
+  where o.church_id=v_church.id and o.member_user_id=v_user
+  order by o.updated_at desc
   limit 1
   for update;
+
+  if v_outreach_id is null then
+    select o.id
+      into v_outreach_id
+    from public.outreach_contacts o
+    where o.church_id=v_church.id
+      and o.member_user_id is null
+      and (
+        (o.email is not null and lower(trim(o.email))=lower(trim(v_email)))
+        or (
+          length(v_phone_digits)>=7
+          and length(regexp_replace(coalesce(o.phone,''),'[^0-9]','','g'))>=7
+          and regexp_replace(coalesce(o.phone,''),'[^0-9]','','g')=v_phone_digits
+        )
+      )
+    order by case when o.email is not null and lower(trim(o.email))=lower(trim(v_email)) then 0 else 1 end,o.updated_at desc
+    limit 1
+    for update;
+  end if;
 
   if v_outreach_id is not null then
     update public.outreach_contacts
