@@ -29,11 +29,14 @@ test('password recovery preserves a pending church invitation',async()=>{
 test('existing accounts can securely redeem a retained church invitation after sign in',async()=>{
   const actions=await read('src/app/login/actions.ts')
   const loginPage=await read('src/app/login/page.tsx')
+  const inviteAdmin=await read('src/app/church/invites/page.tsx')
   const migration=await read('supabase/migrations/20260820053000_existing_account_invite_redemption.sql')
 
   assert.match(loginPage,/name="invite_id" value=\{params\.invite/)
   assert.match(loginPage,/connect this church to your existing account automatically/)
   assert.match(loginPage,/Conectaremos esta iglesia a tu cuenta existente automáticamente/)
+  assert.match(inviteAdmin,/someone who already has a Kingdom Network account can simply sign in/)
+  assert.match(inviteAdmin,/si ya tiene una cuenta de Kingdom Network, solo necesita iniciar sesión/)
   assert.match(actions,/redeem_invite_for_current_user/)
   assert.match(actions,/existing account invite redemption failed/)
   assert.match(actions,/invitePart\+'&mode=signin&message='/)
