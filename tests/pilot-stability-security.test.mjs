@@ -103,3 +103,36 @@ test('Church Builder has bilingual loading and safe retry states',async()=>{
   assert.match(error,/No se cambió nada en la configuración de tu iglesia/)
   assert.match(error,/onClick=\{\(\)=>reset\(\)\}/)
 })
+
+test('My Today has bilingual loading and safe retry states',async()=>{
+  const loading=await read('src/app/today/loading.tsx')
+  const error=await read('src/app/today/error.tsx')
+  assert.match(loading,/aria-busy="true"/)
+  assert.match(loading,/Preparando tu día/)
+  assert.match(error,/role="alert"/)
+  assert.match(error,/Your tasks and church information were not changed/)
+  assert.match(error,/Tus tareas y la información de la iglesia no fueron modificadas/)
+  assert.match(error,/onClick=\{\(\)=>reset\(\)\}/)
+})
+
+test('My Journey has bilingual loading and safe retry states',async()=>{
+  const loading=await read('src/app/journey/loading.tsx')
+  const error=await read('src/app/journey/error.tsx')
+  assert.match(loading,/aria-busy="true"/)
+  assert.match(loading,/Preparando tu camino/)
+  assert.match(error,/role="alert"/)
+  assert.match(error,/Your Journey progress was not changed/)
+  assert.match(error,/El progreso de tu Camino no fue modificado/)
+  assert.match(error,/onClick=\{\(\)=>reset\(\)\}/)
+})
+
+test('Learning Center has bilingual loading and safe retry states',async()=>{
+  const loading=await read('src/app/learning/loading.tsx')
+  const error=await read('src/app/learning/error.tsx')
+  assert.match(loading,/aria-busy="true"/)
+  assert.match(loading,/Preparando tus clases/)
+  assert.match(error,/role="alert"/)
+  assert.match(error,/Your course progress was not changed/)
+  assert.match(error,/El progreso de tus cursos no fue modificado/)
+  assert.match(error,/onClick=\{\(\)=>reset\(\)\}/)
+})
