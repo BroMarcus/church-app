@@ -8,7 +8,15 @@ const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel
 const langOf=(f:FormData)=>text(f,'lang')==='es'?'es':'en'
 const loginUrl=(lang:string,extra='')=>`/login?lang=${lang}${extra}`
 const callbackUrl=(lang:'en'|'es',mode:'signup'|'recovery',next:string)=>`${siteUrl}/auth/callback?lang=${lang}&mode=${mode}&next=${encodeURIComponent(next)}`
-const safeJoinNext=(value:string)=>value.startsWith('/join/')&&!value.startsWith('//')&&!value.includes('..')?value:''
+function safeJoinNext(value:string){
+  try{
+    if(!value.startsWith('/')||value.startsWith('//')||value.includes('\\'))return ''
+    const base='https://kingdom.invalid'
+    const parsed=new URL(value,base)
+    if(parsed.origin!==base||!parsed.pathname.startsWith('/join/'))return ''
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`
+  }catch{return ''}
+}
 const recoveryUrl=(lang:'en'|'es',next='')=>`${siteUrl}/auth/update-password?lang=${lang}${safeJoinNext(next)?`&next=${encodeURIComponent(safeJoinNext(next))}`:''}`
 
 function friendlyAuthEmailError(message:string,lang:'en'|'es'){
@@ -40,8 +48,6 @@ export async function login(formData:FormData){
     else if(normalized.includes('email not confirmed')) message=lang==='es'
       ? 'Tu correo todavía no está confirmado. Abre el correo de confirmación más reciente que te enviamos y confirma tu cuenta antes de iniciar sesión.'
       : 'Your email is not confirmed yet. Open the newest confirmation email we sent and confirm your account before signing in.'
-    // Invalid credentials and unconfirmed email are normal member mistakes, not
-    // production incidents. Keep unexpected auth failures visible to monitoring.
     if(!normalized.includes('invalid login credentials')&&!normalized.includes('email not confirmed')){
       console.error('login failed',{message:error.message})
     }
@@ -111,8 +117,6 @@ export async function requestPasswordReset(formData:FormData){
   const nextPart=next?`&next=${encodeURIComponent(next)}`:''
   const email=text(formData,'reset_email').toLowerCase()
   if(!email)redirect(loginUrl(lang,'&mode=signin'+nextPart+'&error='+encodeURIComponent(lang==='es'?'Escribe primero tu correo electrónico.':'Enter your email address first.')))
-  // Password recovery must land in the browser. Supabase may return the recovery
-  // session in the URL fragment, which a server Route Handler cannot read.
   const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:recoveryUrl(lang,next)})
   if(error){console.error('requestPasswordReset failed',{message:error.message});redirect(loginUrl(lang,'&mode=signin'+nextPart+'&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))}
   const message=lang==='es'
