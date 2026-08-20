@@ -48,3 +48,19 @@ test('pilot readiness avoids database jargon in the hero copy',async()=>{
   assert.match(source,/Live setup checks plus the real-phone tests/)
   assert.match(source,/Revisiones en vivo de la configuración/)
 })
+
+test('public church signup never returns raw auth-provider errors to a member',async()=>{
+  const source=await read('src/app/join/[slug]/actions.ts')
+  assert.doesNotMatch(source,/fail\(error\.message,error\.message\)/)
+  assert.match(source,/console\.error\('public church signup failed'/)
+  assert.match(source,/We could not create your account right now\. Check your email and password and try again\./)
+  assert.match(source,/No pudimos crear tu cuenta en este momento\. Revisa tu correo y contraseña e inténtalo otra vez\./)
+  assert.match(source,/Too many confirmation emails were requested\. Wait about one minute/)
+})
+
+test('existing-account join logs unexpected failures without exposing provider text',async()=>{
+  const source=await read('src/app/join/[slug]/actions.ts')
+  assert.match(source,/console\.error\('existing-account church join failed'/)
+  assert.match(source,/We could not connect your account to this church yet\./)
+  assert.match(source,/Todavía no pudimos conectar tu cuenta con esta iglesia\./)
+})
