@@ -135,3 +135,12 @@ test('pilot readiness hides raw backend errors and exposes one next action',asyn
   assert.match(source,/const nextAction=rows\.find/)
   assert.match(source,/statusLabel\(r\.check_status,lang\)/)
 })
+
+test('pilot readiness preserves Spanish navigation and grammar',async()=>{
+  const source=await read('src/app/church/readiness/page.tsx')
+  assert.match(source,/redirect\(lang==='es'\?'\/\?lang=es':'\/'\)/)
+  assert.match(source,/needOne:'revisión de la aplicación'/)
+  assert.match(source,/needMany:'revisiones de la aplicación'/)
+  assert.match(source,/const needLabel=blockers===1\?t\.needOne:t\.needMany/)
+  assert.doesNotMatch(source,/\{t\.needs\}\{blockers===1\?'':'s'\}/)
+})
