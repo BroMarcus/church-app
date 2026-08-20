@@ -1,0 +1,1 @@
+Application tree validation marker for Kingdom Network pre-deployment CI. This file does not affect the application build.
