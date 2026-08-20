@@ -36,7 +36,7 @@ export default async function MySchedulePage({searchParams}:{searchParams:Promis
     supabase.from('member_time_off').select('id,starts_on,ends_on,notes,status').eq('user_id',userId).gte('ends_on',today).order('starts_on').limit(20)
   ])
   const enrolled=new Set((enrollments??[]).map((e:any)=>e.course_id))
-  const sessions=(allSessions??[]).filter((s:any)=>enrolled.has(s.course_id)||s.instructor_user_id===userId).slice(0,30)
+  const sessions:any[]=(allSessions??[] as any[]).filter((s:any)=>enrolled.has(s.course_id)||s.instructor_user_id===userId).slice(0,30)
   const groups=(groupMemberships??[]).filter((g:any)=>{const x=Array.isArray(g.groups)?g.groups[0]:g.groups;return x?.active!==false}).map((g:any)=>({...g,group:Array.isArray(g.groups)?g.groups[0]:g.groups})).filter((g:any)=>g.group)
   const eventIds=(goingRsvps??[]).map((r:any)=>r.event_id)
   let goingEvents:any[]=[]
