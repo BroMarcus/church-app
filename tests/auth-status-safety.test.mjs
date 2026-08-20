@@ -19,6 +19,19 @@ test('login ignores arbitrary query text and renders only allowlisted bilingual 
   assert.match(callback,/error_code=/)
 })
 
+test('password reset completion is explicit and preserves only canonical church-join return paths',async()=>{
+  const page=await read('src/app/auth/update-password/page.tsx')
+  assert.match(page,/function safeJoinNext/)
+  assert.match(page,/new URL\(value,base\)/)
+  assert.match(page,/parsed\.pathname\.startsWith\('\/join\/'\)/)
+  assert.match(page,/value\.length>500/)
+  assert.match(page,/setCompleted\(true\)/)
+  assert.match(page,/Continue to sign in/)
+  assert.match(page,/Continuar a Iniciar sesión/)
+  assert.match(page,/signInHref=`\/login\?lang=\$\{lang\}&mode=signin\$\{nextPart\}`/)
+  assert.doesNotMatch(page,/[&?]message=\$\{encodeURIComponent/)
+})
+
 test('public church join uses fixed bilingual error codes and never renders raw query error text',async()=>{
   const page=await read('src/app/join/[slug]/page.tsx')
   const actions=await read('src/app/join/[slug]/actions.ts')
