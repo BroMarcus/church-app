@@ -1,62 +1,31 @@
-'use client'
-
-import { FormEvent,useState } from 'react'
-import { CheckCircle2,Clock3,Plus,ShieldCheck } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { CalendarOff,CheckCircle2,ClipboardList,Clock3,Plus } from 'lucide-react'
+import { cancelTimeOff,createPersonalTask,submitTimeOff,updatePersonalTask } from './actions'
 
 type Task={id:string;title:string;notes:string|null;due_at:string|null;status:string;priority:string;created_by:string}
 type TimeOff={id:string;starts_on:string;ends_on:string;notes:string|null;status:string}
 
-export function PersonalPlanning({churchId,tasks,timeOff,lang}:{churchId:string;tasks:Task[];timeOff:TimeOff[];lang:'en'|'es';timeZone:string}){
+const priorityLabel=(value:string,es:boolean)=>value==='high'?(es?'Alta':'High'):value==='low'?(es?'Baja':'Low'):(es?'Normal':'Normal')
+
+export function PersonalPlanning({tasks,timeOff,lang,timeZone}:{churchId:string;tasks:Task[];timeOff:TimeOff[];lang:'en'|'es';timeZone:string}){
   const es=lang==='es'
-  const router=useRouter()
-  const [busy,setBusy]=useState<string|null>(null)
-  const [error,setError]=useState('')
-  const t=es?{
-    title:'Mi planificación',body:'Agrega recordatorios personales y avisa a liderazgo cuando no estarás disponible.',tasks:'MIS TAREAS',newTask:'Agregar tarea',taskTitle:'¿Qué necesitas hacer?',notes:'Notas (opcional)',due:'Fecha y hora (opcional)',priority:'Prioridad',normal:'Normal',high:'Alta',add:'Agregar',adding:'Agregando…',done:'Marcar listo',empty:'No tienes tareas pendientes.',away:'NO ESTOY DISPONIBLE',awayBody:'Envía las fechas para que liderazgo pueda verlas al preparar horarios.',start:'Desde',end:'Hasta',send:'Enviar fechas',sending:'Enviando…',noneAway:'No tienes fechas próximas registradas.',pending:'Pendiente',approved:'Aprobado',declined:'No aprobado',failed:'No se pudo guardar. Inténtalo otra vez.'
-  }:{
-    title:'My planning',body:'Add personal reminders and tell leadership when you will not be available.',tasks:'MY TASKS',newTask:'Add a task',taskTitle:'What do you need to do?',notes:'Notes (optional)',due:'Date & time (optional)',priority:'Priority',normal:'Normal',high:'High',add:'Add task',adding:'Adding…',done:'Mark done',empty:'No open tasks right now.',away:'I AM UNAVAILABLE',awayBody:'Send dates so leadership can see them while preparing schedules.',start:'From',end:'Through',send:'Send dates',sending:'Sending…',noneAway:'No upcoming unavailable dates saved.',pending:'Pending',approved:'Approved',declined:'Not approved',failed:'Could not save that. Please try again.'
-  }
-
-  async function userId(){const supabase=createClient();const {data}=await supabase.auth.getUser();return {supabase,id:data.user?.id}}
-
-  async function addTask(event:FormEvent<HTMLFormElement>){
-    event.preventDefault();setError('');setBusy('task')
-    const form=new FormData(event.currentTarget),title=String(form.get('title')||'').trim()
-    if(!title){setBusy(null);return}
-    const {supabase,id}=await userId();if(!id){setError(t.failed);setBusy(null);return}
-    const due=String(form.get('due_at')||'').trim()
-    const {error:e}=await supabase.from('member_tasks').insert({church_id:churchId,assigned_to:id,created_by:id,title,notes:String(form.get('notes')||'').trim()||null,due_at:due?new Date(due).toISOString():null,priority:String(form.get('priority')||'normal')})
-    if(e){setError(t.failed);setBusy(null);return}
-    event.currentTarget.reset();setBusy(null);router.refresh()
-  }
-
-  async function completeTask(id:string){
-    setError('');setBusy(id);const {supabase}=await userId()
-    const {error:e}=await supabase.from('member_tasks').update({status:'completed',completed_at:new Date().toISOString()}).eq('id',id)
-    if(e)setError(t.failed);setBusy(null);router.refresh()
-  }
-
-  async function addTimeOff(event:FormEvent<HTMLFormElement>){
-    event.preventDefault();setError('');setBusy('timeoff')
-    const form=new FormData(event.currentTarget),starts=String(form.get('starts_on')||''),ends=String(form.get('ends_on')||'')
-    if(!starts||!ends||ends<starts){setError(t.failed);setBusy(null);return}
-    const {supabase,id}=await userId();if(!id){setError(t.failed);setBusy(null);return}
-    const {error:e}=await supabase.from('member_time_off').insert({church_id:churchId,user_id:id,starts_on:starts,ends_on:ends,notes:String(form.get('notes')||'').trim()||null,status:'pending'})
-    if(e){setError(t.failed);setBusy(null);return}
-    event.currentTarget.reset();setBusy(null);router.refresh()
-  }
-
-  const status=(value:string)=>value==='approved'?t.approved:value==='declined'?t.declined:t.pending
+  const dateTime=(value:string)=>new Intl.DateTimeFormat(es?'es-US':'en-US',{dateStyle:'medium',timeStyle:'short',timeZone}).format(new Date(value))
   return <section className="card" style={{padding:18,marginBottom:18}}>
-    <div className="pill"><ShieldCheck size={11}/> {t.title.toUpperCase()}</div><h2 style={{margin:'8px 0 5px'}}>{t.title}</h2><p className="small muted">{t.body}</p>
-    {error&&<div className="notice error">{error}</div>}
-    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',gap:18,marginTop:16}}>
-      <div><div className="pill">{t.tasks}</div><div style={{display:'grid',gap:8,margin:'10px 0 14px'}}>{tasks.map(task=><div className="card" style={{padding:12}} key={task.id}><div className="row" style={{justifyContent:'space-between',alignItems:'flex-start'}}><div><strong>{task.title}</strong>{task.notes&&<div className="small muted">{task.notes}</div>}{task.due_at&&<div className="small muted"><Clock3 size={11}/> {new Date(task.due_at).toLocaleString()}</div>}</div><button className="ghost" type="button" onClick={()=>completeTask(task.id)} disabled={busy===task.id}><CheckCircle2 size={13}/> {t.done}</button></div></div>)}{!tasks.length&&<p className="small muted">{t.empty}</p>}</div>
-        <form onSubmit={addTask} style={{display:'grid',gap:9}}><strong><Plus size={13}/> {t.newTask}</strong><input name="title" placeholder={t.taskTitle} required/><textarea name="notes" rows={2} placeholder={t.notes}/><label className="field"><span>{t.due}</span><input name="due_at" type="datetime-local"/></label><label className="field"><span>{t.priority}</span><select name="priority" defaultValue="normal"><option value="normal">{t.normal}</option><option value="high">{t.high}</option></select></label><button className="btn" disabled={busy==='task'}>{busy==='task'?t.adding:t.add}</button></form>
+    <div className="pill">{es?'PLAN PERSONAL':'PERSONAL PLANNING'}</div>
+    <h2>{es?'Tareas y fechas no disponibles':'Tasks and unavailable dates'}</h2>
+    <p className="small muted">{es?'Agrega recordatorios personales y avisa a liderazgo cuándo no estás disponible.':'Add personal reminders and let leadership know when you are unavailable.'}</p>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:16,marginTop:14}}>
+      <div style={{display:'grid',gap:10}}>
+        <div className="row" style={{gap:7}}><ClipboardList size={16}/><strong>{es?'Mis tareas':'My tasks'}</strong></div>
+        <form action={createPersonalTask} style={{display:'grid',gap:8,padding:12,border:'1px solid var(--line)',borderRadius:12}}>
+          <input type="hidden" name="lang" value={lang}/><label className="field"><span>{es?'Tarea':'Task'}</span><input name="title" maxLength={160} required placeholder={es?'Ej. llamar a Juan':'e.g. Call John'}/></label><label className="field"><span>{es?'Notas opcionales':'Optional notes'}</span><textarea name="notes" rows={2}/></label><div className="row" style={{gap:8,flexWrap:'wrap'}}><label className="field" style={{flex:'1 1 180px'}}><span>{es?'Fecha y hora':'Due date & time'}</span><input name="due_at" type="datetime-local"/></label><label className="field" style={{flex:'0 1 140px'}}><span>{es?'Prioridad':'Priority'}</span><select name="priority" defaultValue="normal"><option value="low">{es?'Baja':'Low'}</option><option value="normal">{es?'Normal':'Normal'}</option><option value="high">{es?'Alta':'High'}</option></select></label></div><button className="btn" type="submit"><Plus size={13}/> {es?'Agregar tarea':'Add task'}</button>
+        </form>
+        <div style={{display:'grid',gap:8}}>{tasks.map(task=><article key={task.id} style={{padding:12,border:'1px solid var(--line)',borderRadius:12}}><div className="row" style={{justifyContent:'space-between',alignItems:'flex-start',gap:10}}><div><strong>{task.title}</strong>{task.notes&&<div className="small muted" style={{marginTop:3}}>{task.notes}</div>}<div className="small muted" style={{marginTop:5}}>{priorityLabel(task.priority,es)}{task.due_at?` • ${dateTime(task.due_at)}`:''}</div></div><form action={updatePersonalTask}><input type="hidden" name="lang" value={lang}/><input type="hidden" name="task_id" value={task.id}/><input type="hidden" name="status" value="completed"/><button className="ghost" type="submit" title={es?'Completar':'Complete'}><CheckCircle2 size={14}/></button></form></div>{task.status==='open'&&<form action={updatePersonalTask} style={{marginTop:8}}><input type="hidden" name="lang" value={lang}/><input type="hidden" name="task_id" value={task.id}/><input type="hidden" name="status" value="in_progress"/><button className="ghost" type="submit"><Clock3 size={12}/> {es?'Marcar en progreso':'Mark in progress'}</button></form>}</article>)}{!tasks.length&&<div className="small muted">{es?'No tienes tareas abiertas.':'No open tasks.'}</div>}</div>
       </div>
-      <div><div className="pill">{t.away}</div><p className="small muted">{t.awayBody}</p><form onSubmit={addTimeOff} style={{display:'grid',gap:9}}><label className="field"><span>{t.start}</span><input name="starts_on" type="date" required/></label><label className="field"><span>{t.end}</span><input name="ends_on" type="date" required/></label><textarea name="notes" rows={2} placeholder={t.notes}/><button className="ghost" disabled={busy==='timeoff'}>{busy==='timeoff'?t.sending:t.send}</button></form><div style={{display:'grid',gap:8,marginTop:14}}>{timeOff.map(row=><div className="notice" style={{margin:0}} key={row.id}><strong>{row.starts_on}{row.ends_on!==row.starts_on?` → ${row.ends_on}`:''}</strong><div className="small muted">{status(row.status)}{row.notes?` • ${row.notes}`:''}</div></div>)}{!timeOff.length&&<p className="small muted">{t.noneAway}</p>}</div></div>
+      <div style={{display:'grid',gap:10,alignContent:'start'}}>
+        <div className="row" style={{gap:7}}><CalendarOff size={16}/><strong>{es?'No estoy disponible':'I am unavailable'}</strong></div>
+        <form action={submitTimeOff} style={{display:'grid',gap:8,padding:12,border:'1px solid var(--line)',borderRadius:12}}><input type="hidden" name="lang" value={lang}/><div className="row" style={{gap:8,flexWrap:'wrap'}}><label className="field" style={{flex:1}}><span>{es?'Desde':'From'}</span><input name="starts_on" type="date" required/></label><label className="field" style={{flex:1}}><span>{es?'Hasta':'Through'}</span><input name="ends_on" type="date" required/></label></div><label className="field"><span>{es?'Nota opcional':'Optional note'}</span><textarea name="notes" rows={2} placeholder={es?'Ej. fuera de la ciudad':'e.g. Out of town'}/></label><button className="btn secondary" type="submit">{es?'Enviar fechas':'Send dates'}</button></form>
+        <div style={{display:'grid',gap:8}}>{timeOff.map(item=><article key={item.id} style={{padding:12,border:'1px solid var(--line)',borderRadius:12}}><strong>{item.starts_on} → {item.ends_on}</strong><div className="small muted" style={{marginTop:3}}>{item.status}{item.notes?` • ${item.notes}`:''}</div>{item.status==='pending'&&<form action={cancelTimeOff} style={{marginTop:7}}><input type="hidden" name="lang" value={lang}/><input type="hidden" name="time_off_id" value={item.id}/><button className="ghost" type="submit">{es?'Cancelar solicitud':'Cancel request'}</button></form>}</article>)}{!timeOff.length&&<div className="small muted">{es?'No hay fechas no disponibles registradas.':'No unavailable dates recorded.'}</div>}</div>
+      </div>
     </div>
   </section>
 }
