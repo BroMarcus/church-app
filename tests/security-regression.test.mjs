@@ -63,6 +63,18 @@ test('Kingdom Guide uses live approved resource schema and excludes unfinished m
   for(const stale of ['member_visible','resource_year','scripture_references','authority_level','source_authority']) assert.doesNotMatch(source,new RegExp(stale))
 })
 
+test('personal schedule planning module exists and writes through server actions',async()=>{
+  const page=await read('src/app/calendar/my/page.tsx')
+  const panel=await read('src/app/calendar/my/personal-planning.tsx')
+  const actions=await read('src/app/calendar/my/actions.ts')
+  assert.match(page,/import \{ PersonalPlanning \} from '\.\/personal-planning'/)
+  for(const action of ['createPersonalTask','updatePersonalTask','submitTimeOff','cancelTimeOff']) assert.match(panel,new RegExp(action))
+  assert.match(actions,/memberContext/)
+  assert.match(actions,/\.eq\('assigned_to',userId\)/)
+  assert.match(actions,/\.eq\('user_id',userId\)/)
+  assert.doesNotMatch(actions,/encodeURIComponent\(error\.message\)/)
+})
+
 test('learning progress action validates course, module, membership and enrollment',async()=>{
   const source=await read('src/app/learning/actions.ts')
   assert.match(source,/module\?\.course_id!==courseId/)
