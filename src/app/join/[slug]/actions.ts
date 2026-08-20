@@ -21,7 +21,7 @@ function joinSignupError(message:string,lang:'en'|'es'){
 
 export async function joinChurch(formData:FormData){
   const supabase=await createClient()
-  const lang:textLang=text(formData,'lang')==='es'?'es':'en'
+  const lang:'en'|'es'=text(formData,'lang')==='es'?'es':'en'
   const slug=text(formData,'church_slug').toLowerCase()
   const email=text(formData,'email').toLowerCase(),phone=text(formData,'phone'),firstName=text(formData,'first_name'),lastName=text(formData,'last_name')
   const password=String(formData.get('password')??''),confirm=String(formData.get('confirm_password')??'')
@@ -59,7 +59,7 @@ export async function joinChurch(formData:FormData){
 
 export async function joinExistingChurch(formData:FormData){
   const supabase=await createClient()
-  const lang:textLang=text(formData,'lang')==='es'?'es':'en'
+  const lang:'en'|'es'=text(formData,'lang')==='es'?'es':'en'
   const slug=text(formData,'church_slug').toLowerCase()
   const fail=(en:string,es:string)=>redirect(`/join/${encodeURIComponent(slug)}?lang=${lang}&error=${encodeURIComponent(lang==='es'?es:en)}`)
   if(!slug)fail('Church link is missing.','Falta el enlace de la iglesia.')
@@ -90,5 +90,3 @@ export async function joinExistingChurch(formData:FormData){
     : row?.already_member?'Your account was already connected to this church.':'Your existing account is now connected to this church.'
   redirect(`/start?lang=${lang}&message=${encodeURIComponent(message)}`)
 }
-
-type textLang='en'|'es'
