@@ -141,3 +141,37 @@ revoke all on function public.church_member_relationship_readiness(uuid) from au
 revoke all on function public.church_health_snapshot_base(uuid,integer) from public;
 revoke all on function public.church_health_snapshot_base(uuid,integer) from anon;
 revoke all on function public.church_health_snapshot_base(uuid,integer) from authenticated;
+
+-- Church Health is a public-facing RPC for authorized leaders, but its
+-- relationship-confidence helper is implementation detail. Keep the API entry
+-- point guarded explicitly, and remove the helper's separate PostgREST surface.
+create or replace function public.church_health_snapshot(p_church_id uuid, p_days integer default 30)
+returns table(metric_key text, category text, label text, value bigint, denominator bigint, detail text)
+language plpgsql
+stable
+security definer
+set search_path to 'public','private'
+as $function$
+begin
+  if auth.uid() is null then
+    raise exception 'Authentication required';
+  end if;
+  if not (
+    private.has_church_role(p_church_id,array['pastor','church_admin']) or
+    private.has_church_permission(p_church_id,'view_leadership') or
+    private.has_church_permission(p_church_id,'manage_members')
+  ) then
+    raise exception 'Leadership reporting access required';
+  end if;
+
+  return query select * from public.church_health_snapshot_base(p_church_id,p_days);
+  return query
+    select c.metric_key,'people'::text,c.label,c.value,null::bigint,c.detail
+    from public.church_member_relationship_confidence(p_church_id) c
+    where c.metric_key in ('member_relationships_verified','member_relationships_unverified');
+end
+$function$;
+
+revoke all on function public.church_member_relationship_confidence(uuid) from public;
+revoke all on function public.church_member_relationship_confidence(uuid) from anon;
+revoke all on function public.church_member_relationship_confidence(uuid) from authenticated;
