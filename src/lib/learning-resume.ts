@@ -51,11 +51,11 @@ export async function getLearningResumeState(supabase:any,userId:string,course:a
     requiredByModule.set(assessment.module_id,list)
   }
 
-  for(const module of modules??[]){
-    const required=requiredByModule.get(module.id)??[]
-    const done=required.length?required.every(passedAssessment):completedModules.has(module.id)
+  for(const courseModule of modules??[]){
+    const required=requiredByModule.get(courseModule.id)??[]
+    const done=required.length?required.every(passedAssessment):completedModules.has(courseModule.id)
     if(!done){
-      return {kind:'lesson',href:`/learning/${courseId}/lesson/${module.id}`,courseId,courseTitle,moduleId:module.id,moduleTitle:module.title}
+      return {kind:'lesson',href:`/learning/${courseId}/lesson/${courseModule.id}`,courseId,courseTitle,moduleId:courseModule.id,moduleTitle:courseModule.title}
     }
   }
 
