@@ -26,7 +26,7 @@ export default defineConfig([
     rules:{"react-hooks/purity":"off"},
   },
   {
-    files:["src/app/groups/[groupId]/page.tsx"],
+    files:["src/app/groups/**/page.tsx"],
     rules:{"react/no-unescaped-entities":"off"},
   },
   globalIgnores([".next/**"]),
