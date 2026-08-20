@@ -16,6 +16,12 @@ const laterStage=(current:string|undefined|null,next:string)=>((stageRank.get(cu
 const isSpanish=(f:FormData)=>text(f,'lang')==='es'
 const href=(f:FormData,key:string,value:string)=>`/outreach?${key}=${encodeURIComponent(value)}${isSpanish(f)?'&lang=es':''}`
 const msg=(f:FormData,en:string,es:string)=>isSpanish(f)?es:en
+const sourceForQuickAdd=(stage:string)=>{
+  if(stage==='guest')return {source_type:'church_service',source_label:'Church service'}
+  if(stage==='invited')return {source_type:'outreach',source_label:'Personal invitation / outreach'}
+  if(stage==='bible_study')return {source_type:'outreach',source_label:'Bible study connection'}
+  return {source_type:'leader_entry',source_label:'Leader entry'}
+}
 
 async function auth(){const supabase=await createClient();const {data}=await supabase.auth.getClaims();const userId=data?.claims?.sub;if(!userId)redirect('/login');return{supabase,userId}}
 async function localToUtc(supabase:any,churchId:string,value:string){if(!value)return null;const {data,error}=await supabase.rpc('church_local_datetime_to_utc',{p_church_id:churchId,p_local_datetime:value});if(error)throw new Error(error.message);return data as string|null}
@@ -49,9 +55,10 @@ export async function createOutreachContact(formData:FormData){
   followUp=followUp||afterHours(24)
   const requestedStage=text(formData,'stage')
   const initialStage=stages.includes(requestedStage as any)?requestedStage:'new_contact'
+  const source=sourceForQuickAdd(initialStage)
   const emailConsent=checked(formData,'email_consent'),smsConsent=checked(formData,'sms_consent'),now=new Date().toISOString()
   const language=text(formData,'communication_language')==='es'?'es':'en'
-  const payload={church_id:churchId,created_by:userId,assigned_to:nullable(formData,'assigned_to')||userId,first_name:firstName,last_name:nullable(formData,'last_name'),phone:nullable(formData,'phone'),email:nullable(formData,'email'),stage:initialStage,bible_study_interest:checked(formData,'bible_study_interest'),messaging_consent:emailConsent||smsConsent,email_consent:emailConsent,sms_consent:smsConsent,email_consent_at:emailConsent?now:null,sms_consent_at:smsConsent?now:null,communication_language:language,prayer_request:nullable(formData,'prayer_request'),follow_up_due_at:followUp,notes:nullable(formData,'notes')}
+  const payload={church_id:churchId,created_by:userId,assigned_to:nullable(formData,'assigned_to')||userId,first_name:firstName,last_name:nullable(formData,'last_name'),phone:nullable(formData,'phone'),email:nullable(formData,'email'),stage:initialStage,source_type:source.source_type,source_label:source.source_label,source_occurred_at:now,bible_study_interest:checked(formData,'bible_study_interest'),messaging_consent:emailConsent||smsConsent,email_consent:emailConsent,sms_consent:smsConsent,email_consent_at:emailConsent?now:null,sms_consent_at:smsConsent?now:null,communication_language:language,prayer_request:nullable(formData,'prayer_request'),follow_up_due_at:followUp,notes:nullable(formData,'notes')}
   const {error}=await supabase.from('outreach_contacts').insert(payload)
   if(error){
     const message=error.code==='23505'?msg(formData,'This person may already be in Outreach. Check the existing pipeline before adding another record.','Esta persona puede que ya esté en Evangelismo. Revise la lista antes de crear otro registro.'):error.message
