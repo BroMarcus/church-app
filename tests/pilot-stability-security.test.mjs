@@ -35,3 +35,25 @@ test('Pilot Readiness provides loading and recoverable error states',async()=>{
   assert.match(error,/No se cambió nada en la configuración de tu iglesia/)
   assert.match(error,/onClick=\{\(\)=>reset\(\)\}/)
 })
+
+test('main login/signup route has visible loading and safe retry states',async()=>{
+  const loading=await read('src/app/login/loading.tsx')
+  const error=await read('src/app/login/error.tsx')
+  assert.match(loading,/aria-busy="true"/)
+  assert.match(loading,/Abriendo el inicio de sesión/)
+  assert.match(error,/role="alert"/)
+  assert.match(error,/Your account was not changed/)
+  assert.match(error,/Tu cuenta no fue modificada/)
+  assert.match(error,/onClick=\{\(\)=>reset\(\)\}/)
+})
+
+test('church signup route has visible loading and safe retry states',async()=>{
+  const loading=await read('src/app/join/[slug]/loading.tsx')
+  const error=await read('src/app/join/[slug]/error.tsx')
+  assert.match(loading,/aria-busy="true"/)
+  assert.match(loading,/Abriendo el registro de la iglesia/)
+  assert.match(error,/role="alert"/)
+  assert.match(error,/No account or church record was changed/)
+  assert.match(error,/No se cambió ninguna cuenta ni registro de iglesia/)
+  assert.match(error,/\/login\?mode=signin/)
+})
