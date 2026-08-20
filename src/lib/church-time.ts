@@ -40,8 +40,9 @@ export function formatRecurringMeeting(frequency:string|null|undefined,day:strin
   if(!day&&!time)return lang==='es'?'Horario por confirmar':'Schedule TBD'
   const clock=formatTimeOfDay(time,lang==='es'?'es-US':'en-US')
   const frequencyLabels:Record<string,[string,string]>={weekly:['Weekly','Cada semana'],biweekly:['Every other week','Cada dos semanas'],monthly:['Monthly','Mensual'],seasonal:['Seasonal','Por temporada'],other:['Recurring','Recurrente']}
+  const spanishDays:Record<string,string>={Monday:'lunes',Tuesday:'martes',Wednesday:'miércoles',Thursday:'jueves',Friday:'viernes',Saturday:'sábado',Sunday:'domingo'}
   const prefix=frequencyLabels[frequency||'weekly']?.[lang==='es'?1:0]??(lang==='es'?'Recurrente':'Recurring')
-  const dayLabel=day||''
+  const rawDay=day||'',dayLabel=lang==='es'?(spanishDays[rawDay]||rawDay):rawDay
   if(dayLabel&&clock)return lang==='es'?`${prefix}, ${dayLabel} a las ${clock}`:`${prefix}, ${dayLabel}${dayLabel.endsWith('s')?'':'s'} at ${clock}`
   if(dayLabel)return `${prefix}, ${dayLabel}`
   return `${prefix}, ${clock}`
