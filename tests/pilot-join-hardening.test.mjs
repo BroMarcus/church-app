@@ -23,9 +23,11 @@ test('existing-account join is idempotent and does not silently reactivate inact
 test('login continuation is restricted to church join routes',()=>{
   const actions=read('src/app/login/actions.ts')
   assert.match(actions,/safeJoinNext/)
-  assert.match(actions,/startsWith\('\/join\/'\)/)
-  assert.match(actions,/!value\.startsWith\('\/\/'\)/)
-  assert.match(actions,/!value\.includes\('\.\.'\)/)
+  assert.match(actions,/value\.startsWith\('\/\/'\)/)
+  assert.match(actions,/value\.includes\('\\\\'\)/)
+  assert.match(actions,/parsed\.origin!==base/)
+  assert.match(actions,/!parsed\.pathname\.startsWith\('\/join\/'\)/)
+  assert.match(actions,/return `\$\{parsed\.pathname\}\$\{parsed\.search\}\$\{parsed\.hash\}`/)
 })
 
 test('public join keeps low-tech password verification and existing-account path',()=>{
