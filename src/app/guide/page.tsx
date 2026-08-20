@@ -46,6 +46,7 @@ const adminQuick={
 } as const
 
 const lower=(v:any)=>String(v??'').toLowerCase()
+const normalize=(v:any)=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()
 const authority=(r:any)=>r.official_source?'official organization':lower(r.source_scope||'local_church')
 const status=(r:any)=>lower(r.archive_status||'current')
 const authorityScore=(v:string)=>v.includes('official')||v.includes('organization')?35:v.includes('district')?28:v.includes('local')||v.includes('church')?20:v.includes('ministry')?12:v.includes('group')?8:5
@@ -57,7 +58,7 @@ export default async function GuidePage({searchParams}:{searchParams:Promise<{q?
   const query=await searchParams
   const lang=query.lang==='es'?'es':'en'
   const t=copy[lang]
-  const q=String(query.q??'').trim(),needle=q.toLowerCase()
+  const q=String(query.q??'').trim(),normalizedQuery=normalize(q),queryTokens=normalizedQuery.split(/\s+/).filter(Boolean).slice(0,8)
   const withLang=(href:string)=>lang==='es'?`${href}${href.includes('?')?'&':'?'}lang=es`:href
   const supabase=await createClient()
   const {data:claims}=await supabase.auth.getClaims();const userId=claims?.claims?.sub
@@ -70,7 +71,17 @@ export default async function GuidePage({searchParams}:{searchParams:Promise<{q?
   if(q){
     const {data,error}=await supabase.from('media_assets').select('id,title,description,asset_type,resource_type,language_code,source_year,ministry_area,topic_tags,scripture_refs,archive_status,source_label,source_scope,official_source,approved_for_members,library_kind,organization_status,created_at').eq('church_id',membership.church_id).eq('approved_for_members',true).not('archive_status','in','(draft,retired)').order('created_at',{ascending:false}).limit(400)
     if(error)console.error('Kingdom Guide resource search failed',{message:error.message})
-    results=(data??[]).map((r:any)=>{const searchable=[r.title,r.description,r.asset_type,r.resource_type,r.language_code,r.source_year,r.ministry_area,r.topic_tags,r.scripture_refs,r.source_label,r.source_scope,r.library_kind,r.organization_status].flatMap(v=>Array.isArray(v)?v:[v]).filter(Boolean).join(' ').toLowerCase();let score=0;if(lower(r.title).includes(needle))score+=55;if(lower(r.description).includes(needle))score+=22;if(searchable.includes(needle))score+=12;score+=authorityScore(authority(r))+statusScore(status(r));return {...r,__score:score,__searchable:searchable,__authority:authority(r),__status:status(r)}}).filter((r:any)=>r.__searchable.includes(needle)||lower(r.title).includes(needle)||lower(r.description).includes(needle)).sort((a:any,b:any)=>b.__score-a.__score||new Date(b.created_at).getTime()-new Date(a.created_at).getTime()).slice(0,24)
+    results=(data??[]).map((r:any)=>{
+      const searchable=normalize([r.title,r.description,r.asset_type,r.resource_type,r.language_code,r.source_year,r.ministry_area,r.topic_tags,r.scripture_refs,r.source_label,r.source_scope,r.library_kind,r.organization_status].flatMap(v=>Array.isArray(v)?v:[v]).filter(Boolean).join(' '))
+      const title=normalize(r.title),description=normalize(r.description)
+      const matchedTokens=queryTokens.filter(token=>searchable.includes(token))
+      let score=authorityScore(authority(r))+statusScore(status(r))
+      if(normalizedQuery&&title.includes(normalizedQuery))score+=55
+      if(normalizedQuery&&description.includes(normalizedQuery))score+=22
+      if(normalizedQuery&&searchable.includes(normalizedQuery))score+=18
+      for(const token of queryTokens){if(title.includes(token))score+=18;else if(description.includes(token))score+=8;else if(searchable.includes(token))score+=3}
+      return {...r,__score:score,__searchable:searchable,__authority:authority(r),__status:status(r),__matchedTokens:matchedTokens.length}
+    }).filter((r:any)=>queryTokens.length>0&&r.__matchedTokens===queryTokens.length).sort((a:any,b:any)=>b.__score-a.__score||new Date(b.created_at).getTime()-new Date(a.created_at).getTime()).slice(0,24)
   }
 
   return <main className="shell"><header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??t.church} • Kingdom Guide</div></div><div className="row"><Languages size={15}/><Link className="ghost" href={`/guide${q?`?q=${encodeURIComponent(q)}&lang=en`:'?lang=en'}`}>{t.english}</Link><Link className="ghost" href={`/guide${q?`?q=${encodeURIComponent(q)}&lang=es`:'?lang=es'}`}>{t.spanish}</Link><Link className="ghost" href="/">{t.home}</Link></div></header>
@@ -82,7 +93,7 @@ export default async function GuidePage({searchParams}:{searchParams:Promise<{q?
 
     <section className="card guide-search"><div style={{marginBottom:12}}><div className="pill">{t.searchTitle.toUpperCase()}</div><h2 style={{margin:'8px 0 4px'}}>{t.searchTitle}</h2><p className="small muted" style={{margin:0}}>{t.searchBody}</p></div><form method="get"><input type="hidden" name="lang" value={lang}/><input name="q" defaultValue={q} placeholder={t.placeholder} aria-label={t.searchTitle}/><button className="btn"><Search size={14}/> {t.search}</button></form><div className="hint">{t.hint}</div></section>
 
-    {q&&<section className="card guide-panel" style={{marginTop:16}}><div className="pill">{t.results}</div><h2>{t.resultsFor} “{q}”</h2><div className="result-list">{results.map((r:any)=>{const title=r.title||(lang==='es'?'Recurso de la iglesia':'Church resource');const auth=r.__authority||'local_church';const st=r.__status||'current';return <article className="guide-result" key={r.id}><div className="result-head"><div><h3>{title}</h3><div className="result-tags"><span className={`result-tag ${auth.includes('official')||auth.includes('organization')?'official':''}`}>{displayAuthority(auth)}</span><span className={`result-tag ${st==='current'?'current':''}`}>{displayStatus(st)}</span>{r.language_code&&<span className="result-tag">{String(r.language_code).toUpperCase()}</span>}</div></div><Compass size={16}/></div>{r.description&&<p>{r.description}</p>}<Link className="record-link resource-link" href={`/resources?q=${encodeURIComponent(title)}`}>{t.open}</Link></article>})}{!results.length&&<div className="guide-beta">{t.none}</div>}</div></section>}
+    {q&&<section className="card guide-panel" style={{marginTop:16}}><div className="pill">{t.results}</div><h2>{t.resultsFor} “{q}”</h2><div className="result-list">{results.map((r:any)=>{const title=r.title||(lang==='es'?'Recurso de la iglesia':'Church resource');const auth=r.__authority||'local_church';const st=r.__status||'current';return <article className="guide-result" key={r.id}><div className="result-head"><div><h3>{title}</h3><div className="result-tags"><span className={`result-tag ${auth.includes('official')||auth.includes('organization')?'official':''}`}>{displayAuthority(auth)}</span><span className={`result-tag ${st==='current'?'current':''}`}>{displayStatus(st)}</span>{r.language_code&&<span className="result-tag">{String(r.language_code).toUpperCase()}</span>}</div></div><Compass size={16}/></div>{r.description&&<p>{r.description}</p>}<Link className="record-link resource-link" href={withLang(`/resources?q=${encodeURIComponent(title)}`)}>{t.open}</Link></article>})}{!results.length&&<div className="guide-beta">{t.none}</div>}</div></section>}
 
     <div className="guide-layout" style={{marginTop:16}}><section className="card guide-panel"><div className="pill">{t.trust}</div><h2>{t.trustTitle}</h2><p className="small muted">{t.trustBody}</p><div className="guide-trust"><div className="trust-row"><strong>{lang==='es'?'Oficial / Organización':'Official / Organization'}</strong><span>{lang==='es'?'Material oficial de la Asamblea u organización.':'Assembly or organization material.'}</span></div><div className="trust-row"><strong>{lang==='es'?'Distrito':'District'}</strong><span>{lang==='es'?'Documentos y dirección regional.':'Regional documents and direction.'}</span></div><div className="trust-row"><strong>{lang==='es'?'Iglesia Local':'Local Church'}</strong><span>{lang==='es'?'Currículo y recursos aprobados localmente.':'Locally approved curriculum and resources.'}</span></div></div></section><aside className="card guide-panel"><MessageSquareWarning size={20}/><h2>{t.feedback}</h2><p className="small muted">{t.feedbackBody}</p><Link className="ghost" href={withLang('/feedback')}>{t.feedbackCta}</Link></aside></div>
   </main>
