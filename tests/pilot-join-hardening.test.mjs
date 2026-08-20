@@ -15,7 +15,7 @@ test('existing-account public church join is authenticated and cannot self-eleva
 
 test('existing-account join is idempotent and does not silently reactivate inactive access',()=>{
   const sql=read('supabase/migrations/20260820164600_existing_account_public_church_join.sql')
-  assert.match(sql,/if v_existing\.status='active' then[\s\S]*already_member/s)
+  assert.match(sql,/if v_existing\.status='active' then[\s\S]*return query select v_church\.id,v_church\.name,true;/)
   assert.match(sql,/previous church access is not active/i)
   assert.match(sql,/public signup capacity has been reached/i)
 })
