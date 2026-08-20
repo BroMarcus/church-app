@@ -16,6 +16,12 @@ test('production dependency manifest contains no floating latest versions',async
   }
 })
 
+test('root layout keeps PageGuide behind Suspense for not-found prerender safety',async()=>{
+  const source=await read('src/app/layout.tsx')
+  assert.match(source,/import \{ Suspense \} from 'react'/)
+  assert.match(source,/<Suspense fallback=\{null\}><PageGuide\/><\/Suspense>/)
+})
+
 test('public auth routes bypass session refresh middleware',async()=>{
   const source=await read('src/lib/supabase/proxy.ts')
   for(const route of ['/login','/auth/callback','/auth/confirm','/auth/verify','/auth/update-password']) assert.match(source,new RegExp(route.replaceAll('/','\\/')))
