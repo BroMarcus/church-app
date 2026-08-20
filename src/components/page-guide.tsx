@@ -34,7 +34,14 @@ export function PageGuide(){
  const pathname=usePathname(),search=useSearchParams(),lang=search.get('lang')==='es'?'es':'en'
  const guide=useMemo(()=>{const pair=Object.entries(guides).filter(([path])=>path==='/'?pathname==='/':pathname===path||pathname.startsWith(path+'/')).sort((a,b)=>b[0].length-a[0].length)[0]?.[1];return pair?.[lang]},[pathname,lang])
  const [open,setOpen]=useState(false)
- useEffect(()=>{if(!guide)return;const key=`kingdom-network:page-guide:${pathname.split('/').slice(0,2).join('/')||'/'}`;if(window.localStorage.getItem(key)!=='seen')setOpen(true)},[guide,pathname])
+ useEffect(()=>{
+  if(!guide)return
+  const frame=window.requestAnimationFrame(()=>{
+   const key=`kingdom-network:page-guide:${pathname.split('/').slice(0,2).join('/')||'/'}`
+   if(window.localStorage.getItem(key)!=='seen')setOpen(true)
+  })
+  return()=>window.cancelAnimationFrame(frame)
+ },[guide,pathname])
  if(!guide)return null
  const key=`kingdom-network:page-guide:${pathname.split('/').slice(0,2).join('/')||'/'}`
  const dismiss=()=>{window.localStorage.setItem(key,'seen');setOpen(false)}
