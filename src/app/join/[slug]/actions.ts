@@ -78,8 +78,5 @@ export async function joinExistingChurch(formData:FormData){
     fail('join_failed')
   }
   const row:any=Array.isArray(data)?data[0]:data
-  const message=lang==='es'
-    ? row?.already_member?'Tu cuenta ya estaba conectada con esta iglesia.':'Tu cuenta existente ya está conectada con esta iglesia.'
-    : row?.already_member?'Your account was already connected to this church.':'Your existing account is now connected to this church.'
-  redirect(`/start?lang=${lang}&message=${encodeURIComponent(message)}`)
+  redirect(`/start?lang=${lang}&message_code=${row?.already_member?'already_joined':'joined_existing'}`)
 }
