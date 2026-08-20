@@ -29,7 +29,7 @@ export async function updateProfile(formData:FormData){
   if(birthday===undefined||anniversary===undefined)redirect(`/profile?error=${encodeURIComponent(lang==='es'?'Usa el formato MM/DD/AAAA para las fechas.':'Use MM/DD/YYYY for birthday and anniversary dates.')}${suffix}`)
   const showContactEmail=formData.get('show_contact_email')==='on',showJourneyProgress=formData.get('show_journey_progress')==='on'
   const [profileResult,detailsResult]=await Promise.all([
-    supabase.from('profiles').update({first_name:text(formData,'first_name'),last_name:text(formData,'last_name'),display_name:text(formData,'display_name'),bio:text(formData,'bio'),contact_email:contactEmail,show_contact_email:showContactEmail,show_journey_progress:showJourneyProgress,updated_at:now}).eq('id',userId),
+    supabase.from('profiles').update({first_name:text(formData,'first_name'),last_name:text(formData,'last_name'),display_name:text(formData,'display_name'),bio:text(formData,'bio'),contact_email:contactEmail,show_contact_email:showContactEmail,show_journey_progress:showJourneyProgress,show_journey_comparison:showJourneyProgress,updated_at:now}).eq('id',userId),
     supabase.from('member_private_details').update({phone:nullable(formData,'phone'),address_line1:nullable(formData,'address_line1'),address_line2:nullable(formData,'address_line2'),city:nullable(formData,'city'),state:nullable(formData,'state'),postal_code:nullable(formData,'postal_code'),birthday,marriage_anniversary:anniversary,updated_at:now}).eq('user_id',userId)
   ])
   const error=profileResult.error??detailsResult.error
