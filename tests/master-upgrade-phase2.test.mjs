@@ -35,7 +35,7 @@ test('More menu is grouped and no longer exposes low-priority duplicate destinat
 
 test('leadership navigation is capability-gated while public join stays navigation-free',()=>{
   const nav=read('src/components/mobile-nav.tsx')
-  assert.match(nav,/if\(access\.canManageOutreach\)leadership\.push/)
+  assert.match(nav,/if\(access\.canManageOutreach&&!disabled\.has\('outreach'\)\)leadership\.push/)
   assert.match(nav,/if\(access\.canManageLearning\|\|access\.canManageCalendar\)leadership\.push/)
   assert.match(nav,/leadership\.length/)
   assert.match(nav,/pathname\.startsWith\('\/join'\)/)
