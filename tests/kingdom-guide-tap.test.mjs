@@ -40,7 +40,8 @@ test('Tap and Go implementation contains no explicit any escapes',async()=>{
   }
 })
 
-test('Tap and Go is directly discoverable from mobile navigation',async()=>{
+test('Kingdom Guide is directly discoverable without a duplicate Tap and Go nav destination',async()=>{
   const source=await read('src/components/mobile-nav.tsx')
-  assert.match(source,/\['\/guide\/tap','Tap & Go'/)
+  assert.match(source,/\['\/guide','Kingdom Guide'/)
+  assert.doesNotMatch(source,/\['\/guide\/tap'/)
 })

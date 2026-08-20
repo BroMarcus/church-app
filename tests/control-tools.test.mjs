@@ -33,7 +33,8 @@ test('control tools preserve history instead of deleting roster or schedule assi
   assert.doesNotMatch(groupRosterActions,/\.delete\s*\(/)
   assert.match(teamActions,/member_status:'active'/)
   assert.match(scheduleActions,/assignment_status:'removed'/)
-  assert.match(scheduleActions,/status:'cancelled'/)
+  assert.match(scheduleActions,/\['scheduled','cancelled'\]\.includes\(status\)/)
+  assert.match(scheduleActions,/\.from\('schedule_items'\)\.update\(\{[^}]*status[^}]*updated_at/s)
 })
 
 test('new control tool server code contains no explicit any escapes',async()=>{
@@ -120,13 +121,17 @@ test('Content Studio gives create and edit tools for church-owned content',async
 })
 
 test('assessment question editing preserves private answer keys unless intentionally replaced',async()=>{
-  const migration=await read('supabase/migrations/20260820152500_secure_assessment_question_edit.sql')
+  const migration=await read('supabase/migrations/20260820223000_preserve_assessment_answer_key_on_blank_edit.sql')
+  const bridge=await read('supabase/migrations/20260820152500_secure_assessment_question_edit.sql')
   const page=await read('src/app/content/page.tsx')
   assert.match(migration,/private\.assessment_answer_keys/)
   assert.match(migration,/if p_correct_answer is not null then/)
+  assert.match(migration,/auth\.uid\(\) is null/)
   assert.match(migration,/private\.has_church_role/)
-  assert.match(migration,/manage_learning/)
-  assert.match(migration,/revoke all on function private\.update_assessment_question_impl/)
+  assert.match(migration,/has_church_permission\(v_church,'manage_learning'\)/)
+  assert.match(migration,/assessment_attempts/)
+  assert.match(bridge,/revoke all on function private\.update_assessment_question_impl/)
+  assert.match(bridge,/grant execute on function private\.update_assessment_question_impl[^\n]*authenticated/)
   assert.match(page,/leave blank to keep the existing answer key/)
   assert.doesNotMatch(page,/assessment_answer_keys/)
 })

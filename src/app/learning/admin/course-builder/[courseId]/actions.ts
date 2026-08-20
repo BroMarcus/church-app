@@ -239,8 +239,8 @@ export async function generateExtractionPlan(formData:FormData){
   const {supabase,churchId}=await manager(courseId)
   const {data:source}=await supabase.from('church_setup_uploads').select('id,source_text').eq('church_id',churchId).eq('created_record_id',courseId).maybeSingle()
   if(!source?.source_text)safeError(courseId,language,language==='es'?'Guarda el texto fuente primero.':'Save source text first.')
-  const plan=buildExtractionPlan(source.source_text)
-  const {error}=await supabase.from('church_setup_uploads').update({extraction_plan:plan,extraction_status:'proposal_ready',extraction_reviewed_at:new Date().toISOString()}).eq('id',source.id)
+  const plan=buildExtractionPlan(source!.source_text)
+  const {error}=await supabase.from('church_setup_uploads').update({extraction_plan:plan,extraction_status:'proposal_ready',extraction_reviewed_at:new Date().toISOString()}).eq('id',source!.id)
   if(error){console.error('course builder extraction proposal failed',{courseId,message:error.message});safeError(courseId,language)}
   success(courseId,language,language==='es'?'Propuesta creada para revisión.':'Draft structure proposed for review.')
 }
@@ -262,6 +262,6 @@ export async function applyExtractionPlan(formData:FormData){
     const {error:assessmentError}=await supabase.from('course_assessments').insert({course_id:courseId,title:plan.assessment?.title||'Course Final Review',assessment_type:'final_exam',passing_score:Math.max(80,Number(plan.assessment?.passing_score||80)),required:true,published:false,created_by:userId})
     if(assessmentError){console.error('course builder extraction assessment failed',{courseId,message:assessmentError.message});safeError(courseId,language)}
   }
-  await supabase.from('church_setup_uploads').update({extraction_status:'applied',extraction_applied_at:new Date().toISOString()}).eq('id',source.id)
+  await supabase.from('church_setup_uploads').update({extraction_status:'applied',extraction_applied_at:new Date().toISOString()}).eq('id',source!.id)
   success(courseId,language,language==='es'?'Propuesta aplicada como borrador.':'Proposal applied as drafts.')
 }

@@ -8,7 +8,8 @@ test('Church Builder requires a real non-admin pilot member before people setup 
   const source=await read('src/app/church/launch/page.tsx')
   assert.match(source,/not\('role','in','\(pastor,church_admin\)'\)/)
   assert.match(source,/const people=\(pilotMembers\?\?0\)>0/)
-  assert.doesNotMatch(source,/const people=.*openInvites/s)
+  const peopleAssignment=source.match(/const people=[^\n]+/)?.[0]??''
+  assert.doesNotMatch(peopleAssignment,/openInvites/)
 })
 
 test('Church Builder sends people setup through the safer Join Center flow',async()=>{

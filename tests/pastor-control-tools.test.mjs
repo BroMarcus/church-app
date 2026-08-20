@@ -28,7 +28,9 @@ test('finance corrections preserve history and never delete records from server 
   assert.doesNotMatch(source,/\.delete\s*\(/)
   assert.match(source,/voidContributionBatch/)
   assert.match(source,/voidManualFinanceTransaction/)
-  assert.match(source,/status:'cancelled'/)
+  assert.match(source,/billStatuses=new Set\(\['open','paid','cancelled'\]\)/)
+  assert.match(source,/if\(!billId\|\|!billStatuses\.has\(status\)\)/)
+  assert.match(source,/const payload=status==='paid'\?\{status,[^\n]+:\{status,/)
   assert.match(source,/transaction_status:'void'/)
 })
 

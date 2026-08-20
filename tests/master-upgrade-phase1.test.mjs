@@ -7,7 +7,7 @@ const read=(path)=>readFileSync(new URL(`../${path}`,import.meta.url),'utf8')
 test('public church join does not render member mobile navigation',()=>{
   const nav=read('src/components/mobile-nav.tsx')
   assert.match(nav,/pathname\.startsWith\('\/join'\)/)
-  assert.match(nav,/if\(publicAuthPath\)return null/)
+  assert.match(nav,/if\([^\n]*pathname\.startsWith\('\/join'\)[^\n]*\)return null/)
 })
 
 test('repository runtime is pinned to the CI Node major',()=>{
