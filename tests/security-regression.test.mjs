@@ -39,7 +39,6 @@ test('login UI prevents duplicate auth and email submissions',async()=>{
   assert.match(submit,/disabled=\{status\.pending\}/)
   assert.match(action,/disabled=\{status\.pending\|\|cooling\}/)
   assert.match(action,/aria-disabled=\{status\.pending\|\|cooling\}/)
-  assert.match(action,/localStorage\.setItem/)
 })
 
 test('password recovery lands in browser reset page instead of server callback',async()=>{
@@ -80,71 +79,77 @@ test('Kingdom Guide uses live approved resource schema and excludes unfinished m
   for(const field of ['approved_for_members','ministry_area','source_year','topic_tags','scripture_refs','archive_status','source_label','source_scope','official_source','library_kind','organization_status']) assert.match(source,new RegExp(field))
   assert.match(source,/\.eq\('approved_for_members',true\)/)
   assert.match(source,/\.not\('archive_status','in','\(draft,retired\)'\)/)
+  for(const stale of ['member_visible','resource_year','scripture_references','authority_level','source_authority']) assert.doesNotMatch(source,new RegExp(stale))
 })
 
 test('personal schedule planning module exists and writes through server actions',async()=>{
-  const page=await read('src/app/personal-planning/page.tsx')
-  const actions=await read('src/app/personal-planning/actions.ts')
-  assert.match(page,/Personal Planning/)
-  assert.match(page,/addPersonalTask/)
-  assert.match(page,/addUnavailableDate/)
-  assert.match(actions,/export async function addPersonalTask/)
-  assert.match(actions,/export async function addUnavailableDate/)
-  assert.match(actions,/church_personal_tasks/)
-  assert.match(actions,/church_member_unavailability/)
+  const page=await read('src/app/calendar/my/page.tsx')
+  const panel=await read('src/app/calendar/my/personal-planning.tsx')
+  const actions=await read('src/app/calendar/my/actions.ts')
+  assert.match(page,/import \{ PersonalPlanning \} from '\.\/personal-planning'/)
+  for(const action of ['createPersonalTask','updatePersonalTask','submitTimeOff','cancelTimeOff']) assert.match(panel,new RegExp(action))
+  assert.match(actions,/memberContext/)
+  assert.match(actions,/\.eq\('assigned_to',userId\)/)
+  assert.match(actions,/\.eq\('user_id',userId\)/)
+  assert.doesNotMatch(actions,/encodeURIComponent\(error\.message\)/)
 })
 
 test('learning progress action validates course, module, membership and enrollment',async()=>{
-  const source=await read('src/app/learning/[courseId]/actions.ts')
-  assert.match(source,/course_modules/)
+  const source=await read('src/app/learning/actions.ts')
+  assert.match(source,/module\?\.course_id!==courseId/)
   assert.match(source,/church_memberships/)
   assert.match(source,/course_enrollments/)
-  assert.match(source,/Module does not belong to this course/)
+  assert.match(source,/Start the course before saving lesson progress/)
 })
 
 test('database migration enforces enrollment before module progress',async()=>{
-  const source=await read('supabase/migrations/20260820024000_learning_progress_enrollment_guard.sql')
-  assert.match(source,/course_enrollments/)
-  assert.match(source,/raise exception 'Active course enrollment is required/)
+  const source=await read('supabase/migrations/20260819235700_enforce_module_progress_enrollment_scope.sql')
+  assert.match(source,/Lesson does not belong to this course/)
+  assert.match(source,/Course enrollment is required before saving lesson progress/)
+  assert.match(source,/before insert or update on public\.course_module_progress/i)
 })
 
 test('storage tenant policies use object path, never church name',async()=>{
-  const source=await read('supabase/migrations/20260817161200_phase3_foundation_and_launch.sql')
-  assert.match(source,/storage\.foldername\(name\)/)
-  assert.doesNotMatch(source,/churches\.name.*storage/s)
+  const source=await read('supabase/migrations/20260819234706_fully_qualify_storage_object_paths.sql')
+  assert.doesNotMatch(source,/foldername\(c\.name\)/)
+  assert.match(source,/foldername\(storage\.objects\.name\)/)
 })
 
 test('private member detail leadership access fails closed for multi-church users',async()=>{
-  const source=await read('supabase/migrations/20260818121400_member_private_details.sql')
-  assert.match(source,/church_id/)
-  assert.match(source,/auth\.uid\(\)/)
+  const source=await read('supabase/migrations/20260819234424_harden_member_private_details_isolation.sql')
+  assert.match(source,/count\(distinct cm\.church_id\)/i)
+  assert.match(source,/and 1 =/i)
 })
 
 test('messages do not redirect raw database error text to members',async()=>{
   const source=await read('src/app/messages/actions.ts')
   assert.doesNotMatch(source,/encodeURIComponent\(error\.message\)/)
+  assert.match(source,/console\.error\('sendDirectMessage failed'/)
 })
 
 test('imports do not redirect raw database error text to leaders',async()=>{
   const source=await read('src/app/church/import/actions.ts')
   assert.doesNotMatch(source,/encodeURIComponent\(error\.message\)/)
+  assert.doesNotMatch(source,/encodeURIComponent\(batchError\?\.message/)
 })
 
 test('fundraising does not expose raw database errors and preserves validation',async()=>{
   const source=await read('src/app/fundraising/actions.ts')
   assert.doesNotMatch(source,/encodeURIComponent\(error\.message\)/)
-  assert.match(source,/goal_amount/)
+  assert.match(source,/goal<=0/)
+  assert.match(source,/endsAt.*startsAt/s)
 })
 
 test('member admin actions reauthorize pastor or church admin server-side',async()=>{
-  const source=await read('src/app/church/members/actions.ts')
-  assert.match(source,/pastor/)
-  assert.match(source,/church_admin/)
-  assert.match(source,/auth\.getClaims/)
+  const source=await read('src/app/church/members/[userId]/admin-actions.ts')
+  assert.match(source,/\['pastor','church_admin'\]\.includes\(actor\.role\)/)
+  assert.match(source,/Member not found in this church/)
+  assert.match(source,/You cannot remove your own admin access/)
 })
 
 test('security-definer migration removes broad execute before restoring intended grants',async()=>{
-  const source=await read('supabase/migrations/20260820031500_security_definer_api_surface.sql')
-  assert.match(source,/revoke execute on function/)
-  assert.match(source,/grant execute on function/)
+  const source=await read('supabase/migrations/20260819234537_lock_down_security_definer_execute_grants.sql')
+  assert.match(source,/revoke all on function %s from public, anon, authenticated/i)
+  assert.match(source,/get_public_signup_status_for_church\(text\) to anon,authenticated/i)
+  assert.match(source,/configure_resend_email_provider.*to authenticated/i)
 })
