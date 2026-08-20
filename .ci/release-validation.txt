@@ -1,2 +1,2 @@
 Application tree validation marker for Kingdom Network pre-deployment CI. This file does not affect the application build.
-Validation rerun: auth, onboarding, lint, and build gate.
+Final validation rerun: auth, onboarding, schema contract, lint, and production build gate.
