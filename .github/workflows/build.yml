@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -54,6 +55,7 @@ jobs:
           TESTS: ${{ steps.tests.outcome }}
           LINT: ${{ steps.lint.outcome }}
           BUILD: ${{ steps.build.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           publish() {
             context="$1"
@@ -64,7 +66,8 @@ jobs:
               "/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
               -f state="$state" \
               -f context="kingdom-network/${context}" \
-              -f description="${context}: ${outcome}"
+              -f description="${context}: ${outcome}" \
+              -f target_url="$RUN_URL"
           }
           publish install "$INSTALL"
           publish security-tests "$TESTS"
@@ -82,5 +85,6 @@ jobs:
             "/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state="$overall" \
             -f context='kingdom-network/release-gate' \
-            -f description="$description"
+            -f description="$description" \
+            -f target_url="$RUN_URL"
           [ "$overall" = success ]
