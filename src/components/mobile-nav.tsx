@@ -15,7 +15,8 @@ export function MobileNav(){
   const pathname=usePathname()
   const [openPath,setOpenPath]=useState<string|null>(null)
   const open=openPath===pathname
-  if(pathname.startsWith('/login')||pathname.startsWith('/auth'))return null
+  const publicAuthPath=pathname.startsWith('/login')||pathname.startsWith('/auth')||pathname.startsWith('/join')
+  if(publicAuthPath)return null
   const active=(href:string)=>{
     if(href==='/')return pathname==='/'
     if(href==='/calendar')return pathname==='/calendar'||pathname==='/calendar/my'
