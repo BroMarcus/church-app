@@ -98,11 +98,32 @@ test('password recovery preserves a safe church-join return path end to end',asy
   assert.match(reset,/href=\{`\/login\?lang=\$\{lang\}&mode=signin\$\{nextPart\}`\}/)
 })
 
-test('login bounds status messages and exposes them accessibly',async()=>{
-  const source=await read('src/app/login/page.tsx')
-  assert.match(source,/const boundedStatus=.*slice\(0,320\)/)
-  assert.match(source,/role="alert"/)
-  assert.match(source,/role="status" aria-live="polite"/)
+test('login renders only allowlisted bilingual status codes, not arbitrary query text',async()=>{
+  const page=await read('src/app/login/page.tsx')
+  assert.match(page,/error_code\?:string;message_code\?:string/)
+  assert.match(page,/const authStatus=/)
+  assert.match(page,/statusError=.*params\.error_code/)
+  assert.match(page,/statusMessage=.*params\.message_code/)
+  assert.doesNotMatch(page,/params\.error\b/)
+  assert.doesNotMatch(page,/params\.message\b/)
+  assert.match(page,/callback_expired:/)
+  assert.match(page,/Ese enlace venció o ya fue usado/)
+  assert.match(page,/role="alert"/)
+  assert.match(page,/role="status" aria-live="polite"/)
+})
+
+test('login and callback emit status codes instead of member-facing query strings',async()=>{
+  const actions=await read('src/app/login/actions.ts')
+  const callback=await read('src/app/auth/callback/route.ts')
+  assert.match(actions,/statusPart\('error','invalid_credentials'\)/)
+  assert.match(actions,/statusPart\('message','account_created'\)/)
+  assert.match(actions,/statusPart\('message','reset_sent'\)/)
+  assert.match(actions,/statusPart\('message','confirmation_sent'\)/)
+  assert.doesNotMatch(actions,/[&?]error=\+?encodeURIComponent/)
+  assert.doesNotMatch(actions,/[&?]message=\+?encodeURIComponent/)
+  assert.match(callback,/error_code=/)
+  assert.match(callback,/loginError\('callback_incomplete'\)/)
+  assert.match(callback,/loginError\('callback_expired'\)/)
 })
 
 test('login warns returning users not to create duplicate accounts in both languages',async()=>{
