@@ -9,14 +9,15 @@ function allowedAuthDestination(path:string){
 
 function safeNext(raw:string|null,fallback:string){
   if(!raw)return fallback
-  if(raw.startsWith('/')&&!raw.startsWith('//')&&allowedAuthDestination(raw))return raw
   try{
-    const requested=new URL(raw)
     const canonical=new URL(siteUrl)
+    const requested=new URL(raw,canonical)
+    if(requested.origin!==canonical.origin)return fallback
     const local=`${requested.pathname}${requested.search}${requested.hash}`
-    if(requested.origin===canonical.origin&&allowedAuthDestination(local))return local
-  }catch{}
-  return fallback
+    return allowedAuthDestination(local)?local:fallback
+  }catch{
+    return fallback
+  }
 }
 
 export async function GET(request:NextRequest){
