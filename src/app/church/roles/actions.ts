@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 
 const text=(f:FormData,k:string)=>String(f.get(k)??'').trim()
-const permissionKeys=['view_leadership','manage_outreach','manage_groups','lead_own_group','manage_learning','manage_calendar','manage_ministries','manage_teams','manage_members','manage_media','view_finance','manage_finance','approve_finance'] as const
+const permissionKeys=['view_leadership','manage_outreach','manage_groups','lead_own_group','manage_learning','manage_calendar','manage_ministries','manage_teams','manage_members','manage_media','request_finance','view_finance','manage_finance','approve_finance'] as const
 const financePermissionKeys=['view_finance','manage_finance','approve_finance'] as const
 const slugify=(v:string)=>v.toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,60)
 const error=(message:string)=>redirect('/church/roles?error='+encodeURIComponent(message))
