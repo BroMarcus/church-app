@@ -23,6 +23,21 @@ export default async function LessonPage({params}:{params:Promise<{courseId:stri
   if(!course||!module)redirect(`/learning/${courseId}`)
   if(!enrollment)redirect(`/learning/${courseId}?error=${encodeURIComponent('Start the course before opening a lesson.')}`)
 
+  const currentPosition=Number(module.position??0)
+  const priorModuleIds=(modules??[]).filter((m:any)=>Number(m.position)<currentPosition).map((m:any)=>m.id)
+  if(priorModuleIds.length){
+    const {data:priorRequired}=await supabase.from('course_assessments').select('id').eq('course_id',courseId).eq('required',true).eq('published',true).in('module_id',priorModuleIds)
+    const priorAssessmentIds=(priorRequired??[]).map((a:any)=>a.id)
+    if(priorAssessmentIds.length){
+      const {data:priorPassed}=await supabase.from('assessment_attempts').select('assessment_id').eq('user_id',userId).eq('passed',true).in('assessment_id',priorAssessmentIds)
+      const passedIds=new Set((priorPassed??[]).map((a:any)=>a.assessment_id))
+      if(priorAssessmentIds.some((id:string)=>!passedIds.has(id))){
+        const message=(course.language_code??'en')==='es'?'Completa primero las evaluaciones requeridas de las lecciones anteriores.':'Complete the required tests in earlier lessons before opening this lesson.'
+        redirect(`/learning/${courseId}?error=${encodeURIComponent(message)}`)
+      }
+    }
+  }
+
   const assessmentIds=(assessments??[]).map((a:any)=>a.id)
   let questions:any[]=[];let attempts:any[]=[]
   if(assessmentIds.length){const [q,a]=await Promise.all([
