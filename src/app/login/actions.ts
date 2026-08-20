@@ -8,7 +8,7 @@ const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel
 const langOf=(f:FormData)=>text(f,'lang')==='es'?'es':'en'
 const loginUrl=(lang:string,extra='')=>`/login?lang=${lang}${extra}`
 const callbackUrl=(lang:'en'|'es',mode:'signup'|'recovery',next:string)=>`${siteUrl}/auth/callback?lang=${lang}&mode=${mode}&next=${encodeURIComponent(next)}`
-const recoveryUrl=(lang:'en'|'es')=>`${siteUrl}/auth/update-password?lang=${lang}`
+const recoveryUrl=(lang:'en'|'es',inviteId='')=>`${siteUrl}/auth/update-password?lang=${lang}${inviteId?`&invite=${encodeURIComponent(inviteId)}`:''}`
 
 function friendlyAuthEmailError(message:string,lang:'en'|'es'){
   const normalized=message.toLowerCase()
@@ -25,7 +25,8 @@ function friendlyAuthEmailError(message:string,lang:'en'|'es'){
 export async function login(formData:FormData){
   const supabase=await createClient()
   const lang=langOf(formData)
-  const email=text(formData,'email').toLowerCase(),password=String(formData.get('password')??'')
+  const email=text(formData,'email').toLowerCase(),password=String(formData.get('password')??''),inviteId=text(formData,'invite_id')
+  const invitePart=inviteId?`&invite=${encodeURIComponent(inviteId)}`:''
   const {data,error}=await supabase.auth.signInWithPassword({email,password})
   if(error){
     const normalized=error.message.toLowerCase()
@@ -39,9 +40,20 @@ export async function login(formData:FormData){
       ? 'Tu correo todavía no está confirmado. Abre el correo de confirmación más reciente que te enviamos y confirma tu cuenta antes de iniciar sesión.'
       : 'Your email is not confirmed yet. Open the newest confirmation email we sent and confirm your account before signing in.'
     console.error('login failed',{message:error.message})
-    redirect(loginUrl(lang,'&mode=signin&error='+encodeURIComponent(message)))
+    redirect(loginUrl(lang,invitePart+'&mode=signin&error='+encodeURIComponent(message)))
   }
   const userId=data.user?.id
+  if(userId&&inviteId){
+    const {error:inviteError}=await supabase.rpc('redeem_invite_for_current_user',{p_invite_id:inviteId})
+    if(inviteError){
+      console.error('existing account invite redemption failed',{message:inviteError.message})
+      const message=lang==='es'
+        ? 'Iniciaste sesión, pero no pudimos conectar esta invitación. Puede haber vencido, pertenecer a otro correo o necesitar ayuda de un líder. Tu cuenta sigue segura.'
+        : 'You signed in, but we could not connect this invitation. It may be expired, belong to another email, or need a church leader to help. Your account is still safe.'
+      redirect(loginUrl(lang,invitePart+'&mode=signin&error='+encodeURIComponent(message)))
+    }
+    redirect(`/start?welcome=1${lang==='es'?'&lang=es':''}&invite=connected`)
+  }
   if(userId){
     const onboardingState=data.user?.user_metadata?.onboarding_completed
     if(onboardingState===false)redirect(`/start?welcome=1${lang==='es'?'&lang=es':''}`)
@@ -87,9 +99,9 @@ export async function signup(formData:FormData){
   if(error){console.error('signup failed',{message:error.message});redirect(loginUrl(lang,invitePart+'&mode=signup&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))}
   if(data.user&&Array.isArray(data.user.identities)&&data.user.identities.length===0){
     const message=lang==='es'
-      ? 'Ese correo ya tiene una cuenta. Inicia sesión con tu contraseña existente o usa “Olvidé mi contraseña” si no la recuerdas.'
-      : 'That email already has an account. Sign in with your existing password, or use “I forgot my password” if you do not remember it.'
-    redirect(loginUrl(lang,'&mode=signin&message='+encodeURIComponent(message)))
+      ? 'Ese correo ya tiene una cuenta. Inicia sesión con tu contraseña existente y conectaremos esta invitación a tu cuenta. Usa “Olvidé mi contraseña” si no la recuerdas.'
+      : 'That email already has an account. Sign in with your existing password and we will connect this invitation to your account. Use “I forgot my password” if you do not remember it.'
+    redirect(loginUrl(lang,invitePart+'&mode=signin&message='+encodeURIComponent(message)))
   }
   if(data.session)redirect(startPath)
   const message=lang==='es'
@@ -101,28 +113,30 @@ export async function signup(formData:FormData){
 export async function requestPasswordReset(formData:FormData){
   const supabase=await createClient()
   const lang=langOf(formData)
-  const email=text(formData,'reset_email').toLowerCase()
-  if(!email)redirect(loginUrl(lang,'&mode=signin&error='+encodeURIComponent(lang==='es'?'Escribe primero tu correo electrónico.':'Enter your email address first.')))
+  const email=text(formData,'reset_email').toLowerCase(),inviteId=text(formData,'invite_id')
+  const invitePart=inviteId?`&invite=${encodeURIComponent(inviteId)}`:''
+  if(!email)redirect(loginUrl(lang,invitePart+'&mode=signin&error='+encodeURIComponent(lang==='es'?'Escribe primero tu correo electrónico.':'Enter your email address first.')))
   // Password recovery must land in the browser. Supabase may return the recovery
   // session in the URL fragment, which a server Route Handler cannot read.
-  const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:recoveryUrl(lang)})
-  if(error){console.error('requestPasswordReset failed',{message:error.message});redirect(loginUrl(lang,'&mode=signin&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))}
+  const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:recoveryUrl(lang,inviteId)})
+  if(error){console.error('requestPasswordReset failed',{message:error.message});redirect(loginUrl(lang,invitePart+'&mode=signin&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))}
   const message=lang==='es'
     ? 'Correo para cambiar la contraseña enviado. Revisa Recibidos y Spam/Correo no deseado. Abre solamente el enlace más reciente.'
     : 'Password reset email sent. Check Inbox and Spam/Junk, then open only the newest reset link.'
-  redirect(loginUrl(lang,'&mode=signin&message='+encodeURIComponent(message)))
+  redirect(loginUrl(lang,invitePart+'&mode=signin&message='+encodeURIComponent(message)))
 }
 
 export async function resendConfirmation(formData:FormData){
   const supabase=await createClient()
   const lang=langOf(formData)
-  const email=text(formData,'reset_email').toLowerCase()
-  if(!email)redirect(loginUrl(lang,'&mode=signin&error='+encodeURIComponent(lang==='es'?'Escribe primero tu correo electrónico.':'Enter your email address first.')))
+  const email=text(formData,'reset_email').toLowerCase(),inviteId=text(formData,'invite_id')
+  const invitePart=inviteId?`&invite=${encodeURIComponent(inviteId)}`:''
+  if(!email)redirect(loginUrl(lang,invitePart+'&mode=signin&error='+encodeURIComponent(lang==='es'?'Escribe primero tu correo electrónico.':'Enter your email address first.')))
   const startPath=`/start?welcome=1${lang==='es'?'&lang=es':''}`
   const {error}=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath)}})
-  if(error){console.error('resendConfirmation failed',{message:error.message});redirect(loginUrl(lang,'&mode=signin&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))}
+  if(error){console.error('resendConfirmation failed',{message:error.message});redirect(loginUrl(lang,invitePart+'&mode=signin&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))}
   const message=lang==='es'
     ? 'Correo de confirmación enviado otra vez. Abre solamente el correo más reciente y revisa Spam/Correo no deseado si no aparece.'
     : 'Confirmation email sent again. Open only the newest email and check Spam/Junk if you do not see it.'
-  redirect(loginUrl(lang,'&mode=signin&message='+encodeURIComponent(message)))
+  redirect(loginUrl(lang,invitePart+'&mode=signin&message='+encodeURIComponent(message)))
 }
