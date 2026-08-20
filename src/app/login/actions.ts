@@ -8,8 +8,16 @@ const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel
 const langOf=(f:FormData)=>text(f,'lang')==='es'?'es':'en'
 const loginUrl=(lang:string,extra='')=>`/login?lang=${lang}${extra}`
 const callbackUrl=(lang:'en'|'es',mode:'signup'|'recovery',next:string)=>`${siteUrl}/auth/callback?lang=${lang}&mode=${mode}&next=${encodeURIComponent(next)}`
-const recoveryUrl=(lang:'en'|'es')=>`${siteUrl}/auth/update-password?lang=${lang}`
-const safeJoinNext=(value:string)=>value.startsWith('/join/')&&!value.startsWith('//')&&!value.includes('..')?value:''
+function safeJoinNext(value:string){
+  try{
+    if(!value.startsWith('/')||value.startsWith('//')||value.includes('\\'))return ''
+    const base='https://kingdom.invalid'
+    const parsed=new URL(value,base)
+    if(parsed.origin!==base||!parsed.pathname.startsWith('/join/'))return ''
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`
+  }catch{return ''}
+}
+const recoveryUrl=(lang:'en'|'es',next='')=>`${siteUrl}/auth/update-password?lang=${lang}${safeJoinNext(next)?`&next=${encodeURIComponent(safeJoinNext(next))}`:''}`
 
 function friendlyAuthEmailError(message:string,lang:'en'|'es'){
   const normalized=message.toLowerCase()
@@ -40,8 +48,6 @@ export async function login(formData:FormData){
     else if(normalized.includes('email not confirmed')) message=lang==='es'
       ? 'Tu correo todavía no está confirmado. Abre el correo de confirmación más reciente que te enviamos y confirma tu cuenta antes de iniciar sesión.'
       : 'Your email is not confirmed yet. Open the newest confirmation email we sent and confirm your account before signing in.'
-    // Invalid credentials and unconfirmed email are normal member mistakes, not
-    // production incidents. Keep unexpected auth failures visible to monitoring.
     if(!normalized.includes('invalid login credentials')&&!normalized.includes('email not confirmed')){
       console.error('login failed',{message:error.message})
     }
@@ -107,29 +113,29 @@ export async function signup(formData:FormData){
 
 export async function requestPasswordReset(formData:FormData){
   const supabase=await createClient()
-  const lang=langOf(formData)
+  const lang=langOf(formData),next=safeJoinNext(text(formData,'next'))
+  const nextPart=next?`&next=${encodeURIComponent(next)}`:''
   const email=text(formData,'reset_email').toLowerCase()
-  if(!email)redirect(loginUrl(lang,'&mode=signin&error='+encodeURIComponent(lang==='es'?'Escribe primero tu correo electrónico.':'Enter your email address first.')))
-  // Password recovery must land in the browser. Supabase may return the recovery
-  // session in the URL fragment, which a server Route Handler cannot read.
-  const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:recoveryUrl(lang)})
-  if(error){console.error('requestPasswordReset failed',{message:error.message});redirect(loginUrl(lang,'&mode=signin&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))}
+  if(!email)redirect(loginUrl(lang,'&mode=signin'+nextPart+'&error='+encodeURIComponent(lang==='es'?'Escribe primero tu correo electrónico.':'Enter your email address first.')))
+  const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:recoveryUrl(lang,next)})
+  if(error){console.error('requestPasswordReset failed',{message:error.message});redirect(loginUrl(lang,'&mode=signin'+nextPart+'&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))}
   const message=lang==='es'
     ? 'Correo para cambiar la contraseña enviado. Revisa Recibidos y Spam/Correo no deseado. Abre solamente el enlace más reciente.'
     : 'Password reset email sent. Check Inbox and Spam/Junk, then open only the newest reset link.'
-  redirect(loginUrl(lang,'&mode=signin&message='+encodeURIComponent(message)))
+  redirect(loginUrl(lang,'&mode=signin'+nextPart+'&message='+encodeURIComponent(message)))
 }
 
 export async function resendConfirmation(formData:FormData){
   const supabase=await createClient()
-  const lang=langOf(formData)
+  const lang=langOf(formData),next=safeJoinNext(text(formData,'next'))
+  const nextPart=next?`&next=${encodeURIComponent(next)}`:''
   const email=text(formData,'reset_email').toLowerCase()
-  if(!email)redirect(loginUrl(lang,'&mode=signin&error='+encodeURIComponent(lang==='es'?'Escribe primero tu correo electrónico.':'Enter your email address first.')))
-  const startPath=`/start?welcome=1${lang==='es'?'&lang=es':''}`
+  if(!email)redirect(loginUrl(lang,'&mode=signin'+nextPart+'&error='+encodeURIComponent(lang==='es'?'Escribe primero tu correo electrónico.':'Enter your email address first.')))
+  const startPath=next||`/start?welcome=1${lang==='es'?'&lang=es':''}`
   const {error}=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath)}})
-  if(error){console.error('resendConfirmation failed',{message:error.message});redirect(loginUrl(lang,'&mode=signin&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))}
+  if(error){console.error('resendConfirmation failed',{message:error.message});redirect(loginUrl(lang,'&mode=signin'+nextPart+'&error='+encodeURIComponent(friendlyAuthEmailError(error.message,lang))))}
   const message=lang==='es'
     ? 'Correo de confirmación enviado otra vez. Abre solamente el correo más reciente y revisa Spam/Correo no deseado si no aparece.'
     : 'Confirmation email sent again. Open only the newest email and check Spam/Junk if you do not see it.'
-  redirect(loginUrl(lang,'&mode=signin&message='+encodeURIComponent(message)))
+  redirect(loginUrl(lang,'&mode=signin'+nextPart+'&message='+encodeURIComponent(message)))
 }
