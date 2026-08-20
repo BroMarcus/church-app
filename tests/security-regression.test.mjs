@@ -152,3 +152,40 @@ test('security-definer migration removes broad execute before restoring intended
   assert.match(source,/get_public_signup_status_for_church\(text\) to anon,authenticated/i)
   assert.match(source,/configure_resend_email_provider.*to authenticated/i)
 })
+
+test('expired auth-email links stay on sign-in recovery UI',async()=>{
+  const callback=await read('src/app/auth/callback/route.ts')
+  assert.match(callback,/\/login\?lang=\$\{lang\}&mode=signin&error=/)
+})
+
+test('password update prevents double submit and returns explicitly to sign in',async()=>{
+  const page=await read('src/app/auth/update-password/page.tsx')
+  assert.match(page,/if\(busy\)return/)
+  assert.match(page,/disabled=\{busy\}/)
+  assert.match(page,/aria-busy=\{busy\}/)
+  assert.match(page,/mode=signin&message=/)
+})
+
+test('Start Here keeps the full app map collapsed for first-login simplicity',async()=>{
+  const source=await read('src/app/start/page.tsx')
+  assert.match(source,/tour:'See the full app map'/)
+  assert.match(source,/tour:'Ver el mapa completo de la aplicación'/)
+  assert.match(source,/<details className="card start-tour"/)
+  assert.match(source,/<summary[^>]*>\{t\.tour\}<\/summary>/)
+})
+
+test('Kingdom Guide search is accent tolerant, multi-word tolerant, and language preserving',async()=>{
+  const source=await read('src/app/guide/page.tsx')
+  assert.match(source,/normalize\('NFD'\)/)
+  assert.match(source,/queryTokens=normalizedQuery\.split/)
+  assert.match(source,/__matchedTokens===queryTokens\.length/)
+  assert.match(source,/withLang\(`\/resources\?q=/)
+})
+
+test('pilot readiness hides raw backend errors and surfaces one next action',async()=>{
+  const source=await read('src/app/church/readiness/page.tsx')
+  assert.match(source,/console\.error\('church_pilot_readiness failed'/)
+  assert.doesNotMatch(source,/\{t\.load\} \{error\.message\}/)
+  assert.match(source,/const nextAction=rows\.find/)
+  assert.match(source,/statusLabel\(r\.check_status,lang\)/)
+})
