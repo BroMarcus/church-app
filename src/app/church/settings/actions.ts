@@ -24,6 +24,10 @@ export async function updateChurchSettings(formData:FormData){
   const payload={name:text(formData,'name'),city:text(formData,'city')||null,state:text(formData,'state')||null,postal_code:text(formData,'postal_code')||null,address_line1:text(formData,'address_line1')||null,address_line2:text(formData,'address_line2')||null,timezone:text(formData,'timezone')||'America/Los_Angeles',website_url:website,contact_email:text(formData,'contact_email')||null,contact_phone:text(formData,'contact_phone')||null,welcome_message:text(formData,'welcome_message')||null,brand_color:brand}
   if(!payload.name)redirect(`${base}${base.includes('?')?'&':'?'}error=`+encodeURIComponent(lang==='es'?'El nombre de la iglesia es obligatorio.':'Church name is required.'))
   const {error}=await supabase.from('churches').update(payload).eq('id',churchId)
-  if(error)redirect(`${base}${base.includes('?')?'&':'?'}error=`+encodeURIComponent(error.message))
+  if(error){
+    console.error('updateChurchSettings failed',{churchId,userId,code:error.code})
+    const message=lang==='es'?'No se pudieron guardar los cambios. Inténtalo de nuevo. Si vuelve a pasar, pide ayuda al administrador.':'We could not save the changes. Try again. If it happens again, ask an administrator for help.'
+    redirect(`${base}${base.includes('?')?'&':'?'}error=`+encodeURIComponent(message))
+  }
   revalidatePath('/church/settings');revalidatePath('/church');revalidatePath('/directory');revalidatePath('/');redirect(`/church/settings?saved=1${suffix}`)
 }
