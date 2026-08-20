@@ -64,3 +64,22 @@ test('existing-account join logs unexpected failures without exposing provider t
   assert.match(source,/We could not connect your account to this church yet\./)
   assert.match(source,/Todavía no pudimos conectar tu cuenta con esta iglesia\./)
 })
+
+test('password reset handles initialization failures without leaving a false-ready form',async()=>{
+  const source=await read('src/app/auth/update-password/page.tsx')
+  assert.match(source,/try\{/)
+  assert.match(source,/password reset initialization failed/)
+  assert.match(source,/setReady\(false\);setMessage\(c\.invalidBack\)/)
+  assert.match(source,/password reset session exchange failed/)
+  assert.match(source,/password reset session lookup failed/)
+})
+
+test('password reset always releases busy state and keeps errors member-safe',async()=>{
+  const source=await read('src/app/auth/update-password/page.tsx')
+  assert.match(source,/finally\{\s*setBusy\(false\)\s*\}/s)
+  assert.match(source,/password update failed/)
+  assert.match(source,/password update request failed/)
+  assert.match(source,/role="status" aria-live="polite"/)
+  assert.match(source,/type="submit" disabled=\{busy\}/)
+  assert.match(source,/mode=signin/)
+})
