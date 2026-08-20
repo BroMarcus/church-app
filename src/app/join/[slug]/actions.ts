@@ -6,9 +6,22 @@ import { createClient } from '@/lib/supabase/server'
 const text=(f:FormData,k:string)=>String(f.get(k)??'').trim()
 const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
 
+function joinSignupError(message:string,lang:'en'|'es'){
+  const lower=message.toLowerCase()
+  if(lower.includes('rate limit')||lower.includes('security purposes')||lower.includes('over_email_send_rate_limit'))return lang==='es'
+    ? 'Se solicitaron demasiados correos de confirmación. Espera aproximadamente un minuto e inténtalo una sola vez más.'
+    : 'Too many confirmation emails were requested. Wait about one minute, then try once more.'
+  if(lower.includes('password'))return lang==='es'
+    ? 'No pudimos usar esa contraseña. Usa por lo menos 8 caracteres e intenta nuevamente.'
+    : 'We could not use that password. Use at least 8 characters and try again.'
+  return lang==='es'
+    ? 'No pudimos crear tu cuenta en este momento. Revisa tu correo y contraseña e inténtalo otra vez.'
+    : 'We could not create your account right now. Check your email and password and try again.'
+}
+
 export async function joinChurch(formData:FormData){
   const supabase=await createClient()
-  const lang=text(formData,'lang')==='es'?'es':'en'
+  const lang:'en'|'es'=text(formData,'lang')==='es'?'es':'en'
   const slug=text(formData,'church_slug').toLowerCase()
   const email=text(formData,'email').toLowerCase(),phone=text(formData,'phone'),firstName=text(formData,'first_name'),lastName=text(formData,'last_name')
   const password=String(formData.get('password')??''),confirm=String(formData.get('confirm_password')??'')
@@ -32,9 +45,9 @@ export async function joinChurch(formData:FormData){
     options:{emailRedirectTo:callback,data:{first_name:firstName,last_name:lastName,display_name:displayName,phone:phone||null,public_signup:true,public_signup_church_id:church.church_id,onboarding_completed:false,preferred_language:lang,join_source:'church_link',email_consent:emailConsent,sms_consent:smsConsent}}
   })
   if(error){
-    const lower=error.message.toLowerCase()
-    if(lower.includes('rate limit')||lower.includes('security purposes'))fail('Too many confirmation emails were requested. Wait about one minute and try once more.','Se solicitaron demasiados correos. Espera aproximadamente un minuto e inténtalo una vez más.')
-    fail(error.message,error.message)
+    console.error('public church signup failed',{churchSlug:slug,message:error.message})
+    const friendly=joinSignupError(error.message,lang)
+    fail(friendly,friendly)
   }
   if(data.user&&Array.isArray(data.user.identities)&&data.user.identities.length===0){
     const next=`/join/${encodeURIComponent(slug)}?lang=${lang}`
@@ -46,7 +59,7 @@ export async function joinChurch(formData:FormData){
 
 export async function joinExistingChurch(formData:FormData){
   const supabase=await createClient()
-  const lang=text(formData,'lang')==='es'?'es':'en'
+  const lang:'en'|'es'=text(formData,'lang')==='es'?'es':'en'
   const slug=text(formData,'church_slug').toLowerCase()
   const fail=(en:string,es:string)=>redirect(`/join/${encodeURIComponent(slug)}?lang=${lang}&error=${encodeURIComponent(lang==='es'?es:en)}`)
   if(!slug)fail('Church link is missing.','Falta el enlace de la iglesia.')
@@ -68,6 +81,7 @@ export async function joinExistingChurch(formData:FormData){
     const msg=error.message.toLowerCase()
     if(msg.includes('capacity'))fail('This church’s public pilot is currently full.','El piloto público de esta iglesia está lleno en este momento.')
     if(msg.includes('previous church access'))fail('Your previous access to this church is inactive. Ask a church administrator to restore it.','Tu acceso anterior a esta iglesia está inactivo. Pide a un administrador de la iglesia que lo restaure.')
+    console.error('existing-account church join failed',{churchSlug:slug,message:error.message})
     fail('We could not connect your account to this church yet.','Todavía no pudimos conectar tu cuenta con esta iglesia.')
   }
   const row:any=Array.isArray(data)?data[0]:data

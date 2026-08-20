@@ -3,15 +3,21 @@ import { createClient } from '@/lib/supabase/server'
 
 const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
 
+function allowedAuthDestination(path:string){
+  return path==='/start'||path.startsWith('/start?')||path.startsWith('/join/')||path==='/auth/update-password'||path.startsWith('/auth/update-password?')
+}
+
 function safeNext(raw:string|null,fallback:string){
   if(!raw)return fallback
-  if(raw.startsWith('/')&&!raw.startsWith('//'))return raw
   try{
-    const requested=new URL(raw)
     const canonical=new URL(siteUrl)
-    if(requested.origin===canonical.origin)return `${requested.pathname}${requested.search}${requested.hash}`
-  }catch{}
-  return fallback
+    const requested=new URL(raw,canonical)
+    if(requested.origin!==canonical.origin)return fallback
+    const local=`${requested.pathname}${requested.search}${requested.hash}`
+    return allowedAuthDestination(local)?local:fallback
+  }catch{
+    return fallback
+  }
 }
 
 export async function GET(request:NextRequest){
@@ -21,7 +27,7 @@ export async function GET(request:NextRequest){
   const mode=url.searchParams.get('mode')==='recovery'?'recovery':'signup'
   const fallback=mode==='recovery'?`/auth/update-password?lang=${lang}`:`/start?welcome=1${lang==='es'?'&lang=es':''}`
   const next=safeNext(url.searchParams.get('next'),fallback)
-  const loginError=(message:string)=>NextResponse.redirect(new URL(`/login?lang=${lang}&error=${encodeURIComponent(message)}`,siteUrl))
+  const loginError=(message:string)=>NextResponse.redirect(new URL(`/login?lang=${lang}&mode=signin&error=${encodeURIComponent(message)}`,siteUrl))
 
   if(!code){
     return loginError(lang==='es'?'Ese enlace de correo está incompleto. Solicita un correo nuevo y abre el enlace más reciente.':'That email link is incomplete. Request one fresh email and open the newest link.')
@@ -30,6 +36,7 @@ export async function GET(request:NextRequest){
   const supabase=await createClient()
   const {error}=await supabase.auth.exchangeCodeForSession(code)
   if(error){
+    console.error('auth callback session exchange failed',{mode,message:error.message})
     return loginError(lang==='es'?'Ese enlace venció o ya fue usado. Solicita un correo nuevo y abre solamente el más reciente.':'That link expired or was already used. Request one fresh email and open only the newest link.')
   }
 
