@@ -263,9 +263,15 @@ with check(
 
 alter table public.team_assignments
   add column if not exists schedule_item_id uuid references public.schedule_items(id) on delete set null,
-  add column if not exists role_label text;
+  add column if not exists role_label text,
+  add column if not exists assignment_status text not null default 'scheduled';
+
+do $$ begin
+  alter table public.team_assignments add constraint team_assignments_status_check check(assignment_status in ('scheduled','removed'));
+exception when duplicate_object then null; end $$;
 
 create index if not exists team_assignments_schedule_item_idx on public.team_assignments(schedule_item_id) where schedule_item_id is not null;
+create index if not exists team_assignments_schedule_status_idx on public.team_assignments(church_id,starts_at,assignment_status);
 
 create or replace function private.prepare_scheduled_team_assignment()
 returns trigger
@@ -365,6 +371,73 @@ using(
             where gm.group_id=s.group_id
               and gm.user_id=(select auth.uid())
           )
+        )
+    )
+  )
+);
+
+drop policy if exists assignments_manage on public.team_assignments;
+create policy assignments_manage on public.team_assignments
+for all to authenticated
+using(
+  created_by=(select auth.uid())
+  or private.has_church_role(church_id,array['ministry_leader','minister','pastor','church_admin'])
+  or private.has_church_permission(church_id,'manage_teams')
+  or (
+    schedule_item_id is not null
+    and exists(
+      select 1
+      from public.schedule_items si
+      join public.church_schedules s on s.id=si.schedule_id
+      where si.id=team_assignments.schedule_item_id
+        and s.church_id=team_assignments.church_id
+        and (
+          (s.ministry_id is not null and exists(
+            select 1 from public.ministry_team_members mtm
+            where mtm.ministry_id=s.ministry_id
+              and mtm.user_id=(select auth.uid())
+              and mtm.member_status='active'
+              and mtm.is_leader=true
+          ))
+          or (s.group_id is not null and exists(
+            select 1 from public.groups g
+            where g.id=s.group_id
+              and (
+                g.leader_id=(select auth.uid())
+                or private.has_group_role(g.id,array['leader','assistant'])
+              )
+          ))
+        )
+    )
+  )
+)
+with check(
+  private.has_church_role(church_id,array['ministry_leader','minister','pastor','church_admin'])
+  or private.has_church_permission(church_id,'manage_teams')
+  or (
+    schedule_item_id is not null
+    and exists(
+      select 1
+      from public.schedule_items si
+      join public.church_schedules s on s.id=si.schedule_id
+      where si.id=team_assignments.schedule_item_id
+        and s.church_id=team_assignments.church_id
+        and (
+          (s.ministry_id is not null and exists(
+            select 1 from public.ministry_team_members mtm
+            where mtm.ministry_id=s.ministry_id
+              and mtm.user_id=(select auth.uid())
+              and mtm.member_status='active'
+              and mtm.is_leader=true
+          ))
+          or (s.group_id is not null and exists(
+            select 1 from public.groups g
+            where g.id=s.group_id
+              and (
+                g.leader_id=(select auth.uid())
+                or private.has_group_role(g.id,array['leader','assistant'])
+              )
+          ))
         )
     )
   )
