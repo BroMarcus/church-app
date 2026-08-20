@@ -1,0 +1,11 @@
+{
+  "generated_from": "Supabase production project jfusmsbccuvqyipcwbbw",
+  "generated_on": "2026-08-19",
+  "scope": "public schema columns, constraints, functions, RLS policies, and triggers",
+  "columns_md5": "190942531841bef85e145849668fe7b4",
+  "constraints_md5": "e194174a2ffe91e08881de19519a9053",
+  "functions_md5": "239fa86cf1b68054f6f1731bb21d68c1",
+  "policies_md5": "a9c26e90332760b3862c797bd19945a6",
+  "triggers_md5": "6193c30c4e78d4ed8389ac5262c39f40",
+  "note": "Historical migration SQL created before repository migration tracking cannot be reconstructed from Supabase migration history. This fingerprint plus checked-in future migrations and regression tests is the authoritative drift check from this date forward."
+}
