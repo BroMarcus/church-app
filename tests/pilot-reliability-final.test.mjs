@@ -83,3 +83,33 @@ test('password reset always releases busy state and keeps errors member-safe',as
   assert.match(source,/type="submit" disabled=\{busy\}/)
   assert.match(source,/mode=signin/)
 })
+
+test('login warns returning users not to create duplicate accounts in both languages',async()=>{
+  const source=await read('src/app/login/page.tsx')
+  assert.match(source,/do not create another account/)
+  assert.match(source,/no crees otra cuenta/)
+  assert.match(source,/return you to the church join page/)
+  assert.match(source,/te regresaremos a la página de la iglesia/)
+  assert.match(source,/joinNext&&<div className="notice success"/)
+})
+
+test('Kingdom Guide includes bilingual account confirmation and existing-account church-join help',async()=>{
+  const knowledge=await read('src/lib/help-knowledge.ts')
+  assert.match(knowledge,/id:'confirm-email'/)
+  assert.match(knowledge,/id:'existing-account-join'/)
+  assert.match(knowledge,/id:'duplicate-account'/)
+  assert.match(knowledge,/join church with existing account/)
+  assert.match(knowledge,/unirme con cuenta existente/)
+  assert.match(knowledge,/open only the newest message/)
+  assert.match(knowledge,/abre solamente el mensaje más reciente/)
+})
+
+test('Kingdom Guide honors preferred language and bounds search input',async()=>{
+  const source=await read('src/app/guide/page.tsx')
+  assert.match(source,/preferred_language/)
+  assert.match(source,/query\.lang==='es'\?'es':query\.lang==='en'\?'en':preferred/)
+  assert.match(source,/\.trim\(\)\.slice\(0,160\)/)
+  assert.match(source,/maxLength=\{160\}/)
+  assert.match(source,/how do I join my church/)
+  assert.match(source,/cómo me uno a mi iglesia/)
+})
