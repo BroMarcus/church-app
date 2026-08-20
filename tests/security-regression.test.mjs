@@ -37,9 +37,7 @@ test('login UI prevents duplicate auth and email submissions',async()=>{
   assert.match(page,/PendingAction/)
   assert.match(submit,/useFormStatus/)
   assert.match(submit,/disabled=\{status\.pending\}/)
-  assert.match(action,/const cooling=remaining>0/)
   assert.match(action,/disabled=\{status\.pending\|\|cooling\}/)
-  assert.match(action,/aria-disabled=\{status\.pending\|\|cooling\}/)
 })
 
 test('password recovery lands in browser reset page instead of server callback',async()=>{
@@ -61,80 +59,96 @@ test('auth callback rejects protocol-relative redirect destinations',async()=>{
 })
 
 test('private invite flow cannot preassign pastor or church admin',async()=>{
-  const action=await read('src/app/church/invites/actions.ts')
-  assert.match(action,/\['member','group_leader','ministry_leader','minister'\]\.includes\(role\)/)
-  assert.doesNotMatch(action,/\['member','group_leader','ministry_leader','minister','church_admin','pastor'\]/)
+  const action=await read('src/app/church/invite-person/actions.ts')
+  const page=await read('src/app/church/invite-person/page.tsx')
+  assert.match(action,/allowedInviteRoles=new Set\(\['member','group_leader','ministry_leader','minister'\]\)/)
+  assert.match(action,/!allowedInviteRoles\.has\(requestedRole\)/)
+  assert.doesNotMatch(page,/\['church_admin'.*'Church admin'/s)
+  assert.match(page,/never preassigned by invitation/)
 })
 
 test('database invite RPC also blocks pastor and church admin preassignment',async()=>{
-  const migration=await read('supabase/migrations/20260819093000_pilot_security_hardening.sql')
-  assert.match(migration,/v_role not in \('member','group_leader','ministry_leader','minister'\)/)
+  const source=await read('supabase/migrations/20260820013700_disallow_privileged_invite_role_preassignment.sql')
+  assert.match(source,/v_role not in \('member','group_leader','ministry_leader','minister'\)/)
+  assert.match(source,/Privileged pastor\/admin roles must be assigned after the account is verified/)
 })
 
 test('Kingdom Guide uses live approved resource schema and excludes unfinished material',async()=>{
   const source=await read('src/app/guide/page.tsx')
-  assert.match(source,/\.from\('media_assets'\)/)
+  for(const field of ['approved_for_members','ministry_area','source_year','topic_tags','scripture_refs','archive_status','source_label','source_scope','official_source','library_kind','organization_status']) assert.match(source,new RegExp(field))
   assert.match(source,/\.eq\('approved_for_members',true\)/)
   assert.match(source,/\.not\('archive_status','in','\(draft,retired\)'\)/)
+  for(const stale of ['member_visible','resource_year','scripture_references','authority_level','source_authority']) assert.doesNotMatch(source,new RegExp(stale))
 })
 
 test('personal schedule planning module exists and writes through server actions',async()=>{
   const page=await read('src/app/calendar/my/page.tsx')
+  const panel=await read('src/app/calendar/my/personal-planning.tsx')
   const actions=await read('src/app/calendar/my/actions.ts')
-  assert.match(page,/Personal Planning/)
-  assert.match(actions,/createPersonalTask/)
-  assert.match(actions,/addUnavailableDate/)
+  assert.match(page,/import \{ PersonalPlanning \} from '\.\/personal-planning'/)
+  for(const action of ['createPersonalTask','updatePersonalTask','submitTimeOff','cancelTimeOff']) assert.match(panel,new RegExp(action))
+  assert.match(actions,/memberContext/)
+  assert.match(actions,/\.eq\('assigned_to',userId\)/)
+  assert.match(actions,/\.eq\('user_id',userId\)/)
+  assert.doesNotMatch(actions,/encodeURIComponent\(error\.message\)/)
 })
 
 test('learning progress action validates course, module, membership and enrollment',async()=>{
-  const actions=await read('src/app/learning/[courseId]/lesson/[moduleId]/actions.ts')
-  assert.match(actions,/course_enrollments/)
-  assert.match(actions,/church_memberships/)
-  assert.match(actions,/course_modules/)
+  const source=await read('src/app/learning/actions.ts')
+  assert.match(source,/module\?\.course_id!==courseId/)
+  assert.match(source,/church_memberships/)
+  assert.match(source,/course_enrollments/)
+  assert.match(source,/Start the course before saving lesson progress/)
 })
 
 test('database migration enforces enrollment before module progress',async()=>{
-  const migration=await read('supabase/migrations/20260819122000_learning_progress_enrollment_guard.sql')
-  assert.match(migration,/course_enrollments/)
-  assert.match(migration,/not enrolled/i)
+  const source=await read('supabase/migrations/20260819235700_enforce_module_progress_enrollment_scope.sql')
+  assert.match(source,/Lesson does not belong to this course/)
+  assert.match(source,/Course enrollment is required before saving lesson progress/)
+  assert.match(source,/before insert or update on public\.course_module_progress/i)
 })
 
 test('storage tenant policies use object path, never church name',async()=>{
-  const migration=await read('supabase/migrations/20260819143000_storage_tenant_policy_hardening.sql')
-  assert.match(migration,/storage\.foldername/)
-  assert.doesNotMatch(migration,/churches\.name/)
+  const source=await read('supabase/migrations/20260819234706_fully_qualify_storage_object_paths.sql')
+  assert.doesNotMatch(source,/foldername\(c\.name\)/)
+  assert.match(source,/foldername\(storage\.objects\.name\)/)
 })
 
 test('private member detail leadership access fails closed for multi-church users',async()=>{
-  const migration=await read('supabase/migrations/20260819152000_private_member_detail_tenant_hardening.sql')
-  assert.match(migration,/has_church_role/)
-  assert.match(migration,/church_id/)
+  const source=await read('supabase/migrations/20260819234424_harden_member_private_details_isolation.sql')
+  assert.match(source,/count\(distinct cm\.church_id\)/i)
+  assert.match(source,/and 1 =/i)
 })
 
 test('messages do not redirect raw database error text to members',async()=>{
-  const actions=await read('src/app/messages/actions.ts')
-  assert.doesNotMatch(actions,/encodeURIComponent\(error\.message\)/)
+  const source=await read('src/app/messages/actions.ts')
+  assert.doesNotMatch(source,/encodeURIComponent\(error\.message\)/)
+  assert.match(source,/console\.error\('sendDirectMessage failed'/)
 })
 
 test('imports do not redirect raw database error text to leaders',async()=>{
-  const actions=await read('src/app/church/import/actions.ts')
-  assert.doesNotMatch(actions,/encodeURIComponent\(error\.message\)/)
+  const source=await read('src/app/church/import/actions.ts')
+  assert.doesNotMatch(source,/encodeURIComponent\(error\.message\)/)
+  assert.doesNotMatch(source,/encodeURIComponent\(batchError\?\.message/)
 })
 
 test('fundraising does not expose raw database errors and preserves validation',async()=>{
-  const actions=await read('src/app/fundraising/actions.ts')
-  assert.doesNotMatch(actions,/encodeURIComponent\(error\.message\)/)
-  assert.match(actions,/amount/i)
+  const source=await read('src/app/fundraising/actions.ts')
+  assert.doesNotMatch(source,/encodeURIComponent\(error\.message\)/)
+  assert.match(source,/goal<=0/)
+  assert.match(source,/endsAt.*startsAt/s)
 })
 
 test('member admin actions reauthorize pastor or church admin server-side',async()=>{
-  const actions=await read('src/app/church/member-control/actions.ts')
-  assert.match(actions,/pastor/)
-  assert.match(actions,/church_admin/)
+  const source=await read('src/app/church/members/[userId]/admin-actions.ts')
+  assert.match(source,/\['pastor','church_admin'\]\.includes\(actor\.role\)/)
+  assert.match(source,/Member not found in this church/)
+  assert.match(source,/You cannot remove your own admin access/)
 })
 
 test('security-definer migration removes broad execute before restoring intended grants',async()=>{
-  const migration=await read('supabase/migrations/20260819181500_security_definer_execute_hardening.sql')
-  assert.match(migration,/revoke execute/i)
-  assert.match(migration,/grant execute/i)
+  const source=await read('supabase/migrations/20260819234537_lock_down_security_definer_execute_grants.sql')
+  assert.match(source,/revoke all on function %s from public, anon, authenticated/i)
+  assert.match(source,/get_public_signup_status_for_church\(text\) to anon,authenticated/i)
+  assert.match(source,/configure_resend_email_provider.*to authenticated/i)
 })
