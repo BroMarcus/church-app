@@ -121,3 +121,23 @@ $function$;
 revoke all on function public.redeem_invite_for_current_user(uuid) from public;
 revoke all on function public.redeem_invite_for_current_user(uuid) from anon;
 grant execute on function public.redeem_invite_for_current_user(uuid) to authenticated;
+
+-- These are implementation helpers behind guarded parent RPCs. They should not
+-- be independently callable through PostgREST. Their SECURITY DEFINER bodies
+-- already enforce church permissions, but removing the extra public API surface
+-- makes the intended access path explicit and reduces accidental future misuse.
+revoke all on function public.church_pilot_readiness_base(uuid) from public;
+revoke all on function public.church_pilot_readiness_base(uuid) from anon;
+revoke all on function public.church_pilot_readiness_base(uuid) from authenticated;
+
+revoke all on function public.church_growth_funnel_readiness(uuid) from public;
+revoke all on function public.church_growth_funnel_readiness(uuid) from anon;
+revoke all on function public.church_growth_funnel_readiness(uuid) from authenticated;
+
+revoke all on function public.church_member_relationship_readiness(uuid) from public;
+revoke all on function public.church_member_relationship_readiness(uuid) from anon;
+revoke all on function public.church_member_relationship_readiness(uuid) from authenticated;
+
+revoke all on function public.church_health_snapshot_base(uuid,integer) from public;
+revoke all on function public.church_health_snapshot_base(uuid,integer) from anon;
+revoke all on function public.church_health_snapshot_base(uuid,integer) from authenticated;
