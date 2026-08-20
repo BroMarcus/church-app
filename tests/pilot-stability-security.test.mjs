@@ -136,3 +136,14 @@ test('Learning Center has bilingual loading and safe retry states',async()=>{
   assert.match(error,/El progreso de tus cursos no fue modificado/)
   assert.match(error,/onClick=\{\(\)=>reset\(\)\}/)
 })
+
+test('My Profile has bilingual loading and safe retry states',async()=>{
+  const loading=await read('src/app/profile/loading.tsx')
+  const error=await read('src/app/profile/error.tsx')
+  assert.match(loading,/aria-busy="true"/)
+  assert.match(loading,/Cargando tu perfil de iglesia y tus datos privados/)
+  assert.match(error,/role="alert"/)
+  assert.match(error,/Nothing in your profile was changed/)
+  assert.match(error,/No se cambió nada en tu perfil/)
+  assert.match(error,/onClick=\{\(\)=>reset\(\)\}/)
+})
