@@ -11,7 +11,7 @@ function SharedFields({course}:{course?:any}){return <>
   <label><span>Pathway order</span><input name="pathway_order" type="number" min="0" defaultValue={course?.pathway_order??100}/></label>
   <label><span>Category</span><input name="category" defaultValue={course?.category??''} placeholder="discipleship"/></label>
   <label><span>Estimated minutes</span><input name="estimated_minutes" type="number" min="0" defaultValue={course?.estimated_minutes??''}/></label>
-  <label><span>Passing score</span><input name="passing_score" type="number" min="0" max="100" defaultValue={course?.passing_score??80}/></label>
+  <label><span>Course minimum passing score</span><input name="passing_score" type="number" min="0" max="100" defaultValue={course?.passing_score??80}/><small className="muted">Required assessments use at least this score. An individual test may be stricter.</small></label>
   <label><span>Credential / badge</span><input name="badge_name" defaultValue={course?.badge_name??''} placeholder="Faith Messenger"/></label>
   <label><span>Curriculum version</span><input name="curriculum_version" defaultValue={course?.curriculum_version??'1.0'} placeholder="1.0"/></label>
   <label><span>Translation pair key</span><input name="translation_key" defaultValue={course?.translation_key??''} placeholder="effective-soul-winning"/><small className="muted">Use the same key on English and Spanish versions.</small></label>
