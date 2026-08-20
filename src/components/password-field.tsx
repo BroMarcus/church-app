@@ -1,6 +1,6 @@
 'use client'
 
-import {useState,type InputHTMLAttributes} from 'react'
+import {useState,type CSSProperties,type InputHTMLAttributes} from 'react'
 import {Eye,EyeOff} from 'lucide-react'
 
 type Props={
@@ -8,7 +8,7 @@ type Props={
   label:string
   showLabel?:string
   hideLabel?:string
-  inputStyle?:React.CSSProperties
+  inputStyle?:CSSProperties
 }&Omit<InputHTMLAttributes<HTMLInputElement>,'type'|'name'|'style'>
 
 export function PasswordField({name,label,showLabel='Show password',hideLabel='Hide password',inputStyle,...inputProps}:Props){
