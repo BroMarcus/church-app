@@ -37,8 +37,42 @@ export async function joinChurch(formData:FormData){
     fail(error.message,error.message)
   }
   if(data.user&&Array.isArray(data.user.identities)&&data.user.identities.length===0){
-    redirect(`/login?lang=${lang}&mode=signin&message=${encodeURIComponent(lang==='es'?'Ese correo ya tiene una cuenta. Inicia sesión y Kingdom Network conservará tu cuenta existente.':'That email already has an account. Sign in and Kingdom Network will keep your existing account.')}`)
+    const next=`/join/${encodeURIComponent(slug)}?lang=${lang}`
+    redirect(`/login?lang=${lang}&mode=signin&next=${encodeURIComponent(next)}&message=${encodeURIComponent(lang==='es'?'Ese correo ya tiene una cuenta. Inicia sesión; después podrás unirte a esta iglesia con tu cuenta existente.':'That email already has an account. Sign in; then you can join this church with your existing account.')}`)
   }
   if(data.session)redirect(startPath)
   redirect(`/login?lang=${lang}&mode=signin&message=${encodeURIComponent(lang==='es'?`Cuenta creada para ${church.church_name}. Revisa tu correo y confirma la cuenta; después irás a Empieza Aquí.`:`Account created for ${church.church_name}. Check your email and confirm the account; then you’ll go to Start Here.`)}`)
+}
+
+export async function joinExistingChurch(formData:FormData){
+  const supabase=await createClient()
+  const lang=text(formData,'lang')==='es'?'es':'en'
+  const slug=text(formData,'church_slug').toLowerCase()
+  const fail=(en:string,es:string)=>redirect(`/join/${encodeURIComponent(slug)}?lang=${lang}&error=${encodeURIComponent(lang==='es'?es:en)}`)
+  if(!slug)fail('Church link is missing.','Falta el enlace de la iglesia.')
+
+  const {data:claims}=await supabase.auth.getClaims()
+  if(!claims?.claims?.sub){
+    const next=`/join/${encodeURIComponent(slug)}?lang=${lang}`
+    redirect(`/login?lang=${lang}&mode=signin&next=${encodeURIComponent(next)}`)
+  }
+
+  const {data,error}=await supabase.rpc('join_public_church_existing_account',{
+    p_church_slug:slug,
+    p_phone:null,
+    p_email_consent:false,
+    p_sms_consent:false,
+    p_language:lang
+  })
+  if(error){
+    const msg=error.message.toLowerCase()
+    if(msg.includes('capacity'))fail('This church’s public pilot is currently full.','El piloto público de esta iglesia está lleno en este momento.')
+    if(msg.includes('previous church access'))fail('Your previous access to this church is inactive. Ask a church administrator to restore it.','Tu acceso anterior a esta iglesia está inactivo. Pide a un administrador de la iglesia que lo restaure.')
+    fail('We could not connect your account to this church yet.','Todavía no pudimos conectar tu cuenta con esta iglesia.')
+  }
+  const row:any=Array.isArray(data)?data[0]:data
+  const message=lang==='es'
+    ? row?.already_member?'Tu cuenta ya estaba conectada con esta iglesia.':'Tu cuenta existente ya está conectada con esta iglesia.'
+    : row?.already_member?'Your account was already connected to this church.':'Your existing account is now connected to this church.'
+  redirect(`/start?lang=${lang}&message=${encodeURIComponent(message)}`)
 }
