@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 
-export default function PilotReadinessError({reset}:{error:Error&{digest?:string};reset:()=>void}){
+export default function PilotReadinessError({reset}:{reset:()=>void}){
   return <main className="shell">
     <section className="card" role="alert" style={{padding:26,marginTop:24}}>
       <div className="pill">PILOT READINESS • PREPARACIÓN DEL PILOTO</div>
