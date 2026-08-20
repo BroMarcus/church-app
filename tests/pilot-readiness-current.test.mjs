@@ -89,6 +89,19 @@ test('church-specific signup hides raw auth failures',async()=>{
   assert.doesNotMatch(source,/fail\(error\.message,error\.message\)/)
 })
 
+test('church-specific join form reuses hardened password and pending-submit controls',async()=>{
+  const source=await read('src/app/join/[slug]/page.tsx')
+  assert.match(source,/PasswordField/)
+  assert.match(source,/PendingSubmit/)
+  assert.match(source,/pendingLabel=\{t\.creating\}/)
+  assert.match(source,/showLabel=\{t\.showPassword\}/)
+  assert.match(source,/hideLabel=\{t\.hidePassword\}/)
+  assert.match(source,/autoCapitalize:'none'/)
+  assert.match(source,/spellCheck:false/)
+  assert.match(source,/role="alert"/)
+  assert.match(source,/role="status"/)
+})
+
 test('existing-account church signup guidance does not imply automatic membership',async()=>{
   const source=await read('src/app/join/[slug]/actions.ts')
   assert.match(source,/church admin can add that account without creating another one/)
