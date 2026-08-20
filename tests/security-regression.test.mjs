@@ -40,6 +40,18 @@ test('login UI prevents duplicate auth and email submissions',async()=>{
   assert.match(action,/disabled=\{status\.pending\}/)
 })
 
+test('password recovery lands in browser reset page instead of server callback',async()=>{
+  const actions=await read('src/app/login/actions.ts')
+  const updatePage=await read('src/app/auth/update-password/page.tsx')
+  assert.match(actions,/const recoveryUrl=.*\/auth\/update-password/)
+  assert.match(actions,/resetPasswordForEmail\(email,\{redirectTo:recoveryUrl\(lang\)\}\)/)
+  assert.doesNotMatch(actions,/resetPasswordForEmail\(email,\{redirectTo:callbackUrl/)
+  assert.match(updatePage,/exchangeCodeForSession\(code\)/)
+  assert.match(updatePage,/onAuthStateChange/)
+  assert.match(updatePage,/event==='PASSWORD_RECOVERY'/)
+  assert.match(updatePage,/updateUser\(\{password\}\)/)
+})
+
 test('auth callback rejects protocol-relative redirect destinations',async()=>{
   const source=await read('src/app/auth/callback/route.ts')
   assert.match(source,/raw\.startsWith\('\/'\).*?!raw\.startsWith\('\/\/'\)/s)
