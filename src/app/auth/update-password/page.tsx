@@ -53,6 +53,7 @@ export default function UpdatePasswordPage(){
 
   async function save(e:React.FormEvent){
     e.preventDefault()
+    if(busy)return
     if(password.length<8){setMessage(t.short);return}
     if(password!==confirm){setMessage(t.mismatch);return}
     setBusy(true)
@@ -61,8 +62,8 @@ export default function UpdatePasswordPage(){
     if(error){setMessage(t.failed);setBusy(false);return}
     setMessage(t.updated)
     await supabase.auth.signOut()
-    router.replace(`/login?lang=${lang}&message=${encodeURIComponent(t.success)}`)
+    router.replace(`/login?lang=${lang}&mode=signin&message=${encodeURIComponent(t.success)}`)
   }
 
-  return <main className="login-wrap"><div className="login card"><div className="pill">KINGDOM NETWORK</div><h1>{t.title}</h1><div className={`notice ${ready?'success':'error'}`}>{message}</div>{ready&&<form onSubmit={save}><label className="field"><span>{t.newPassword}</span><input type="password" minLength={8} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} required/></label><label className="field"><span>{t.again}</span><input type="password" minLength={8} autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} required/></label><button className="btn" disabled={busy}>{busy?t.updating:t.update}</button></form>}<p className="small muted" style={{marginTop:16}}><a href={`/login?lang=${lang}`}>{t.back}</a></p></div></main>
+  return <main className="login-wrap"><div className="login card"><div className="pill">KINGDOM NETWORK</div><h1>{t.title}</h1><div className={`notice ${ready?'success':'error'}`}>{message}</div>{ready&&<form onSubmit={save}><label className="field"><span>{t.newPassword}</span><input type="password" minLength={8} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} disabled={busy} required/></label><label className="field"><span>{t.again}</span><input type="password" minLength={8} autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} disabled={busy} required/></label><button className="btn" type="submit" disabled={busy} aria-busy={busy}>{busy?t.updating:t.update}</button></form>}<p className="small muted" style={{marginTop:16}}><a href={`/login?lang=${lang}&mode=signin`}>{t.back}</a></p></div></main>
 }
