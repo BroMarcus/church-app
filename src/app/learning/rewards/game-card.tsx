@@ -15,16 +15,16 @@ export function GameCard({game}:{game:Game}){
   const startedAt=useRef<number|null>(null)
   const allAnswered=game.questions.every(q=>Boolean(answers[q.id]))
 
-  function choose(questionId:string,value:string){
-    if(startedAt.current===null)startedAt.current=Date.now()
+  function choose(questionId:string,value:string,eventTime:number){
+    if(startedAt.current===null)startedAt.current=eventTime
     setAnswers(current=>({...current,[questionId]:value}))
   }
 
-  async function submit(){
+  async function submit(event:React.MouseEvent<HTMLButtonElement>){
     setBusy(true);setError('')
     const supabase=createClient()
-    const start=startedAt.current??Date.now()
-    const duration=Math.max(1,Math.round((Date.now()-start)/1000))
+    const start=startedAt.current??event.timeStamp
+    const duration=Math.max(1,Math.round((event.timeStamp-start)/1000))
     const {data,error}=await supabase.rpc('submit_learning_game',{p_game_id:game.id,p_answers:answers,p_duration_seconds:duration})
     if(error){setError(error.message);setBusy(false);return}
     const row=Array.isArray(data)?data[0]:data
@@ -35,7 +35,7 @@ export function GameCard({game}:{game:Game}){
   function reset(){startedAt.current=null;setAnswers({});setResult(null);setError('')}
 
   return <article className="card game-card"><div className="game-head"><div><div className="pill"><Gamepad2 size={12}/> {game.language_code==='es'?'JUEGO':'GAME'}</div><h3>{game.title}</h3><p>{game.description}</p></div><span className="xp-chip">+{game.xp_reward} XP</span></div>
-    {!result&&<div className="game-questions">{game.questions.map(q=><fieldset key={q.id} className="game-question"><legend>{q.position}. {q.prompt}</legend>{(q.options??[]).map((o:any)=><label className="game-option" key={String(o.value)}><input type="radio" name={q.id} checked={answers[q.id]===String(o.value)} onChange={()=>choose(q.id,String(o.value))}/><span>{String(o.label)}</span></label>)}</fieldset>)}</div>}
+    {!result&&<div className="game-questions">{game.questions.map(q=><fieldset key={q.id} className="game-question"><legend>{q.position}. {q.prompt}</legend>{(q.options??[]).map((o:any)=><label className="game-option" key={String(o.value)}><input type="radio" name={q.id} checked={answers[q.id]===String(o.value)} onChange={event=>choose(q.id,String(o.value),event.timeStamp)}/><span>{String(o.label)}</span></label>)}</fieldset>)}</div>}
     {result&&<div className={`game-result ${result.percentage>=80?'great':''}`}><Trophy/><div><strong>{result.score}/{result.max_score} • {Math.round(result.percentage)}%</strong><span>{result.xp_awarded>0?`+${result.xp_awarded} XP earned today`:'Daily XP already earned — replay for practice anytime.'}</span></div></div>}
     {!result?<button className="btn" onClick={submit} disabled={busy||!allAnswered}>{busy?'Scoring…':game.language_code==='es'?'Terminar juego':'Finish game'}</button>:<button className="ghost" onClick={reset}><RotateCcw size={13}/> {game.language_code==='es'?'Jugar otra vez':'Play again'}</button>}
     {error&&<div className="notice error" style={{marginTop:10}}>{error}</div>}
