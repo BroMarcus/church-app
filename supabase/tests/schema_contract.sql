@@ -27,7 +27,7 @@ trigs as (
 )
 select case when columns_md5='190942531841bef85e145849668fe7b4'
  and constraints_md5='e194174a2ffe91e08881de19519a9053'
- and functions_md5='239fa86cf1b68054f6f1731bb21d68c1'
+ and functions_md5='b0506d06869a36f87b0ae41ada63c6d5'
  and policies_md5='a9c26e90332760b3862c797bd19945a6'
  and triggers_md5='6193c30c4e78d4ed8389ac5262c39f40'
  then 'schema_contract_passed' else 'schema_contract_drifted' end result,
