@@ -44,10 +44,10 @@ export async function joinChurch(formData:FormData){
   }
   if(data.user&&Array.isArray(data.user.identities)&&data.user.identities.length===0){
     const next=`/join/${encodeURIComponent(slug)}?lang=${lang}`
-    redirect(`/login?lang=${lang}&mode=signin&next=${encodeURIComponent(next)}&message_code=join_account_exists`)
+    redirect(`/login?lang=${lang}&mode=signin&next=${encodeURIComponent(next)}&message_code=account_exists`)
   }
   if(data.session)redirect(startPath)
-  redirect(`/login?lang=${lang}&mode=signin&message_code=join_account_created`)
+  redirect(`/login?lang=${lang}&mode=signin&message_code=account_created`)
 }
 
 export async function joinExistingChurch(formData:FormData){
@@ -78,5 +78,8 @@ export async function joinExistingChurch(formData:FormData){
     fail('join_failed')
   }
   const row:any=Array.isArray(data)?data[0]:data
-  redirect(`/start?lang=${lang}&message_code=${row?.already_member?'already_joined':'joined_existing'}`)
+  const message=lang==='es'
+    ? row?.already_member?'Tu cuenta ya estaba conectada con esta iglesia.':'Tu cuenta existente ya está conectada con esta iglesia.'
+    : row?.already_member?'Your account was already connected to this church.':'Your existing account is now connected to this church.'
+  redirect(`/start?lang=${lang}&message=${encodeURIComponent(message)}`)
 }
