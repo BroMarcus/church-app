@@ -5,8 +5,8 @@ import {readFileSync} from 'node:fs'
 const source=readFileSync(new URL('../src/app/guide/page.tsx',import.meta.url),'utf8')
 
 test('Kingdom Guide resource search is accent tolerant and token based',()=>{
-  assert.match(source,/normalize\('NFD'\)/)
-  assert.match(source,/replace\(\/\[\\u0300-\\u036f\]\/g,'')/)
+  assert.ok(source.includes("normalize('NFD')"))
+  assert.ok(source.includes("replace(/[\\u0300-\\u036f]/g,'')"))
   assert.match(source,/queryTokens=normalizedQuery\.split/)
   assert.match(source,/__matchedTokens===queryTokens\.length/)
 })
