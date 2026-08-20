@@ -1,6 +1,6 @@
 'use client'
 
-export default function LoginError({reset}:{error:Error&{digest?:string};reset:()=>void}){
+export default function LoginError({reset}:{reset:()=>void}){
   return <main className="login-wrap">
     <div className="login card" role="alert">
       <div className="pill">KINGDOM NETWORK • PILOT</div>
