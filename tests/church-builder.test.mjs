@@ -1,0 +1,38 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import {readFile} from 'node:fs/promises'
+
+const read=(path)=>readFile(new URL(`../${path}`,import.meta.url),'utf8')
+
+test('Church Builder requires a real non-admin pilot member before people setup is ready',async()=>{
+  const source=await read('src/app/church/launch/page.tsx')
+  assert.match(source,/not\('role','in','\(pastor,church_admin\)'\)/)
+  assert.match(source,/const people=\(pilotMembers\?\?0\)>0/)
+  assert.doesNotMatch(source,/const people=.*openInvites/s)
+})
+
+test('Church Builder sends people setup through the safer Join Center flow',async()=>{
+  const source=await read('src/app/church/launch/page.tsx')
+  assert.match(source,/href:l\('\/church\/join-center'\)/)
+  assert.match(source,/href:'\/church\/join-center'/)
+  assert.match(source,/A pending invitation alone does not count as complete/)
+  assert.match(source,/Una invitación pendiente por sí sola no cuenta como completado/)
+})
+
+test('Church Builder gives bilingual duplicate-account and password-recovery guidance',async()=>{
+  const source=await read('src/app/church/launch/page.tsx')
+  for(const phrase of [
+    'Do not create a second account for the same person.',
+    'No crees una segunda cuenta para la misma persona.',
+    'Practice password recovery once',
+    'Prueba la recuperación de contraseña una vez'
+  ]) assert.match(source,new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')))
+  assert.match(source,/href=\{l\('\/login'\)\}/)
+})
+
+test('Church Builder remains pastor/admin only and preserves Spanish route context',async()=>{
+  const source=await read('src/app/church/launch/page.tsx')
+  assert.match(source,/!\['pastor','church_admin'\]\.includes\(membership\.role\)/)
+  assert.match(source,/const l=\(path:string\)=>lang==='es'/)
+  assert.match(source,/\/church\/launch\?lang=es/)
+})
