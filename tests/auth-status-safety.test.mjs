@@ -17,6 +17,8 @@ test('login ignores arbitrary query text and renders only allowlisted bilingual 
   assert.doesNotMatch(actions,/[&?]error=\+?encodeURIComponent/)
   assert.doesNotMatch(actions,/[&?]message=\+?encodeURIComponent/)
   assert.match(callback,/error_code=/)
+  assert.match(callback,/const joinNext=next\.startsWith\('\/join\/'\)\?next:''/)
+  assert.match(callback,/nextPart=joinNext\?`&next=\$\{encodeURIComponent\(joinNext\)\}`:''/)
 })
 
 test('password reset completion is explicit and preserves only canonical church-join return paths',async()=>{
