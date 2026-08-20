@@ -27,7 +27,11 @@ export async function GET(request:NextRequest){
   const mode=url.searchParams.get('mode')==='recovery'?'recovery':'signup'
   const fallback=mode==='recovery'?`/auth/update-password?lang=${lang}`:`/start?welcome=1${lang==='es'?'&lang=es':''}`
   const next=safeNext(url.searchParams.get('next'),fallback)
-  const loginError=(errorCode:string)=>NextResponse.redirect(new URL(`/login?lang=${lang}&mode=signin&error_code=${encodeURIComponent(errorCode)}`,siteUrl))
+  const joinNext=next.startsWith('/join/')?next:''
+  const loginError=(errorCode:string)=>{
+    const nextPart=joinNext?`&next=${encodeURIComponent(joinNext)}`:''
+    return NextResponse.redirect(new URL(`/login?lang=${lang}&mode=signin${nextPart}&error_code=${encodeURIComponent(errorCode)}`,siteUrl))
+  }
 
   if(!code)return loginError('callback_incomplete')
 
