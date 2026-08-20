@@ -35,7 +35,7 @@ create table if not exists public.church_finance_transactions(
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint church_finance_transactions_account_church_fkey
-    foreign key(account_id,church_id) references public.church_finance_accounts(id,church_id) on delete set null
+    foreign key(account_id,church_id) references public.church_finance_accounts(id,church_id) on delete restrict
 );
 
 create index if not exists church_finance_transactions_church_date_idx
@@ -64,7 +64,7 @@ create table if not exists public.church_contribution_batches(
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint church_contribution_batches_account_church_fkey
-    foreign key(account_id,church_id) references public.church_finance_accounts(id,church_id) on delete set null
+    foreign key(account_id,church_id) references public.church_finance_accounts(id,church_id) on delete restrict
 );
 
 create index if not exists church_contribution_batches_church_date_idx
@@ -92,7 +92,7 @@ create table if not exists public.church_bills(
     or (status<>'paid')
   ),
   constraint church_bills_account_church_fkey
-    foreign key(account_id,church_id) references public.church_finance_accounts(id,church_id) on delete set null
+    foreign key(account_id,church_id) references public.church_finance_accounts(id,church_id) on delete restrict
 );
 
 create index if not exists church_bills_church_due_idx
@@ -133,6 +133,7 @@ as $$
 $$;
 
 revoke all on function private.pastor_finance_access(uuid) from public,anon,authenticated;
+grant execute on function private.pastor_finance_access(uuid) to authenticated;
 
 drop policy if exists church_finance_accounts_pastor_admin on public.church_finance_accounts;
 create policy church_finance_accounts_pastor_admin on public.church_finance_accounts
@@ -359,11 +360,12 @@ begin
       and occurred_on between p_start_on and p_end_on
   ),
   all_account_tx as(
-    select coalesce(sum(case when direction='income' then amount else -amount end),0) as delta
-    from public.church_finance_transactions
-    where church_id=p_church_id
-      and transaction_status='posted'
-      and account_id is not null
+    select coalesce(sum(case when t.direction='income' then t.amount else -t.amount end),0) as delta
+    from public.church_finance_transactions t
+    join public.church_finance_accounts a on a.id=t.account_id and a.church_id=t.church_id
+    where t.church_id=p_church_id
+      and t.transaction_status='posted'
+      and a.active=true
   ),
   opening as(
     select coalesce(sum(opening_balance),0) as amount
