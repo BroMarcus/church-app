@@ -10,6 +10,9 @@ const routes = [
   ['notifications','Notifications / Notificaciones'],
   ['account/security','Account Security / Seguridad de la cuenta'],
   ['account/privacy','Privacy / Privacidad'],
+  ['fundraising','Fundraising / Recaudación de fondos'],
+  ['feedback','Feedback / Comentarios'],
+  ['directory','Member Directory / Directorio de miembros'],
 ]
 
 for (const [route,label] of routes) {
