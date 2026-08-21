@@ -58,6 +58,22 @@ test('Friendship Group overview shows a real report-derived attendance average',
   assert.match(page,/avg attendance/)
 })
 
+test('Friendship Group paper-report batch calculates totals, supports five guests, and preserves a phone draft',async()=>{
+  const [page,helper]=await Promise.all([
+    read('src/app/groups/[groupId]/page.tsx'),
+    read('src/app/groups/[groupId]/report-parity-helper.tsx')
+  ])
+  assert.match(page,/data-friendship-report/)
+  assert.match(page,/\[1,2,3,4,5\]\.map/)
+  assert.match(page,/guest_\$\{n\}_visit/)
+  assert.match(helper,/present\+extra\.children\+extra\.churchMembers\+extra\.otherGroupMembers/)
+  assert.match(helper,/filter\(field=>field\.value==='1'\)\.length/)
+  assert.match(helper,/localStorage\.setItem\(key/)
+  assert.match(helper,/name="attendance_count" value=\{total\}/)
+  assert.match(helper,/name="first_time_guests" value=\{firstTime\}/)
+  assert.match(helper,/Borrador del teléfono encontrado/)
+})
+
 test('Friendship Group roster removal is manager-scoped, protects the primary leader, and never reports false success',async()=>{
   const [actions,page]=await Promise.all([
     read('src/app/groups/[groupId]/roster/actions.ts'),
