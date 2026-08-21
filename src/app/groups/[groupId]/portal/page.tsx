@@ -1,13 +1,24 @@
 import {redirect} from 'next/navigation'
 import {createClient} from '@/lib/supabase/server'
-import {formatRecurringMeeting} from '@/lib/church-time'
+import {churchDateParts,formatRecurringMeeting} from '@/lib/church-time'
 import {FriendshipPortalClient} from './portal-client'
 import './portal.css'
 
 const personName=(p:any)=>p?.display_name||[p?.first_name,p?.last_name].filter(Boolean).join(' ')||'Church member'
+const dayIndex:Record<string,number>={Sunday:0,Monday:1,Tuesday:2,Wednesday:3,Thursday:4,Friday:5,Saturday:6}
 
-export default async function FriendshipPortalPage({params}:{params:Promise<{groupId:string}>}){
-  const {groupId}=await params
+function meetingDateForThisWeek(meetingDay:string|null|undefined,timeZone:string){
+  const parts=churchDateParts(new Date(),timeZone)
+  const today=`${parts.year}-${parts.month}-${parts.day}`
+  const target=meetingDay?dayIndex[meetingDay]:undefined
+  if(target===undefined)return today
+  const date=new Date(`${today}T12:00:00Z`)
+  date.setUTCDate(date.getUTCDate()+(target-date.getUTCDay()))
+  return date.toISOString().slice(0,10)
+}
+
+export default async function FriendshipPortalPage({params,searchParams}:{params:Promise<{groupId:string}>;searchParams:Promise<{tab?:string;attendance_saved?:string;error?:string}>}){
+  const [{groupId},query]=await Promise.all([params,searchParams])
   const supabase=await createClient()
   const {data:claimsData}=await supabase.auth.getClaims()
   const userId=claimsData?.claims?.sub
@@ -28,14 +39,16 @@ export default async function FriendshipPortalPage({params}:{params:Promise<{gro
   const canManage=isAdmin||group.leader_id===userId||myMembership?.role==='leader'
   const canReport=canManage||myMembership?.role==='assistant'
   const canViewPrivate=isAdmin||group.leader_id===userId||Boolean(myMembership)
+  const meetingDate=meetingDateForThisWeek(group.meeting_day,church?.timezone||'America/Los_Angeles')
 
-  const [rosterResult,privateResult,reportsResult,lessonsResult,prayerResult,allGroupsResult]=await Promise.all([
+  const [rosterResult,privateResult,reportsResult,lessonsResult,prayerResult,allGroupsResult,attendanceDraftResult]=await Promise.all([
     canViewPrivate?supabase.from('group_memberships').select('user_id,role,joined_at').eq('group_id',groupId).order('joined_at'):Promise.resolve({data:[] as any[]}),
     canViewPrivate?supabase.from('group_private_details').select('meeting_address,access_notes').eq('group_id',groupId).maybeSingle():Promise.resolve({data:null}),
     canReport?supabase.from('group_reports').select('id,meeting_date,attendance_count,first_time_guests,prayer_needs,general_notes,created_at').eq('group_id',groupId).order('meeting_date',{ascending:false}).limit(12):Promise.resolve({data:[] as any[]}),
     canViewPrivate?supabase.from('group_lesson_assignments').select('id,scheduled_for,status,teaching_note,friendship_group_lessons(id,title,lesson_number,source_asset_path)').eq('group_id',groupId).neq('status','cancelled').order('scheduled_for',{ascending:false}).limit(20):Promise.resolve({data:[] as any[]}),
     canViewPrivate?supabase.from('prayer_requests').select('id,user_id,body,status,created_at').eq('group_id',groupId).eq('share_with_group',true).order('created_at',{ascending:false}).limit(25):Promise.resolve({data:[] as any[]}),
-    supabase.from('groups').select('id,name,leader_id,meeting_day,meeting_time,meeting_frequency,location_label,capacity,accepting_members,active').eq('church_id',churchMembership.church_id).eq('group_type','friendship').eq('active',true).order('name')
+    supabase.from('groups').select('id,name,leader_id,meeting_day,meeting_time,meeting_frequency,location_label,capacity,accepting_members,active').eq('church_id',churchMembership.church_id).eq('group_type','friendship').eq('active',true).order('name'),
+    canReport?supabase.from('group_attendance_drafts').select('user_id,attendance_status').eq('group_id',groupId).eq('meeting_date',meetingDate):Promise.resolve({data:[] as any[]})
   ])
 
   const roster:any[]=rosterResult.data??[]
@@ -43,6 +56,7 @@ export default async function FriendshipPortalPage({params}:{params:Promise<{gro
   const assignments:any[]=lessonsResult.data??[]
   const prayers:any[]=prayerResult.data??[]
   const allGroups:any[]=allGroupsResult.data??[]
+  const attendanceDraft=Object.fromEntries(((attendanceDraftResult as any).data??[]).map((row:any)=>[row.user_id,row.attendance_status]))
 
   const profileIds=Array.from(new Set([
     ...roster.map((r:any)=>r.user_id),
@@ -65,37 +79,21 @@ export default async function FriendshipPortalPage({params}:{params:Promise<{gro
     for(const row of members??[])counts.set(row.group_id,(counts.get(row.group_id)||0)+1)
   }
 
-  const rosterView=roster.map((r:any)=>({
-    userId:r.user_id,
-    name:personName(profileMap.get(r.user_id)),
-    role:r.role,
-    avatarPath:profileMap.get(r.user_id)?.avatar_path??null
-  }))
+  const rosterView=roster.map((r:any)=>({userId:r.user_id,name:personName(profileMap.get(r.user_id)),role:r.role,avatarPath:profileMap.get(r.user_id)?.avatar_path??null}))
   const prayerView=prayers.map((r:any)=>({...r,name:personName(profileMap.get(r.user_id))}))
   const lessonView=assignments.map((a:any)=>{
     const lesson=Array.isArray(a.friendship_group_lessons)?a.friendship_group_lessons[0]:a.friendship_group_lessons
     return {id:a.id,scheduledFor:a.scheduled_for,status:a.status,teachingNote:a.teaching_note,title:lesson?.title||'Scheduled lesson',lessonNumber:lesson?.lesson_number??null,assetPath:lesson?.source_asset_path??null}
   })
-  const groupList=allGroups.map((g:any)=>({
-    id:g.id,name:g.name,leader:personName(profileMap.get(g.leader_id)),day:g.meeting_day,time:g.meeting_time,frequency:g.meeting_frequency,
-    place:g.location_label||'Location shared after joining',members:counts.get(g.id)||0,capacity:g.capacity,acceptingMembers:g.accepting_members
-  }))
+  const groupList=allGroups.map((g:any)=>({id:g.id,name:g.name,leader:personName(profileMap.get(g.leader_id)),day:g.meeting_day,time:g.meeting_time,frequency:g.meeting_frequency,place:g.location_label||'Location shared after joining',members:counts.get(g.id)||0,capacity:g.capacity,acceptingMembers:g.accepting_members}))
 
-  const attendanceAverage=reports.length&&roster.length
-    ? Math.round(reports.reduce((sum:number,r:any)=>sum+Math.min(100,(Number(r.attendance_count||0)/Math.max(1,roster.length))*100),0)/reports.length)
-    : null
+  const attendanceAverage=reports.length&&roster.length?Math.round(reports.reduce((sum:number,r:any)=>sum+Math.min(100,(Number(r.attendance_count||0)/Math.max(1,roster.length))*100),0)/reports.length):null
   const schedule=formatRecurringMeeting(group.meeting_frequency,group.meeting_day,group.meeting_time,'en')
 
   return <FriendshipPortalClient
     group={{id:group.id,name:group.name,description:group.description,schedule,day:group.meeting_day,time:group.meeting_time,place:(privateResult as any).data?.meeting_address||group.location_label||'Location shared with members',memberCount:roster.length,attendanceAverage}}
-    roster={rosterView}
-    reports={reports}
-    lessons={lessonView}
-    prayers={prayerView}
-    allGroups={groupList}
-    canManage={canManage}
-    canReport={canReport}
-    canViewPrivate={canViewPrivate}
-    currentGroupId={groupId}
+    roster={rosterView} reports={reports} lessons={lessonView} prayers={prayerView} allGroups={groupList}
+    canManage={canManage} canReport={canReport} canViewPrivate={canViewPrivate} currentGroupId={groupId}
+    attendanceDraft={attendanceDraft} meetingDate={meetingDate} attendanceSaved={query.attendance_saved==='1'} attendanceError={query.error||null} initialTab={query.tab==='attendance'?'attendance':'overview'}
   />
 }

@@ -2,7 +2,9 @@
 
 import Link from 'next/link'
 import {useMemo,useState} from 'react'
+import {useFormStatus} from 'react-dom'
 import {BookOpen,Calendar,Check,ChevronRight,Clock,Crown,FileText,HandHeart,Home,MapPin,MoreHorizontal,Play,Search,Send,UserPlus,Users,X} from 'lucide-react'
+import {savePortalAttendance} from './attendance-actions'
 
 type GroupInfo={id:string;name:string;description?:string|null;schedule:string;day?:string|null;time?:string|null;place:string;memberCount:number;attendanceAverage:number|null}
 type RosterMember={userId:string;name:string;role:string;avatarPath?:string|null}
@@ -10,111 +12,64 @@ type Report={id:string;meeting_date:string;attendance_count:number;first_time_gu
 type Lesson={id:string;scheduledFor:string;status:string;teachingNote?:string|null;title:string;lessonNumber?:number|null;assetPath?:string|null}
 type Prayer={id:string;user_id:string;name:string;body:string;status:string;created_at:string}
 type BrowseGroup={id:string;name:string;leader:string;day?:string|null;time?:string|null;frequency?:string|null;place:string;members:number;capacity?:number|null;acceptingMembers:boolean}
+type AttendanceStatus='on_time'|'late'|'missing'
 
-type Props={group:GroupInfo;roster:RosterMember[];reports:Report[];lessons:Lesson[];prayers:Prayer[];allGroups:BrowseGroup[];canManage:boolean;canReport:boolean;canViewPrivate:boolean;currentGroupId:string}
+type Props={group:GroupInfo;roster:RosterMember[];reports:Report[];lessons:Lesson[];prayers:Prayer[];allGroups:BrowseGroup[];canManage:boolean;canReport:boolean;canViewPrivate:boolean;currentGroupId:string;attendanceDraft:Record<string,AttendanceStatus>;meetingDate:string;attendanceSaved:boolean;attendanceError:string|null;initialTab:string}
 
 const initials=(name:string)=>name.split(/\s+/).filter(Boolean).slice(0,2).map(p=>p[0]?.toUpperCase()).join('')||'KN'
 const fmtDate=(value:string)=>new Date(value+'T12:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})
 
-export function FriendshipPortalClient({group,roster,reports,lessons,prayers,allGroups,canManage,canReport,canViewPrivate,currentGroupId}:Props){
+function AttendanceSaveButton({disabled}:{disabled:boolean}){
+  const {pending}=useFormStatus()
+  return <button className="fgp-primary" disabled={disabled||pending} aria-disabled={disabled||pending}>{pending?'Saving Attendance…':'Save Attendance'}</button>
+}
+
+export function FriendshipPortalClient({group,roster,reports,lessons,prayers,allGroups,canManage,canReport,canViewPrivate,currentGroupId,attendanceDraft,meetingDate,attendanceSaved,attendanceError,initialTab}:Props){
   const [mode,setMode]=useState(canViewPrivate?'group':'browse')
-  const [tab,setTab]=useState('overview')
+  const [tab,setTab]=useState(initialTab)
   const [query,setQuery]=useState('')
-  const [attendance,setAttendance]=useState<Record<string,boolean|null>>(()=>Object.fromEntries(roster.map(r=>[r.userId,null])))
+  const [attendance,setAttendance]=useState<Record<string,boolean|null>>(()=>Object.fromEntries(roster.map(r=>[r.userId,attendanceDraft[r.userId]?attendanceDraft[r.userId]!=='missing':null])))
   const marked=Object.values(attendance).filter(v=>v!==null).length
   const filtered=useMemo(()=>allGroups.filter(g=>g.name.toLowerCase().includes(query.toLowerCase())),[allGroups,query])
   const tabs=[['overview','Overview'],['attendance','Attendance'],['report','Report'],['lessons','Lessons'],['members','Members'],['prayer','Prayer']]
 
-  return <main className="fgp-root">
-    <div className="fgp-phone">
-      <header className="fgp-brand"><Crown size={17}/><span>KINGDOM NETWORK</span></header>
-      <section className="fgp-title-row">
-        <div><h1>{mode==='group'?'Friendship Group Portal':'Find a Group'}</h1><p>{mode==='group'?`You ${canManage?'lead':'belong to'}: ${group.name}`:"Browse Friendship Groups in your church"}</p></div>
-      </section>
+  return <main className="fgp-root"><div className="fgp-phone">
+    <header className="fgp-brand"><Crown size={17}/><span>KINGDOM NETWORK</span></header>
+    <section className="fgp-title-row"><div><h1>{mode==='group'?'Friendship Group Portal':'Find a Group'}</h1><p>{mode==='group'?`You ${canManage?'lead':'belong to'}: ${group.name}`:'Browse Friendship Groups in your church'}</p></div></section>
+    <div className="fgp-mode-switch"><button type="button" className={mode==='group'?'active':''} onClick={()=>setMode('group')} disabled={!canViewPrivate}>My Group{canManage?' (Leader)':''}</button><button type="button" className={mode==='browse'?'active':''} onClick={()=>setMode('browse')}>Browse All Groups</button></div>
 
-      <div className="fgp-mode-switch">
-        <button type="button" className={mode==='group'?'active':''} onClick={()=>setMode('group')} disabled={!canViewPrivate}>My Group{canManage?' (Leader)':''}</button>
-        <button type="button" className={mode==='browse'?'active':''} onClick={()=>setMode('browse')}>Browse All Groups</button>
-      </div>
+    {mode==='group'?<>
+      <nav className="fgp-tabs" aria-label="Friendship Group portal sections">{tabs.map(([key,label])=><button key={key} type="button" className={tab===key?'active':''} onClick={()=>setTab(key)}>{label}</button>)}</nav>
 
-      {mode==='group'?<>
-        <nav className="fgp-tabs" aria-label="Friendship Group portal sections">
-          {tabs.map(([key,label])=><button key={key} type="button" className={tab===key?'active':''} onClick={()=>setTab(key)}>{label}</button>)}
-        </nav>
-
-        {tab==='overview'&&<section className="fgp-section">
-          <article className="fgp-week-card">
-            <div className="fgp-week-head"><div><span className="fgp-kicker">THIS WEEK</span><h2>{group.name} Group</h2></div>{canManage&&<Link href={`/groups/${currentGroupId}`} className="fgp-subtle-button">Edit</Link>}</div>
-            <div className="fgp-gold-divider"/>
-            <div className="fgp-facts"><span><Calendar size={15}/>{group.day||group.schedule}</span><span><Clock size={15}/>{group.time?String(group.time).slice(0,5):'Time TBD'}</span><span><MapPin size={15}/>{group.place}</span></div>
-          </article>
-          <div className="fgp-stat-grid">
-            <article className="fgp-card fgp-stat"><strong>{group.memberCount}</strong><span>GROUP MEMBERS</span></article>
-            <article className="fgp-card fgp-stat"><strong>{group.attendanceAverage==null?'—':`${group.attendanceAverage}%`}</strong><span>AVG. ATTENDANCE</span></article>
-          </div>
-          <article className="fgp-card">
-            <span className="fgp-kicker">QUICK ACTIONS</span>
-            <button type="button" className="fgp-action-row" onClick={()=>setTab('attendance')}><span className="fgp-action-icon"><Check size={14}/></span><span>Take attendance for this week</span><ChevronRight size={15}/></button>
-            <button type="button" className="fgp-action-row" onClick={()=>setTab('report')}><span className="fgp-action-icon"><Send size={14}/></span><span>Fill out & send weekly report</span><ChevronRight size={15}/></button>
-            <button type="button" className="fgp-action-row" onClick={()=>setTab('members')}><span className="fgp-action-icon"><UserPlus size={14}/></span><span>Invite someone to your group</span><ChevronRight size={15}/></button>
-          </article>
-          <button type="button" className="fgp-primary" onClick={()=>setTab('attendance')}>Continue</button>
-        </section>}
-
-        {tab==='attendance'&&<section className="fgp-section">
-          <article className="fgp-card fgp-section-head"><div><strong>Weekly Attendance</strong><span>{marked} of {roster.length} marked</span></div><span className="fgp-chip">Editable</span></article>
-          {roster.map(member=><article className="fgp-card fgp-person" key={member.userId}>
-            <div className="fgp-person-main"><span className="fgp-avatar">{initials(member.name)}</span><div><strong>{member.name}</strong><span>{member.role==='leader'?'Group Leader':member.role==='assistant'?'Assistant':'Member'}</span></div></div>
-            <div className="fgp-attendance-buttons">
-              <button type="button" aria-label={`Mark ${member.name} present`} className={attendance[member.userId]===true?'yes active':'yes'} onClick={()=>setAttendance(s=>({...s,[member.userId]:true}))}><Check size={16}/></button>
-              <button type="button" aria-label={`Mark ${member.name} absent`} className={attendance[member.userId]===false?'no active':'no'} onClick={()=>setAttendance(s=>({...s,[member.userId]:false}))}><X size={16}/></button>
-            </div>
-          </article>)}
-          <button type="button" className="fgp-primary" disabled title="Persistence is being wired to the protected attendance workflow">Save Attendance</button>
-          <p className="fgp-dev-note">Attendance selections are visual-only in this branch until the protected manual-attendance persistence path is finalized. Existing self check-in remains unchanged.</p>
-        </section>}
-
-        {tab==='report'&&<section className="fgp-section">
-          <article className="fgp-card">
-            <span className="fgp-kicker">WEEKLY REPORT</span>
-            <div className="fgp-report-stats"><div><strong>{reports[0]?.attendance_count??0}</strong><span>PRESENT</span></div><div><strong>{reports[0]?.first_time_guests??0}</strong><span>FIRST-TIME</span></div></div>
-            <label className="fgp-field"><span>PRAYER REQUESTS / NOTES</span><textarea rows={4} defaultValue={reports[0]?.prayer_needs||''} readOnly={!canReport} placeholder="Anything leadership should know about this week..."/></label>
-            <Link className="fgp-primary fgp-link-button" href={`/groups/${currentGroupId}`}>{canReport?'Open Working Report Form':'View Group'}</Link>
-          </article>
-          <span className="fgp-kicker fgp-history-title">PAST REPORTS</span>
-          {reports.map(r=><article className="fgp-card fgp-report-row" key={r.id}><div><strong>{fmtDate(r.meeting_date)}</strong><span>{r.attendance_count} present · {r.first_time_guests} first-time</span></div><FileText size={16}/></article>)}
-          {!reports.length&&<article className="fgp-card fgp-empty">No reports yet.</article>}
-        </section>}
-
-        {tab==='lessons'&&<section className="fgp-section">
-          {canManage&&<Link className="fgp-secondary-action" href={`/groups/${currentGroupId}/lessons`}><BookOpen size={16}/> Schedule / Add a Lesson</Link>}
-          {lessons.map(l=><article className="fgp-card fgp-lesson" key={l.id}><span className="fgp-lesson-icon"><Play size={16}/></span><div><strong>{l.title}</strong><span>{fmtDate(l.scheduledFor)}{l.lessonNumber?` · Lesson ${l.lessonNumber}`:''}</span></div>{l.status==='scheduled'&&<span className="fgp-chip">Scheduled</span>}</article>)}
-          {!lessons.length&&<article className="fgp-card fgp-empty">No lessons have been scheduled yet.</article>}
-        </section>}
-
-        {tab==='members'&&<section className="fgp-section">
-          {canManage&&<Link className="fgp-secondary-action" href={`/groups/${currentGroupId}`}><UserPlus size={16}/> Invite / Add Someone</Link>}
-          {roster.map(member=><article className="fgp-card fgp-person" key={member.userId}><div className="fgp-person-main"><span className="fgp-avatar">{initials(member.name)}</span><div><strong>{member.name}</strong><span>{member.role==='leader'?'Group Leader':member.role==='assistant'?'Assistant':'Member'}</span></div></div><span className="fgp-chip">{member.role.toUpperCase()}</span></article>)}
-          {!roster.length&&<article className="fgp-card fgp-empty">No roster entries are visible for this account.</article>}
-        </section>}
-
-        {tab==='prayer'&&<section className="fgp-section">
-          <Link className="fgp-secondary-action" href="/prayer"><HandHeart size={16}/> Add a Prayer Request</Link>
-          {prayers.map(p=><article className="fgp-card" key={p.id}><div className="fgp-prayer-head"><strong>{p.name}</strong><span className="fgp-chip">{p.status==='answered'?'ANSWERED':'PRAYER'}</span></div><p className="fgp-prayer-body">{p.body}</p><span className="fgp-muted-small">{new Date(p.created_at).toLocaleString()}</span></article>)}
-          {!prayers.length&&<article className="fgp-card fgp-empty">No group-shared prayer requests yet.</article>}
-        </section>}
-      </>:<section className="fgp-section">
-        <label className="fgp-search"><Search size={15}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search groups..."/></label>
-        {filtered.map(g=><article className="fgp-card" key={g.id}><div className="fgp-browse-head"><div><h2>{g.name}</h2><span>Led by {g.leader}</span></div><span className="fgp-chip">{g.members} members</span></div><div className="fgp-facts browse"><span><Calendar size={13}/>{g.day||'Day TBD'}</span><span><Clock size={13}/>{g.time?String(g.time).slice(0,5):'Time TBD'}</span><span><MapPin size={13}/>{g.place}</span></div><Link className="fgp-primary fgp-link-button" href={`/groups/${g.id}`}>{g.id===currentGroupId&&canViewPrivate?'Open My Group':g.acceptingMembers?'View / Join This Group':'View Group'}</Link></article>)}
+      {tab==='overview'&&<section className="fgp-section">
+        <article className="fgp-week-card"><div className="fgp-week-head"><div><span className="fgp-kicker">THIS WEEK</span><h2>{group.name} Group</h2></div>{canManage&&<Link href={`/groups/${currentGroupId}`} className="fgp-subtle-button">Edit</Link>}</div><div className="fgp-gold-divider"/><div className="fgp-facts"><span><Calendar size={15}/>{group.day||group.schedule}</span><span><Clock size={15}/>{group.time?String(group.time).slice(0,5):'Time TBD'}</span><span><MapPin size={15}/>{group.place}</span></div></article>
+        <div className="fgp-stat-grid"><article className="fgp-card fgp-stat"><strong>{group.memberCount}</strong><span>GROUP MEMBERS</span></article><article className="fgp-card fgp-stat"><strong>{group.attendanceAverage==null?'—':`${group.attendanceAverage}%`}</strong><span>AVG. ATTENDANCE</span></article></div>
+        <article className="fgp-card"><span className="fgp-kicker">QUICK ACTIONS</span><button type="button" className="fgp-action-row" onClick={()=>setTab('attendance')}><span className="fgp-action-icon"><Check size={14}/></span><span>Take attendance for this week</span><ChevronRight size={15}/></button><button type="button" className="fgp-action-row" onClick={()=>setTab('report')}><span className="fgp-action-icon"><Send size={14}/></span><span>Fill out & send weekly report</span><ChevronRight size={15}/></button><button type="button" className="fgp-action-row" onClick={()=>setTab('members')}><span className="fgp-action-icon"><UserPlus size={14}/></span><span>Invite someone to your group</span><ChevronRight size={15}/></button></article>
+        <button type="button" className="fgp-primary" onClick={()=>setTab('attendance')}>Continue</button>
       </section>}
 
-      <nav className="fgp-bottom-nav" aria-label="Kingdom Network navigation">
-        <Link href="/"><Home size={18}/><span>Home</span></Link>
-        <Link href="/journey"><BookOpen size={18}/><span>My Journey</span></Link>
-        <Link href="/groups" className="active"><Users size={18}/><span>Connect</span></Link>
-        <Link href="/events"><Calendar size={18}/><span>Events</span></Link>
-        <Link href="/"><MoreHorizontal size={18}/><span>More</span></Link>
-      </nav>
-    </div>
-  </main>
+      {tab==='attendance'&&<section className="fgp-section">
+        {attendanceSaved&&<article className="fgp-card"><span className="fgp-kicker">SAVED</span><strong>Attendance saved for {fmtDate(meetingDate)}.</strong></article>}
+        {attendanceError&&<article className="fgp-card"><span className="fgp-kicker">ATTENTION</span><strong>{attendanceError}</strong></article>}
+        <form action={savePortalAttendance}>
+          <input type="hidden" name="group_id" value={currentGroupId}/><input type="hidden" name="meeting_date" value={meetingDate}/>
+          <article className="fgp-card fgp-section-head"><div><strong>Weekly Attendance · {fmtDate(meetingDate)}</strong><span>{marked} of {roster.length} marked</span></div><span className="fgp-chip">{canReport?'Editable':'View only'}</span></article>
+          {roster.map(member=><article className="fgp-card fgp-person" key={member.userId}><div className="fgp-person-main"><span className="fgp-avatar">{initials(member.name)}</span><div><strong>{member.name}</strong><span>{member.role==='leader'?'Group Leader':member.role==='assistant'?'Assistant':'Member'}</span></div></div><div className="fgp-attendance-buttons"><button type="button" disabled={!canReport} aria-label={`Mark ${member.name} present`} className={attendance[member.userId]===true?'yes active':'yes'} onClick={()=>setAttendance(s=>({...s,[member.userId]:true}))}><Check size={16}/></button><button type="button" disabled={!canReport} aria-label={`Mark ${member.name} absent`} className={attendance[member.userId]===false?'no active':'no'} onClick={()=>setAttendance(s=>({...s,[member.userId]:false}))}><X size={16}/></button></div>{attendance[member.userId]!==null&&<input type="hidden" name={`attendance_${member.userId}`} value={attendance[member.userId]?'on_time':'missing'}/>}</article>)}
+          <AttendanceSaveButton disabled={!canReport||marked===0}/>
+        </form>
+        <p className="fgp-dev-note">Saved attendance stays private to authorized group leadership until the weekly report is finalized. Existing member self check-in still uses its protected time-window rules.</p>
+        {canManage&&<Link className="fgp-secondary-action" href={`/groups/${currentGroupId}/roster`}><Users size={16}/> Open Leader Roll Sheet & History</Link>}
+      </section>}
+
+      {tab==='report'&&<section className="fgp-section"><article className="fgp-card"><span className="fgp-kicker">WEEKLY REPORT</span><div className="fgp-report-stats"><div><strong>{reports[0]?.attendance_count??0}</strong><span>PRESENT</span></div><div><strong>{reports[0]?.first_time_guests??0}</strong><span>FIRST-TIME</span></div></div><label className="fgp-field"><span>PRAYER REQUESTS / NOTES</span><textarea rows={4} defaultValue={reports[0]?.prayer_needs||''} readOnly={!canReport} placeholder="Anything leadership should know about this week..."/></label><Link className="fgp-primary fgp-link-button" href={`/groups/${currentGroupId}`}>{canReport?'Open Working Report Form':'View Group'}</Link></article><span className="fgp-kicker fgp-history-title">PAST REPORTS</span>{reports.map(r=><article className="fgp-card fgp-report-row" key={r.id}><div><strong>{fmtDate(r.meeting_date)}</strong><span>{r.attendance_count} present · {r.first_time_guests} first-time</span></div><FileText size={16}/></article>)}{!reports.length&&<article className="fgp-card fgp-empty">No reports yet.</article>}</section>}
+
+      {tab==='lessons'&&<section className="fgp-section">{canManage&&<Link className="fgp-secondary-action" href={`/groups/${currentGroupId}/lessons`}><BookOpen size={16}/> Schedule / Add a Lesson</Link>}{lessons.map(l=><article className="fgp-card fgp-lesson" key={l.id}><span className="fgp-lesson-icon"><Play size={16}/></span><div><strong>{l.title}</strong><span>{fmtDate(l.scheduledFor)}{l.lessonNumber?` · Lesson ${l.lessonNumber}`:''}</span></div>{l.status==='scheduled'&&<span className="fgp-chip">Scheduled</span>}</article>)}{!lessons.length&&<article className="fgp-card fgp-empty">No lessons have been scheduled yet.</article>}</section>}
+
+      {tab==='members'&&<section className="fgp-section">{canManage&&<Link className="fgp-secondary-action" href={`/groups/${currentGroupId}/roster`}><UserPlus size={16}/> Invite / Manage Roster</Link>}{roster.map(member=><article className="fgp-card fgp-person" key={member.userId}><div className="fgp-person-main"><span className="fgp-avatar">{initials(member.name)}</span><div><strong>{member.name}</strong><span>{member.role==='leader'?'Group Leader':member.role==='assistant'?'Assistant':'Member'}</span></div></div><span className="fgp-chip">{member.role.toUpperCase()}</span></article>)}{!roster.length&&<article className="fgp-card fgp-empty">No roster entries are visible for this account.</article>}</section>}
+
+      {tab==='prayer'&&<section className="fgp-section"><Link className="fgp-secondary-action" href="/prayer"><HandHeart size={16}/> Add a Prayer Request</Link>{prayers.map(p=><article className="fgp-card" key={p.id}><div className="fgp-prayer-head"><strong>{p.name}</strong><span className="fgp-chip">{p.status==='answered'?'ANSWERED':'PRAYER'}</span></div><p className="fgp-prayer-body">{p.body}</p><span className="fgp-muted-small">{new Date(p.created_at).toLocaleString()}</span></article>)}{!prayers.length&&<article className="fgp-card fgp-empty">No group-shared prayer requests yet.</article>}</section>}
+    </>:<section className="fgp-section"><label className="fgp-search"><Search size={15}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search groups..."/></label>{filtered.map(g=><article className="fgp-card" key={g.id}><div className="fgp-browse-head"><div><h2>{g.name}</h2><span>Led by {g.leader}</span></div><span className="fgp-chip">{g.members} members</span></div><div className="fgp-facts browse"><span><Calendar size={13}/>{g.day||'Day TBD'}</span><span><Clock size={13}/>{g.time?String(g.time).slice(0,5):'Time TBD'}</span><span><MapPin size={13}/>{g.place}</span></div><Link className="fgp-primary fgp-link-button" href={`/groups/${g.id}`}>{g.id===currentGroupId&&canViewPrivate?'Open My Group':g.acceptingMembers?'View / Join This Group':'View Group'}</Link></article>)}</section>}
+
+    <nav className="fgp-bottom-nav" aria-label="Kingdom Network navigation"><Link href="/"><Home size={18}/><span>Home</span></Link><Link href="/journey"><BookOpen size={18}/><span>My Journey</span></Link><Link href="/groups" className="active"><Users size={18}/><span>Connect</span></Link><Link href="/events"><Calendar size={18}/><span>Events</span></Link><Link href="/"><MoreHorizontal size={18}/><span>More</span></Link></nav>
+  </div></main>
 }

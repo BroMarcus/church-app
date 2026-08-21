@@ -35,3 +35,21 @@ test('Friendship Group portal server page reads existing Groups system instead o
   assert.match(source,/from\('prayer_requests'\)/)
   assert.doesNotMatch(source,/from\('friendship_groups'\)/)
 })
+
+test('Friendship Group attendance tab persists drafts through protected server action',async()=>{
+  const [client,action,migration,page]=await Promise.all([
+    read('src/app/groups/[groupId]/portal/portal-client.tsx'),
+    read('src/app/groups/[groupId]/portal/attendance-actions.ts'),
+    read('supabase/migrations/20260820234000_friendship_group_attendance_drafts.sql'),
+    read('src/app/groups/[groupId]/portal/page.tsx')
+  ])
+  assert.match(client,/savePortalAttendance/)
+  assert.match(client,/Save Attendance/)
+  assert.doesNotMatch(client,/visual-only/)
+  assert.match(action,/from\('group_attendance_drafts'\)\.upsert/)
+  assert.match(action,/onConflict:'group_id,user_id,meeting_date'/)
+  assert.match(page,/from\('group_attendance_drafts'\)/)
+  assert.match(migration,/enable row level security/)
+  assert.match(migration,/private\.can_operate_group\(group_id\)/)
+  assert.match(migration,/group_attendance_drafts_unique unique \(group_id,user_id,meeting_date\)/)
+})
