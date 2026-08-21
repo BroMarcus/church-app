@@ -8,6 +8,7 @@ export async function MobileNavShell(){
   const {data:claims}=await supabase.auth.getClaims()
   const userId=claims?.claims?.sub
   if(!userId)return null
+  const preferredLanguage=(claims?.claims as any)?.user_metadata?.preferred_language==='es'?'es':'en'
 
   const {data:membership}=await supabase.from('church_memberships').select('church_id,role').eq('user_id',userId).eq('status','active').limit(1).maybeSingle()
   if(!membership?.church_id)return null
@@ -35,5 +36,5 @@ export async function MobileNavShell(){
     disabledFeatures:(featureResult.data??[]).map((row:any)=>String(row.feature_key))
   }
 
-  return <MobileNav access={access}/>
+  return <MobileNav access={access} preferredLanguage={preferredLanguage}/>
 }
