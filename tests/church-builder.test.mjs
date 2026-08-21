@@ -74,6 +74,19 @@ test('Setup Inbox plan actions expose one-tap pending states in both languages',
   assert.match(page,/Toca una vez y mantén esta página abierta hasta que termine\./)
 })
 
+test('Setup Inbox Spanish mode translates stored review plans without rewriting setup data',async()=>{
+  const page=await read('src/app/church/setup-inbox/page.tsx')
+  assert.match(page,/const esPlanCopy/)
+  assert.match(page,/course_draft:\{title:'Crear un curso borrador con este material'/)
+  assert.match(page,/resource_review:\{title:'Revisar este archivo como recurso confiable'/)
+  assert.match(page,/const esStatus/)
+  assert.match(page,/const esCategory/)
+  assert.match(page,/const esConfidence/)
+  assert.match(page,/translated\?\.title\|\|plan\.title/)
+  assert.match(page,/translated\?\.summary\|\|plan\.summary/)
+  assert.match(page,/translated\?\.destination\|\|plan\.destination/)
+})
+
 test('Setup Inbox uploader hides provider errors, validates uploads, and always releases busy state',async()=>{
   const source=await read('src/app/church/setup-inbox/setup-uploader.tsx')
   assert.doesNotMatch(source,/setStatus\(upload\.error\.message\)/)
