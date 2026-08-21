@@ -33,3 +33,13 @@ test('Friendship Groups crash recovery is language-aware and avoids provider tex
   assert.match(source,/console\.error\('Friendship Groups route failed'/)
   assert.doesNotMatch(source,/error\.message/)
 })
+
+test('Friendship Groups loading state follows selected language and announces progress',async()=>{
+  const source=await read('src/app/groups/loading.tsx')
+  assert.match(source,/params\.get\('lang'\)==='es'/)
+  assert.match(source,/aria-busy="true"/)
+  assert.match(source,/aria-live="polite"/)
+  assert.match(source,/Loading your groups…/)
+  assert.match(source,/Cargando tus grupos…/)
+  assert.doesNotMatch(source,/Friendship Groups \/ Grupos de Amistad/)
+})
