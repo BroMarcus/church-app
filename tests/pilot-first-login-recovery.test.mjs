@@ -38,6 +38,16 @@ test('global error boundary hides technical error text and gives three safe exit
   assert.match(source,/Sign in \/ Iniciar sesión/)
 })
 
+test('root global error catches layout-level failures without exposing technical text',async()=>{
+  const source=await read('src/app/global-error.tsx')
+  assert.match(source,/export default function GlobalError/)
+  assert.match(source,/<html lang="en"><body/)
+  assert.doesNotMatch(source,/error\.message/)
+  assert.match(source,/console\.error\('Kingdom Network root failed'/)
+  assert.match(source,/Reload \/ Recargar/)
+  assert.match(source,/Sign in \/ Iniciar sesión/)
+})
+
 test('global not-found page is bilingual and never renders arbitrary request text',async()=>{
   const source=await read('src/app/not-found.tsx')
   assert.match(source,/We could not find that page/)
