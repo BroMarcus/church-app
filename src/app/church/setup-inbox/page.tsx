@@ -23,9 +23,9 @@ const esConfidence:Record<string,string>={low:'BAJA',medium:'MEDIA',high:'ALTA'}
 
 export default async function SetupInbox({searchParams}:{searchParams:Promise<{lang?:string;error?:string}>}){
  const q=await searchParams,lang=q.lang==='es'?'es':'en',es=lang==='es',l=(p:string)=>es?`${p}${p.includes('?')?'&':'?'}lang=es`:p
- const supabase=await createClient();const {data:claims}=await supabase.auth.getClaims();const userId=claims?.claims?.sub;if(!userId)redirect(l('/login'))
- const {data:m}=await supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).single();if(!m?.church_id||!['pastor','church_admin'].includes(m.role))redirect('/')
- const {data:rows}=await supabase.from('church_setup_uploads').select('*').eq('church_id',m.church_id).order('created_at',{ascending:false})
+ const supabase=await createClient();const {data:claims,error:claimsError}=await supabase.auth.getClaims();if(claimsError){console.error('SetupInbox claims read failed',{code:claimsError.code});throw new Error('setup-inbox-load-failed')}const userId=claims?.claims?.sub;if(!userId)redirect(l('/login'))
+ const {data:m,error:membershipError}=await supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).single();if(membershipError){console.error('SetupInbox membership read failed',{userId,code:membershipError.code});throw new Error('setup-inbox-load-failed')}if(!m?.church_id||!['pastor','church_admin'].includes(m.role))redirect('/')
+ const {data:rows,error:rowsError}=await supabase.from('church_setup_uploads').select('*').eq('church_id',m.church_id).order('created_at',{ascending:false});if(rowsError){console.error('SetupInbox records read failed',{churchId:m.church_id,code:rowsError.code});throw new Error('setup-inbox-load-failed')}
  const church:any=Array.isArray(m.churches)?m.churches[0]:m.churches
  const counts={received:(rows??[]).filter((x:any)=>x.status==='received').length,reviewing:(rows??[]).filter((x:any)=>x.status==='reviewing').length,ready:(rows??[]).filter((x:any)=>x.status==='ready').length}
  const errorMessage=q.error?(q.error==='approve'?(es?'No se pudo aprobar ese plan. Nada se marcó como listo. Inténtalo de nuevo.':'That plan could not be approved. Nothing was marked ready. Try again.'):(es?'No se pudo crear el plan recomendado. Inténtalo de nuevo.':'The recommended plan could not be created. Try again.')):null
