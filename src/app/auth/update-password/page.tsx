@@ -1,22 +1,29 @@
 'use client'
 
 import { useEffect,useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { PasswordField } from '@/components/password-field'
 import { createClient } from '@/lib/supabase/client'
 
 const copy={
-  en:{opening:'Opening your secure reset link…',invalid:'This reset link is invalid or expired. Please request one fresh reset email.',choose:'Choose a new password below.',invalidBack:'This reset link is invalid or expired. Go back to Sign in and request one fresh reset email.',short:'Password must be at least 8 characters.',mismatch:'The two passwords do not match.',failed:'We could not update the password. Please request a fresh reset email and try again.',updated:'Password updated. Taking you back to sign in…',success:'Password updated. Sign in with your new password.',title:'Reset your password',newPassword:'New password',again:'Type it again',showPassword:'Show password',hidePassword:'Hide password',updating:'Updating…',update:'Update password',back:'Back to sign in'},
-  es:{opening:'Abriendo tu enlace seguro…',invalid:'Este enlace no es válido o ya venció. Solicita un correo nuevo para cambiar tu contraseña.',choose:'Escribe una contraseña nueva abajo.',invalidBack:'Este enlace no es válido o ya venció. Vuelve a Iniciar sesión y solicita un correo nuevo.',short:'La contraseña debe tener al menos 8 caracteres.',mismatch:'Las dos contraseñas no coinciden.',failed:'No pudimos cambiar la contraseña. Solicita un correo nuevo e inténtalo otra vez.',updated:'Contraseña actualizada. Volviendo a Iniciar sesión…',success:'Contraseña actualizada. Inicia sesión con tu nueva contraseña.',title:'Cambiar tu contraseña',newPassword:'Nueva contraseña',again:'Escríbela otra vez',showPassword:'Mostrar contraseña',hidePassword:'Ocultar contraseña',updating:'Actualizando…',update:'Actualizar contraseña',back:'Volver a Iniciar sesión'}
+  en:{opening:'Opening your secure reset link…',invalid:'This reset link is invalid or expired. Please request one fresh reset email.',choose:'Choose a new password below.',invalidBack:'This reset link is invalid or expired. Go back to Sign in and request one fresh reset email.',short:'Password must be at least 8 characters.',mismatch:'The two passwords do not match.',failed:'We could not update the password. Please request a fresh reset email and try again.',updated:'Password updated. Your old password will no longer work.',success:'Password updated. Continue to sign in with your new password.',title:'Reset your password',newPassword:'New password',again:'Type it again',showPassword:'Show password',hidePassword:'Hide password',updating:'Updating…',update:'Update password',continue:'Continue to sign in',back:'Back to sign in'},
+  es:{opening:'Abriendo tu enlace seguro…',invalid:'Este enlace no es válido o ya venció. Solicita un correo nuevo para cambiar tu contraseña.',choose:'Escribe una contraseña nueva abajo.',invalidBack:'Este enlace no es válido o ya venció. Vuelve a Iniciar sesión y solicita un correo nuevo.',short:'La contraseña debe tener al menos 8 caracteres.',mismatch:'Las dos contraseñas no coinciden.',failed:'No pudimos cambiar la contraseña. Solicita un correo nuevo e inténtalo otra vez.',updated:'Contraseña actualizada. Tu contraseña anterior ya no funcionará.',success:'Contraseña actualizada. Continúa para iniciar sesión con tu nueva contraseña.',title:'Cambiar tu contraseña',newPassword:'Nueva contraseña',again:'Escríbela otra vez',showPassword:'Mostrar contraseña',hidePassword:'Ocultar contraseña',updating:'Actualizando…',update:'Actualizar contraseña',continue:'Continuar a Iniciar sesión',back:'Volver a Iniciar sesión'}
 } as const
 
-const safeJoinNext=(value:string|null)=>value?.startsWith('/join/')&&!value.startsWith('//')&&!value.includes('..')?value:''
+function safeJoinNext(value:string|null){
+  if(!value||value.length>500||value.includes('\\'))return ''
+  try{
+    const base='https://kingdom.invalid'
+    const parsed=new URL(value,base)
+    if(parsed.origin!==base||!parsed.pathname.startsWith('/join/'))return ''
+    return `${parsed.pathname}${parsed.search}`
+  }catch{return ''}
+}
 
 export default function UpdatePasswordPage(){
-  const router=useRouter()
   const [lang,setLang]=useState<'en'|'es'>('en')
   const [joinNext,setJoinNext]=useState('')
   const [ready,setReady]=useState(false)
+  const [completed,setCompleted]=useState(false)
   const [password,setPassword]=useState('')
   const [confirm,setConfirm]=useState('')
   const [message,setMessage]=useState<string>(copy.en.opening)
@@ -58,7 +65,7 @@ export default function UpdatePasswordPage(){
     }
     void check()
     const {data:listener}=supabase.auth.onAuthStateChange((event,session)=>{
-      if(!mounted)return
+      if(!mounted||completed)return
       if((event==='PASSWORD_RECOVERY'||event==='SIGNED_IN')&&session){
         const url=new URL(window.location.href)
         const nextLang=url.searchParams.get('lang')==='es'?'es':'en'
@@ -66,7 +73,7 @@ export default function UpdatePasswordPage(){
       }
     })
     return()=>{mounted=false;listener.subscription.unsubscribe()}
-  },[])
+  },[completed])
 
   async function save(e:React.FormEvent){
     e.preventDefault()
@@ -81,11 +88,13 @@ export default function UpdatePasswordPage(){
         setMessage(t.failed)
         return
       }
-      setMessage(t.updated)
       const {error:signOutError}=await supabase.auth.signOut()
       if(signOutError)console.error('post-reset sign out failed',{message:signOutError.message})
-      const nextPart=joinNext?`&next=${encodeURIComponent(joinNext)}`:''
-      router.replace(`/login?lang=${lang}&mode=signin${nextPart}&message=${encodeURIComponent(t.success)}`)
+      setPassword('')
+      setConfirm('')
+      setReady(false)
+      setCompleted(true)
+      setMessage(t.success)
     }catch(error){
       console.error('password update request failed',{message:error instanceof Error?error.message:String(error)})
       setMessage(t.failed)
@@ -95,5 +104,6 @@ export default function UpdatePasswordPage(){
   }
 
   const nextPart=joinNext?`&next=${encodeURIComponent(joinNext)}`:''
-  return <main className="login-wrap"><div className="login card"><div className="pill">KINGDOM NETWORK</div><h1>{t.title}</h1><div className={`notice ${ready?'success':'error'}`} role="status" aria-live="polite">{message}</div>{ready&&<form onSubmit={save}><PasswordField name="password" label={t.newPassword} minLength={8} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><PasswordField name="confirm_password" label={t.again} minLength={8} autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><button className="btn" type="submit" disabled={busy}>{busy?t.updating:t.update}</button></form>}<p className="small muted" style={{marginTop:16}}><a href={`/login?lang=${lang}&mode=signin${nextPart}`}>{t.back}</a></p></div></main>
+  const signInHref=`/login?lang=${lang}&mode=signin${nextPart}`
+  return <main className="login-wrap"><div className="login card"><div className="pill">KINGDOM NETWORK</div><h1>{t.title}</h1><div className={`notice ${ready||completed?'success':'error'}`} role={completed?'status':'alert'} aria-live="polite">{message}</div>{ready&&!completed&&<form onSubmit={save}><PasswordField name="password" label={t.newPassword} minLength={8} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><PasswordField name="confirm_password" label={t.again} minLength={8} autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><button className="btn" type="submit" disabled={busy}>{busy?t.updating:t.update}</button></form>}{completed?<p style={{marginTop:16}}><a className="btn" href={signInHref}>{t.continue}</a></p>:<p className="small muted" style={{marginTop:16}}><a href={signInHref}>{t.back}</a></p>}</div></main>
 }
