@@ -58,7 +58,7 @@ test('Friendship Group overview shows a real report-derived attendance average',
   assert.match(page,/avg attendance/)
 })
 
-test('Friendship Group roster removal is manager-scoped and protects the primary leader',async()=>{
+test('Friendship Group roster removal is manager-scoped, protects the primary leader, and never reports false success',async()=>{
   const [actions,page]=await Promise.all([
     read('src/app/groups/[groupId]/roster/actions.ts'),
     read('src/app/groups/[groupId]/roster/page.tsx')
@@ -67,7 +67,10 @@ test('Friendship Group roster removal is manager-scoped and protects the primary
   assert.match(actions,/requireRosterManager\(groupId,lang\)/)
   assert.match(actions,/memberUserId===leaderId/)
   assert.match(actions,/Reassign the group’s primary leader before removing this person from the roster\./)
-  assert.match(actions,/from\('group_memberships'\)\.delete\(\)\.eq\('group_id',groupId\)\.eq\('user_id',memberUserId\)/)
+  assert.match(actions,/from\('group_memberships'\)\.delete\(\)\.eq\('group_id',groupId\)\.eq\('user_id',memberUserId\)\.select\('user_id'\)\.maybeSingle\(\)/)
+  assert.match(actions,/if\(error\|\|!removed\)/)
+  assert.match(actions,/Refresh the roster and try again\./)
+  assert.match(actions,/Actualiza la lista e inténtalo otra vez\./)
   assert.match(page,/action=\{removeRosterMember\}/)
   assert.match(page,/Confirm removal/)
   assert.match(page,/church account, profile, and history stay intact/)
