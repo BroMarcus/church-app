@@ -21,6 +21,24 @@ test('login ignores arbitrary query text and renders only allowlisted bilingual 
   assert.match(callback,/nextPart=joinNext\?`&next=\$\{encodeURIComponent\(joinNext\)\}`:''/)
 })
 
+test('token-hash confirmation and recovery use fixed statuses and preserve safe join context',async()=>{
+  const confirm=await read('src/app/auth/confirm/route.ts')
+  const verify=await read('src/app/auth/verify/actions.ts')
+  for(const source of [confirm,verify]){
+    assert.match(source,/function allowedAuthDestination/)
+    assert.match(source,/new URL\(raw,canonical\)/)
+    assert.match(source,/requested\.origin!==canonical\.origin/)
+    assert.match(source,/startsWith\('\/join\/'\)/)
+    assert.doesNotMatch(source,/[&?]error=\$?\{?encodeURIComponent/)
+    assert.doesNotMatch(source,/[&?]message=\$?\{?encodeURIComponent/)
+  }
+  assert.match(confirm,/error_code=callback_incomplete/)
+  assert.match(verify,/error_code=callback_incomplete/)
+  assert.match(verify,/error_code=callback_expired/)
+  assert.match(verify,/console\.error\('auth token verification failed'/)
+  assert.match(verify,/redirect\(`\/auth\/update-password\?lang=\$\{lang\}\$\{nextPart\}`\)/)
+})
+
 test('password reset completion is explicit and preserves only canonical church-join return paths',async()=>{
   const page=await read('src/app/auth/update-password/page.tsx')
   assert.match(page,/function safeJoinNext/)
