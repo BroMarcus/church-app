@@ -31,6 +31,15 @@ test('simplified mobile navigation offers a persistent language switch without l
   assert.match(source,/href=\{languageHref\('es'\)\}/)
 })
 
+test('simplified mobile navigation honors the saved preferred language unless the URL explicitly selects one',async()=>{
+  const nav=await read('src/components/mobile-nav.tsx')
+  const shell=await read('src/components/mobile-nav-shell.tsx')
+  assert.match(nav,/preferredLanguage='en'/)
+  assert.match(nav,/explicitLang==='es'\?'es':explicitLang==='en'\?'en':preferredLanguage/)
+  assert.match(shell,/user_metadata\?\.preferred_language==='es'\?'es':'en'/)
+  assert.match(shell,/preferredLanguage=\{preferredLanguage\}/)
+})
+
 test('simplified mobile navigation exposes existing leadership destinations only through existing access flags',async()=>{
   const source=await read('src/components/mobile-nav.tsx')
   assert.match(source,/if\(access\.canViewLeadership\)leadership\.push\(\['\/church\/leadership','Leadership Home',ClipboardList\]\)/)
