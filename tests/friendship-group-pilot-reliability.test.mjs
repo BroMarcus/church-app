@@ -43,3 +43,23 @@ test('Friendship Groups loading state follows selected language and announces pr
   assert.match(source,/Cargando tus grupos…/)
   assert.doesNotMatch(source,/Friendship Groups \/ Grupos de Amistad/)
 })
+
+test('Friendship Group leader settings prevent repeat saves on slow phones',async()=>{
+  const source=await read('src/app/groups/[groupId]/group-settings.tsx')
+  assert.match(source,/useFormStatus/)
+  assert.match(source,/disabled=\{pending\}/)
+  assert.match(source,/aria-disabled=\{pending\}/)
+  assert.match(source,/Tap Save once\./)
+  assert.match(source,/Toca Guardar una sola vez\./)
+})
+
+test('Friendship Group leader settings follow selected English or Spanish language',async()=>{
+  const source=await read('src/app/groups/[groupId]/group-settings.tsx')
+  assert.match(source,/useSearchParams/)
+  assert.match(source,/searchParams\.get\('lang'\)==='es'/)
+  assert.match(source,/Meeting information/)
+  assert.match(source,/Información de la reunión/)
+  assert.match(source,/Save meeting details/)
+  assert.match(source,/Guardar detalles de la reunión/)
+  assert.match(source,/Solo miembros del grupo y liderazgo autorizado/)
+})
