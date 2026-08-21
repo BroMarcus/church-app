@@ -12,18 +12,19 @@ test('signed-in account without a church gets concrete bilingual recovery guidan
   assert.match(source,/No crees otra cuenta/)
   assert.match(source,/newest church invitation or join link/)
   assert.match(source,/invitación o el enlace más reciente/)
-  assert.match(source,/I need help connecting/)
-  assert.match(source,/Necesito ayuda para conectarme/)
+  assert.match(source,/Check connection again/)
+  assert.match(source,/Revisar conexión otra vez/)
 })
 
-test('no-church state does not send the member into the inaccessible Guide loop',async()=>{
+test('no-church state avoids inaccessible Guide and Feedback redirect loops',async()=>{
   const source=await read('src/app/page.tsx')
   const start=source.indexOf("if(!membership?.church_id)return")
   const end=source.indexOf("const isAdmin=",start)
   assert.ok(start>=0&&end>start,'no-church branch must exist')
   const branch=source.slice(start,end)
   assert.doesNotMatch(branch,/href=\{l\('\/guide'\)\}/)
-  assert.match(branch,/href=\{l\('\/feedback'\)\}/)
+  assert.doesNotMatch(branch,/href=\{l\('\/feedback'\)\}/)
+  assert.match(branch,/href=\{l\('\/'\)\}/)
   assert.match(branch,/action="\/auth\/signout"/)
 })
 
