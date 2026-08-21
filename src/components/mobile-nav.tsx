@@ -31,7 +31,7 @@ const es:Record<string,string>={
   Me:'Yo',Church:'Iglesia',Leadership:'Liderazgo',Help:'Ayuda',Language:'Idioma',Settings:'Ajustes','Start Here':'Empieza Aquí',Profile:'Perfil',Documents:'Documentos',Alerts:'Alertas',
   'Kingdom Guide':'Guía Kingdom','Prayer & Testimony':'Oración y Testimonio',Messages:'Mensajes',Serve:'Servir','My Teams':'Mis Equipos',Directory:'Directorio',
   'Official Updates':'Avisos Oficiales','Private Care':'Atención Privada',Library:'Biblioteca','Help & Feedback':'Ayuda y Comentarios',Forms:'Formularios','Shared Schedules':'Horarios Compartidos',
-  'Leader Rosters':'Listas de Líderes','Class Builder':'Constructor de Clases','Content Studio':'Estudio de Contenido',Outreach:'Evangelismo','Work Inbox':'Bandeja de Trabajo',
+  'Leadership Home':'Inicio de Liderazgo','Church Admin':'Administrar Iglesia','Leader Rosters':'Listas de Líderes','Class Builder':'Constructor de Clases','Content Studio':'Estudio de Contenido',Outreach:'Evangelismo','Work Inbox':'Bandeja de Trabajo',
   'Church Features':'Funciones de la Iglesia','Alert Settings':'Ajustes de Alertas',Privacy:'Privacidad',Security:'Seguridad','My Data':'Mis Datos'
 }
 
@@ -45,12 +45,13 @@ export function MobileNav({access}:{access:MobileNavAccess}){
   const main:Entry[]=[['/','Home',Home],['/groups','Groups',Users],['/journey','My Journey',Sparkles],...(access.canLeadGroups?[['/groups','Leader Hub',ClipboardList] as Entry]:[['/calendar','Calendar',CalendarDays] as Entry])]
   const available=(entry:Entry)=>!entry[3]||!disabled.has(entry[3])
   const leadership:Entry[]=[]
+  if(access.canViewLeadership)leadership.push(['/church/leadership','Leadership Home',ClipboardList])
   if(access.canManageCalendar||access.canManageTeams||access.canLeadGroups)leadership.push(['/calendar/shared','Shared Schedules',CalendarDays])
   if(access.canLeadGroups||access.canManageTeams)leadership.push(['/rosters','Leader Rosters',ClipboardList])
   if(access.canManageLearning)leadership.push(['/learning/admin/course-builder','Class Builder',GraduationCap])
   if(access.canManageLearning||access.canManageCalendar)leadership.push(['/content','Content Studio',FileText])
   if(access.canManageOutreach&&!disabled.has('outreach'))leadership.push(['/outreach','Outreach',Megaphone,'outreach'])
-  if(access.canManageChurch){leadership.push(['/church/inbox','Work Inbox',ClipboardList]);leadership.push(['/church/features','Church Features',Settings2])}
+  if(access.canManageChurch){leadership.push(['/church','Church Admin',Church]);leadership.push(['/church/inbox','Work Inbox',ClipboardList]);leadership.push(['/church/features','Church Features',Settings2])}
   const churchItems=church.filter(available);if(access.hasForms)churchItems.push(['/forms','Forms',ClipboardList])
   const sections:Section[]=[{label:'Me',items:personal.filter(available)},{label:'Church',items:churchItems},...(leadership.length?[{label:'Leadership',items:leadership.filter(available)}]:[]),{label:'Help',items:support},{label:'Settings',items:settings}]
   const active=(path:string)=>path==='/'?pathname==='/':path==='/calendar'?pathname==='/calendar'||pathname==='/calendar/my':pathname===path||pathname.startsWith(path+'/')
