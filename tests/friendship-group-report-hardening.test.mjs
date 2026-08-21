@@ -74,6 +74,16 @@ test('Friendship Group paper-report batch calculates totals, supports five guest
   assert.match(helper,/Borrador del teléfono encontrado/)
 })
 
+test('Friendship Group review page is branch-only, read-only, and shows the actual parity controls',async()=>{
+  const page=await read('src/app/groups/report-preview/page.tsx')
+  assert.match(page,/process\.env\.VERCEL_GIT_COMMIT_REF!==previewBranch/)
+  assert.match(page,/notFound\(\)/)
+  assert.match(page,/ReportParityHelper/)
+  assert.match(page,/\[1,2,3,4,5\]\.map/)
+  assert.match(page,/Preview only — no data will be submitted/)
+  assert.doesNotMatch(page,/action=\{/)
+})
+
 test('Friendship Group roster removal is manager-scoped, protects the primary leader, and never reports false success',async()=>{
   const [actions,page]=await Promise.all([
     read('src/app/groups/[groupId]/roster/actions.ts'),
