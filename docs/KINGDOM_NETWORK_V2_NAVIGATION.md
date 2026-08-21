@@ -1,59 +1,78 @@
-# Kingdom Network V2 — Navigation Decision Gate
+# Kingdom Network V2 — Navigation Contract
 
-Status: NOT YET APPROVED
+Status: NAVIGATION DECISION APPROVED · STEP 1 PREVIEW STILL AWAITS MARCUS REVIEW
 Step: 1 — Foundation
 
-## Rule
+## Permanent member navigation
 
-No real V2 feature/tab implementation begins until Marcus approves the permanent top-level navigation model.
+The V2 member shell uses exactly five bottom destinations by default:
 
-The purpose of this gate is to keep V2 simple and prevent the navigation from growing into a long list of disconnected features.
+| Position | English | Spanish | Default destination |
+| --- | --- | --- | --- |
+| 1 | Home | Inicio | `/v2` |
+| 2 | My Group | Mi Grupo | `/v2/groups` |
+| 3 | Learn | Aprender | `/v2/learn` |
+| 4 | Serve | Servir | `/v2/serve` |
+| 5 | More | Más | `/v2/more` |
 
-## Principles already approved
+These labels are the approved default navigation. Individual feature screens are **not** implied to exist merely because their destination is reserved.
 
-- Mobile-first.
-- English and Spanish are designed together.
-- New members and low-tech users should know what to do without understanding church-management software.
-- Member navigation should be simpler than leader/pastor navigation.
-- Role-specific operational tools should not clutter ordinary member screens.
-- The member experience should organize church life around the person and their next step, not around database categories.
-- New ideas that belong elsewhere go to backlog rather than becoming a new top-level tab immediately.
-- Navigation can reveal deeper tools progressively rather than putting everything in the first screen.
+## Bottom-bar visual contract
 
-## Questions still to settle before Step 1 can be approved
+- Total height: 76px.
+- Bottom padding: 10px for the device home-indicator area.
+- Five evenly spaced destinations.
+- Icon: 20px stroked SVG, 1.75 stroke width, round caps/joins.
+- Label: 10.5px.
+- Icon-to-label gap: 4px.
+- Active icon/label: `gold-400` / `#E3C179`.
+- Inactive icon/label: `ink-500` / `#8894B4`.
+- Minimum tap target: 44px.
+- Do not draw a fake operating-system status bar or fake keyboard.
 
-The final navigation discussion must settle, at minimum:
+## User customization requirement
 
-1. How many permanent member-facing top-level destinations should exist.
-2. Which destination is the everyday starting point.
-3. Whether My Journey is top-level or reached through Home/profile.
-4. Whether Learning is a top-level destination or part of Grow/Journey.
-5. Whether Friendship Groups belong under Connect, Groups, or another top-level destination.
-6. Whether Events/Calendar is permanent top-level navigation or contextual.
-7. Whether Serve is top-level for all members or appears when relevant.
-8. Where Community, Prayer, Messages, Directory, Documents, Business Partners, and other secondary areas live without clutter.
-9. How leader/admin workspaces are entered without exposing leader complexity to ordinary members.
-10. How the navigation translates into Spanish using short, obvious language.
+The default five tabs are configuration-driven so a future user may repoint a tab to a destination that is more useful to that person. Example: an authorized Friendship Group leader may point `My Group` directly at that leader's own group dashboard.
 
-## Candidate direction from the founder vision — discussion only
+Rules:
 
-The founder vision previously described a person-centered path similar to:
+1. Preferences belong to the individual user, not to the role as a whole.
+2. A user may customize destinations only from destinations they are actually allowed to access.
+3. Navigation customization **never grants authorization**. Server/database permission checks remain authoritative.
+4. A bad/stale custom destination must fail safely and return the user to an understandable allowed screen.
+5. The five default tabs remain the fallback when no preference is stored or a saved destination becomes invalid.
+6. Step 1 implements a config-driven navigation component only. Persisting per-user preferences is deferred because that would be a live write workflow and must be tested/approved separately.
 
-**Connect → Grow → Belong → Serve → Lead**
+## Groups hierarchy contract
 
-It also described possible member areas such as Home, Journey, Connect, Explore/Grow, Serve, and More.
+V2 must preserve two distinct concepts:
 
-These are inputs for the discussion, **not an approved V2 menu**.
+### 1. Groups List
 
-## Approval requirement
+A church-wide browse/directory surface showing groups the signed-in person is permitted to discover. It is not a leader operations screen.
 
-When the navigation model is agreed:
+### 2. Group Dashboard
 
-- record the final English labels;
-- record the final Spanish labels;
-- define what belongs under each destination;
-- define which destinations are member-visible versus role-dependent;
-- keep the first-level mobile navigation intentionally small;
-- then mark this gate APPROVED in this document and the Control Room.
+A scoped workspace entered after opening one specific group. Group-specific operations belong here: roster, attendance, weekly reporting, lessons, prayer/group activity, schedule, guidelines, and session assignments according to permission.
 
-Until that happens, V2 remains at Step 1 Foundation.
+**Never place one group's private/operational tools on the Groups List.**
+
+`My Group` may eventually route a person directly to the correct Group Dashboard when there is one clear active group. If the user has no group, more than one relevant group, or a stale saved destination, the app must provide a simple safe choice rather than guessing incorrectly.
+
+## Member simplicity
+
+The five-tab shell is intentionally small. Secondary destinations live behind contextual actions or `More`, rather than becoming additional permanent bottom tabs. Likely secondary areas include Community, Prayer, Messages, Calendar/Events, My Journey/Profile, Directory, Documents, Business Partners, settings, and authorized leadership tools. Their exact placement is decided when their owning step is designed.
+
+## Leader/admin access
+
+Leadership tools must not clutter the ordinary member experience. A leader, pastor, or admin may receive contextual actions or a role-appropriate workspace inside an allowed destination, but elevated navigation is never a substitute for server-side/database authorization.
+
+## Branding
+
+Every V2 screen includes the fixed Kingdom Network lockup at top-left, with the active church name underneath and an optional small church mark. See `docs/KINGDOM_NETWORK_V2_FOUNDATION.md` for exact visual tokens.
+
+## Approval state
+
+Marcus supplied and approved the five-tab navigation decision as part of the Claude Step 1 Navigation & Design System Brief. The navigation decision gate is therefore settled.
+
+The overall **Step 1 foundation is not yet complete** until Marcus reviews and approves the updated V2 preview. Until then, no real Home, Groups, Learning, Serve, Finance, AI, or other feature implementation begins.
