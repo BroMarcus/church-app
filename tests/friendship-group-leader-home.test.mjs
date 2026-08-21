@@ -49,3 +49,13 @@ test('Friendship Group overview summarizes the leader week from existing records
   assert.match(client,/leaderSummary\.openPrayerCount/)
   assert.match(client,/leaderSummary\.weeklyRoleCount/)
 })
+
+test('Friendship Group portal fails closed instead of presenting failed reads as empty data',async()=>{
+  const page=await read('src/app/groups/[groupId]/portal/page.tsx')
+  assert.match(page,/friendship-group-portal\] read failed/)
+  assert.match(page,/throw new Error\('friendship_group_portal_read_failed'\)/)
+  for(const area of ['church_membership','group','my_group_membership','roster','private_details','reports','lessons','prayer','directory','attendance_draft','guidelines','schedule','schedule_items','weekly_assignments','profiles']){
+    assert.match(page,new RegExp(`requireRead\\('${area}'`))
+  }
+  assert.doesNotMatch(page,/console\.error\([^\n]*error\.message/)
+})
