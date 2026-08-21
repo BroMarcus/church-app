@@ -21,6 +21,12 @@ test('Prayer actions use bounded status codes instead of rendering provider/quer
   assert.doesNotMatch(page,/query\.error&&/)
 })
 
+test('Prayer reactions are constrained to the signed-in member active church',async()=>{
+  const reactions=await read('src/app/prayer/reaction-actions.ts')
+  assert.match(reactions,/from\('church_memberships'\).*eq\('user_id',userId\).*eq\('status','active'\)/)
+  assert.match(reactions,/eq\('church_id',membership\.church_id\)\.eq\('post_type','prayer_request'\)/)
+})
+
 test('Prayer creation, reactions, and answered actions prevent repeat taps on slow phones',async()=>{
   const [button,page]=await Promise.all([
     read('src/app/prayer/pending-button.tsx'),
