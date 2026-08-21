@@ -1,0 +1,45 @@
+/* Simplified Kingdom Network blue-and-gold experience. */
+:root {
+  --bg: #061426;
+  --panel: #0b2038;
+  --line: #27486a;
+  --text: #f8fbff;
+  --muted: #a9bdd0;
+  --purple: #d9ad45;
+  --purple2: #b98018;
+  --blue: #123b66;
+  --gold: #e3b94f;
+  --gold-soft: #ffe2a0;
+}
+
+html, body { background: radial-gradient(circle at 18% -8%, #174f83 0, transparent 35%), linear-gradient(180deg, #071a2f 0, var(--bg) 55%); }
+.brand span { color: var(--gold); }
+.card { background: linear-gradient(155deg, rgba(15,48,81,.96), rgba(7,28,50,.98)); box-shadow: 0 14px 42px rgba(0,8,20,.28); }
+.pill { color: var(--gold-soft); background: #173b5e; border-color: #80652b; }
+.module svg { color: var(--gold); }
+.btn { color: #122033; font-weight: 900; box-shadow: 0 7px 20px rgba(185,128,24,.2); }
+.avatar { background: #194f7c; color: #ffe1a0; }
+
+.simple-stack { display: grid; gap: 0; margin: 18px 0 24px; }
+.stack-card { position: relative; padding: 22px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 16px; min-height: 112px; transition: transform .18s ease, border-color .18s ease; }
+.stack-card + .stack-card { margin-top: -8px; }
+.stack-card:nth-child(2) { margin-left: 14px; margin-right: 14px; }
+.stack-card:nth-child(3) { margin-left: 28px; margin-right: 28px; }
+.stack-card:hover { transform: translateY(-3px); border-color: #cba23f; z-index: 3; }
+.stack-icon { width: 48px; height: 48px; border-radius: 15px; display: grid; place-items: center; background: linear-gradient(145deg,#1b5688,#0e345a); color: var(--gold); border: 1px solid #356c99; }
+.stack-copy strong, .stack-copy span { display: block; }
+.stack-copy strong { font-size: 19px; }
+.stack-copy span { color: var(--muted); font-size: 14px; margin-top: 3px; }
+.stack-arrow { color: var(--gold); }
+
+.group-card:hover { border-color: #cba23f; }
+.group-icon { background: #174b76; color: #f0c763; border: 1px solid #39698f; }
+.group-meta svg { color: var(--gold); }
+.leader-badge { background: #173b5e; border-color: #80652b; color: #ffe2a0; }
+
+@media (max-width: 520px) {
+  .stack-card { padding: 17px; min-height: 96px; }
+  .stack-card:nth-child(2), .stack-card:nth-child(3) { margin-left: 0; margin-right: 0; }
+  .stack-copy strong { font-size: 17px; }
+  .stack-copy span { font-size: 13px; }
+}
