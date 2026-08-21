@@ -10,6 +10,18 @@ test('Friendship Group weekly-role navigation preserves the selected language',a
   assert.match(client,/href=\{roleManageHref\}/)
 })
 
+test('Friendship Group Browse mode and search survive an EN/ES switch',async()=>{
+  const client=await read('src/app/groups/[groupId]/portal/portal-client.tsx')
+  assert.match(client,/useSearchParams/)
+  assert.match(client,/initialBrowse=searchParams\.get\('view'\)==='browse'/)
+  assert.match(client,/initialQuery=\(searchParams\.get\('q'\)\|\|''\)\.slice\(0,80\)/)
+  assert.match(client,/useState\(canViewPrivate&&!initialBrowse\?'group':'browse'\)/)
+  assert.match(client,/mode==='browse'\?'&view=browse':''/)
+  assert.match(client,/encodeURIComponent\(query\.trim\(\)\.slice\(0,80\)\)/)
+  assert.match(client,/href=\{languageHref\}/)
+  assert.match(client,/maxLength=\{80\}/)
+})
+
 test('leader self-create preserves language and uses fixed recovery status codes',async()=>{
   const [page,action]=await Promise.all([
     read('src/app/groups/page.tsx'),
