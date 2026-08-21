@@ -63,6 +63,17 @@ test('global not-found page follows language and gives stale invitation recovery
   assert.doesNotMatch(source,/error\.message/)
 })
 
+test('global loading state reassures users and is announced accessibly',async()=>{
+  const source=await read('src/app/loading.tsx')
+  assert.match(source,/role="status"/)
+  assert.match(source,/aria-live="polite"/)
+  assert.match(source,/aria-busy="true"/)
+  assert.match(source,/Getting your home ready/)
+  assert.match(source,/Preparando tu inicio/)
+  assert.match(source,/Please keep this page open/)
+  assert.match(source,/Mantén esta página abierta/)
+})
+
 test('pilot feedback renders only fixed bilingual status values',async()=>{
   const page=await read('src/app/feedback/page.tsx')
   const actions=await read('src/app/feedback/actions.ts')
