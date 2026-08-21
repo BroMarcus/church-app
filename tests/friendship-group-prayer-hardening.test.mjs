@@ -44,8 +44,13 @@ test('Prayer creation, reactions, and answered actions prevent repeat taps on sl
   assert.match(page,/Marcar contestada/)
 })
 
-test('Prayer privacy copy does not promise unverified leadership routing',async()=>{
+test('Prayer requests are private by default and group sharing stays an explicit separate choice',async()=>{
   const page=await read('src/app/prayer/page.tsx')
+  assert.match(page,/value="private" defaultChecked/)
+  assert.doesNotMatch(page,/value="public" defaultChecked/)
+  assert.match(page,/Private — recommended/)
+  assert.match(page,/Privada — recomendada/)
+  assert.match(page,/Prayer requests start Private\./)
   assert.match(page,/Use the separate Friendship Group choice below if you want your group to see it\./)
   assert.match(page,/Esta opción estará disponible después de que te unas a uno\./)
   assert.doesNotMatch(page,/It still routes to the proper Friendship Group leader or leadership follow-up\./)
