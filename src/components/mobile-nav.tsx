@@ -40,7 +40,7 @@ export function MobileNav({access}:{access:MobileNavAccess}){
   if(pathname.startsWith('/login')||pathname.startsWith('/auth')||pathname.startsWith('/join'))return null
   const lang=searchParams.get('lang')==='es'?'es':'en',label=(value:string)=>lang==='es'?(es[value]??value):value
   const href=(path:string)=>lang==='es'?`${path}${path.includes('?')?'&':'?'}lang=es`:path
-  const languageHref=(next:'en'|'es')=>{const params=new URLSearchParams(searchParams.toString());if(next==='es')params.set('lang','es');else params.delete('lang');const query=params.toString();return `${pathname}${query?`?${query}`:''}`}
+  const languageHref=(next:'en'|'es')=>{const params=new URLSearchParams(searchParams.toString());for(const key of ['error','message','error_code','status','sent'])params.delete(key);if(next==='es')params.set('lang','es');else params.delete('lang');const query=params.toString();return `${pathname}${query?`?${query}`:''}`}
   const disabled=new Set(access.disabledFeatures)
   const main:Entry[]=[['/','Home',Home],['/groups','Groups',Users],['/journey','My Journey',Sparkles],...(access.canLeadGroups?[['/groups','Leader Hub',ClipboardList] as Entry]:[['/calendar','Calendar',CalendarDays] as Entry])]
   const available=(entry:Entry)=>!entry[3]||!disabled.has(entry[3])
