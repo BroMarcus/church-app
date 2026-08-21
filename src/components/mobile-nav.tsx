@@ -35,10 +35,10 @@ const es:Record<string,string>={
   'Church Features':'Funciones de la Iglesia','Alert Settings':'Ajustes de Alertas',Privacy:'Privacidad',Security:'Seguridad','My Data':'Mis Datos'
 }
 
-export function MobileNav({access}:{access:MobileNavAccess}){
+export function MobileNav({access,preferredLanguage='en'}:{access:MobileNavAccess;preferredLanguage?:'en'|'es'}){
   const pathname=usePathname(),searchParams=useSearchParams(),[openPath,setOpenPath]=useState<string|null>(null),open=openPath===pathname
   if(pathname.startsWith('/login')||pathname.startsWith('/auth')||pathname.startsWith('/join'))return null
-  const lang=searchParams.get('lang')==='es'?'es':'en',label=(value:string)=>lang==='es'?(es[value]??value):value
+  const explicitLang=searchParams.get('lang'),lang=explicitLang==='es'?'es':explicitLang==='en'?'en':preferredLanguage,label=(value:string)=>lang==='es'?(es[value]??value):value
   const href=(path:string)=>lang==='es'?`${path}${path.includes('?')?'&':'?'}lang=es`:path
   const languageHref=(next:'en'|'es')=>{const params=new URLSearchParams(searchParams.toString());for(const key of ['error','message','error_code','status','sent'])params.delete(key);if(next==='es')params.set('lang','es');else params.delete('lang');const query=params.toString();return `${pathname}${query?`?${query}`:''}`}
   const disabled=new Set(access.disabledFeatures)
