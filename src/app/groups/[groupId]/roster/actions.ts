@@ -74,10 +74,10 @@ export async function removeRosterMember(formData:FormData){
   if(memberUserId===leaderId){
     redirect(rosterUrl(groupId,lang,'&error='+encodeURIComponent(safe(lang,'Reassign the group’s primary leader before removing this person from the roster.','Reasigna al líder principal del grupo antes de quitar a esta persona de la lista.'))))
   }
-  const {error}=await supabase.from('group_memberships').delete().eq('group_id',groupId).eq('user_id',memberUserId)
-  if(error){
-    console.error('removeRosterMember failed',{groupId,memberUserId,code:error.code,message:error.message})
-    redirect(rosterUrl(groupId,lang,'&error='+encodeURIComponent(safe(lang,'We could not remove that person from this group.','No pudimos quitar a esa persona de este grupo.'))))
+  const {data:removed,error}=await supabase.from('group_memberships').delete().eq('group_id',groupId).eq('user_id',memberUserId).select('user_id').maybeSingle()
+  if(error||!removed){
+    console.error('removeRosterMember failed',{groupId,memberUserId,code:error?.code,message:error?.message,removed:Boolean(removed)})
+    redirect(rosterUrl(groupId,lang,'&error='+encodeURIComponent(safe(lang,'We could not remove that person from this group. Refresh the roster and try again.','No pudimos quitar a esa persona de este grupo. Actualiza la lista e inténtalo otra vez.'))))
   }
   revalidatePath(`/groups/${groupId}`);revalidatePath(`/groups/${groupId}/roster`);revalidatePath('/groups');revalidatePath('/journey')
   redirect(rosterUrl(groupId,lang,'&member_removed=1'))
