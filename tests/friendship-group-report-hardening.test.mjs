@@ -27,15 +27,26 @@ test('Friendship Group duplicate reports get a specific recovery message',async(
   assert.match(actions,/Open Meeting history instead of submitting it again\./)
 })
 
-test('Friendship Group report submission prevents repeat taps while saving',async()=>{
+test('Friendship Group report submission prevents repeat taps and explains saving in English and Spanish',async()=>{
   const [button,page]=await Promise.all([
     read('src/app/groups/[groupId]/report-submit-button.tsx'),
     read('src/app/groups/[groupId]/page.tsx')
   ])
   assert.match(button,/useFormStatus/)
+  assert.match(button,/useSearchParams/)
+  assert.match(button,/searchParams\.get\('lang'\)==='es'/)
   assert.match(button,/disabled=\{pending\}/)
   assert.match(button,/aria-disabled=\{pending\}/)
+  assert.match(button,/aria-busy=\{pending\}/)
+  assert.match(button,/aria-describedby="group-report-submit-help group-report-submit-status"/)
+  assert.match(button,/role="status"/)
+  assert.match(button,/aria-live="polite"/)
   assert.match(button,/Submitting report…/)
+  assert.match(button,/Enviando reporte…/)
+  assert.match(button,/Tap Submit report once\. Keep this page open until it finishes\./)
+  assert.match(button,/Toca Enviar reporte una sola vez\. Mantén esta página abierta hasta que termine\./)
+  assert.match(button,/Do not tap the button again\./)
+  assert.match(button,/No vuelvas a tocar el botón\./)
   assert.match(page,/<ReportSubmitButton\/>/)
   assert.match(page,/One report is stored per group and meeting date\./)
 })
