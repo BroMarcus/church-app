@@ -39,7 +39,7 @@ export function FriendshipPortalClient({group,roster,reports,lessons,prayers,all
   const t=copy[lang],[mode,setMode]=useState(canViewPrivate?'group':'browse'),[tab,setTab]=useState(canReport||!['attendance','report'].includes(initialTab)?initialTab:'overview'),[query,setQuery]=useState('')
   const [attendance,setAttendance]=useState<Record<string,boolean|null>>(()=>Object.fromEntries(roster.map(r=>[r.userId,attendanceDraft[r.userId]?attendanceDraft[r.userId]!=='missing':null])))
   const marked=Object.values(attendance).filter(v=>v!==null).length,filtered=useMemo(()=>allGroups.filter(g=>g.name.toLowerCase().includes(query.toLowerCase())),[allGroups,query])
-  const tabs=canReport?[[ 'overview',t.overview],['attendance',t.attendance],['report',t.report],['lessons',t.lessons],['members',t.members],['prayer',t.prayer]]:[['overview',t.overview],['lessons',t.lessons],['members',t.members],['prayer',t.prayer]],roleManageHref=scheduleId?`/calendar/manage?schedule=${scheduleId}`:'/calendar/manage',portalError=portalErrorCode?errors[lang][portalErrorCode]??null:null
+  const tabs=canReport?[[ 'overview',t.overview],['attendance',t.attendance],['report',t.report],['lessons',t.lessons],['members',t.members],['prayer',t.prayer]]:[['overview',t.overview],['lessons',t.lessons],['members',t.members],['prayer',t.prayer]],roleManageHref=scheduleId?`/calendar/manage?schedule=${scheduleId}&lang=${lang}`:`/calendar/manage?lang=${lang}`,portalError=portalErrorCode?errors[lang][portalErrorCode]??null:null
   const memberRole=(role:string)=>role==='leader'?t.groupLeader:role==='assistant'?t.assistant:t.member
 
   return <main className="fgp-root"><div className="fgp-phone">
