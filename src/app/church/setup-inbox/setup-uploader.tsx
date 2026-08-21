@@ -4,8 +4,10 @@ import { useState } from 'react'
 import { Upload } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
-const clean=(name:string)=>name.replace(/[^a-zA-Z0-9._-]/g,'_').slice(-140)
+const clean=(name:string)=>name.replace(/[^a-zA-Z0-9._-]/g,'_').slice(-140)||'upload'
 const allowedTypes=new Set(['application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.ms-powerpoint','application/vnd.openxmlformats-officedocument.presentationml.presentation','text/plain','image/jpeg','image/png','image/webp'])
+const allowedExtensions=new Set(['.pdf','.doc','.docx','.ppt','.pptx','.txt','.jpg','.jpeg','.png','.webp'])
+const allowedCategories=new Set(['unsorted','curriculum','forms','branding','leadership','policies','certificates','media','calendar','other'])
 type UploadStatus={kind:'success'|'error';message:string}|null
 
 export function SetupUploader({churchId,userId,lang}:{churchId:string;userId:string;lang:'en'|'es'}){
@@ -17,13 +19,14 @@ export function SetupUploader({churchId,userId,lang}:{churchId:string;userId:str
   const file=formData.get('file') as File|null
   if(!file||!file.size){fail(es?'Selecciona un archivo primero.':'Choose a file first.');return}
   if(file.size>20*1024*1024){fail(es?'El archivo debe ser de 20 MB o menos.':'File must be 20 MB or smaller.');return}
-  if(file.type&&!allowedTypes.has(file.type)){fail(es?'Ese tipo de archivo no está permitido. Usa PDF, Word, PowerPoint, texto o una imagen.':'That file type is not allowed. Use PDF, Word, PowerPoint, text, or an image.');return}
+  const extension=file.name.toLowerCase().match(/\.[^.]+$/)?.[0]??''
+  if((file.type&&!allowedTypes.has(file.type))||(!file.type&&!allowedExtensions.has(extension))){fail(es?'Ese tipo de archivo no está permitido. Usa PDF, Word, PowerPoint, texto o una imagen.':'That file type is not allowed. Use PDF, Word, PowerPoint, text, or an image.');return}
   setSaving(true);setStatus(null)
   const supabase=createClient();const path=`${churchId}/${crypto.randomUUID()}/${clean(file.name)}`
   try{
    const upload=await supabase.storage.from('church-setup').upload(path,file,{contentType:file.type||undefined,upsert:false})
    if(upload.error){console.error('SetupUploader storage upload failed',{churchId,code:upload.error.name});fail();return}
-   const category=String(formData.get('category')||'unsorted')
+   const categoryValue=String(formData.get('category')||'unsorted'),category=allowedCategories.has(categoryValue)?categoryValue:'unsorted'
    const notes=String(formData.get('notes')||'').trim().slice(0,1000)||null
    const insert=await supabase.from('church_setup_uploads').insert({church_id:churchId,uploaded_by:userId,file_name:file.name.slice(0,255),storage_path:path,content_type:file.type||null,size_bytes:file.size,category,notes,suggested_destination:category==='curriculum'?'Learning Center':category==='branding'?'Church Settings / Media':category==='leadership'?'Leadership records':category==='forms'?'Forms & workflows':category==='calendar'?'Calendar':'Kingdom Guide review queue'})
    if(insert.error){console.error('SetupUploader metadata insert failed',{churchId,code:insert.error.code});const cleanup=await supabase.storage.from('church-setup').remove([path]);if(cleanup.error)console.error('SetupUploader cleanup failed',{churchId,code:cleanup.error.name});fail();return}
