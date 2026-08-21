@@ -29,3 +29,11 @@ test('simplified mobile navigation offers a persistent language switch without l
   assert.match(source,/href=\{languageHref\('en'\)\}/)
   assert.match(source,/href=\{languageHref\('es'\)\}/)
 })
+
+test('simplified mobile navigation exposes existing leadership destinations only through existing access flags',async()=>{
+  const source=await read('src/components/mobile-nav.tsx')
+  assert.match(source,/if\(access\.canViewLeadership\)leadership\.push\(\['\/church\/leadership','Leadership Home',ClipboardList\]\)/)
+  assert.match(source,/if\(access\.canManageChurch\)\{leadership\.push\(\['\/church','Church Admin',Church\]\)/)
+  assert.match(source,/'Leadership Home':'Inicio de Liderazgo'/)
+  assert.match(source,/'Church Admin':'Administrar Iglesia'/)
+})
