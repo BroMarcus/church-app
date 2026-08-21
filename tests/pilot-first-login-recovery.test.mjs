@@ -47,3 +47,23 @@ test('global not-found page is bilingual and never renders arbitrary request tex
   assert.match(source,/href="\/"/)
   assert.match(source,/href="\/login\?mode=signin"/)
 })
+
+test('pilot feedback renders only fixed bilingual error codes',async()=>{
+  const page=await read('src/app/feedback/page.tsx')
+  const actions=await read('src/app/feedback/actions.ts')
+  assert.doesNotMatch(page,/q\.error&&/)
+  assert.doesNotMatch(page,/\{q\.error\}/)
+  assert.match(page,/q\.error_code==='message_short'/)
+  assert.match(page,/q\.error_code==='save_failed'/)
+  assert.match(page,/role="alert"/)
+  assert.match(actions,/error_code=message_short/)
+  assert.match(actions,/error_code=save_failed/)
+  assert.doesNotMatch(actions,/encodeURIComponent\(/)
+})
+
+test('pilot feedback logs safe diagnostics and preserves Spanish when membership is missing',async()=>{
+  const source=await read('src/app/feedback/actions.ts')
+  assert.match(source,/console\.error\('Pilot feedback save failed',\{code:error\.code\?\?'unknown'\}\)/)
+  assert.doesNotMatch(source,/error\.message/)
+  assert.match(source,/redirect\(lang==='es'\?'\/\?lang=es':'\/'\)/)
+})
