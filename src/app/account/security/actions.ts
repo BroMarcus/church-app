@@ -24,14 +24,16 @@ export async function changeLoginEmail(formData:FormData){
   const email=text(formData,'email').toLowerCase()
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))redirect(failureUrl(lang,'email_invalid'))
 
+  let updateError:unknown=null
   try{
-    const {error}=await supabase.auth.updateUser({email})
-    if(error){
-      console.error('Account security email update failed',safeAuthDiagnostic(error))
-      redirect(failureUrl(lang,'email_update_failed'))
-    }
+    const result=await supabase.auth.updateUser({email})
+    updateError=result.error
   }catch(error){
     console.error('Account security email update request failed',safeAuthDiagnostic(error))
+    redirect(failureUrl(lang,'email_update_failed'))
+  }
+  if(updateError){
+    console.error('Account security email update failed',safeAuthDiagnostic(updateError))
     redirect(failureUrl(lang,'email_update_failed'))
   }
   redirect(securityUrl(lang,'&email=1'))
@@ -44,14 +46,16 @@ export async function changePassword(formData:FormData){
   if(password.length<12)redirect(failureUrl(lang,'password_short'))
   if(password!==confirm)redirect(failureUrl(lang,'password_mismatch'))
 
+  let updateError:unknown=null
   try{
-    const {error}=await supabase.auth.updateUser({password})
-    if(error){
-      console.error('Account security password update failed',safeAuthDiagnostic(error))
-      redirect(failureUrl(lang,'password_update_failed'))
-    }
+    const result=await supabase.auth.updateUser({password})
+    updateError=result.error
   }catch(error){
     console.error('Account security password update request failed',safeAuthDiagnostic(error))
+    redirect(failureUrl(lang,'password_update_failed'))
+  }
+  if(updateError){
+    console.error('Account security password update failed',safeAuthDiagnostic(updateError))
     redirect(failureUrl(lang,'password_update_failed'))
   }
   redirect(securityUrl(lang,'&password=1'))
@@ -59,14 +63,16 @@ export async function changePassword(formData:FormData){
 
 export async function signOutEverywhere(formData:FormData){
   const lang=langOf(formData),supabase=await createClient()
+  let signOutError:unknown=null
   try{
-    const {error}=await supabase.auth.signOut({scope:'global'})
-    if(error){
-      console.error('Account security global sign-out failed',safeAuthDiagnostic(error))
-      redirect(failureUrl(lang,'signout_failed'))
-    }
+    const result=await supabase.auth.signOut({scope:'global'})
+    signOutError=result.error
   }catch(error){
     console.error('Account security global sign-out request failed',safeAuthDiagnostic(error))
+    redirect(failureUrl(lang,'signout_failed'))
+  }
+  if(signOutError){
+    console.error('Account security global sign-out failed',safeAuthDiagnostic(signOutError))
     redirect(failureUrl(lang,'signout_failed'))
   }
   redirect(`/login?lang=${lang}&mode=signin`)
