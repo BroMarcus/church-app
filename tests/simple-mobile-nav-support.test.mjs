@@ -19,11 +19,12 @@ test('simplified mobile navigation preserves Spanish on onboarding and help link
   assert.match(source,/href=\{href\(path\)\}/)
 })
 
-test('simplified mobile navigation offers a persistent language switch without losing page context',async()=>{
+test('simplified mobile navigation offers a persistent language switch without losing useful page context',async()=>{
   const source=await read('src/components/mobile-nav.tsx')
   assert.match(source,/Language:'Idioma'/)
   assert.match(source,/const languageHref=/)
   assert.match(source,/new URLSearchParams\(searchParams\.toString\(\)\)/)
+  assert.match(source,/for\(const key of \['error','message','error_code','status','sent'\]\)params\.delete\(key\)/)
   assert.match(source,/params\.set\('lang','es'\)/)
   assert.match(source,/params\.delete\('lang'\)/)
   assert.match(source,/href=\{languageHref\('en'\)\}/)
