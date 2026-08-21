@@ -63,3 +63,17 @@ test('Friendship Group leader settings follow selected English or Spanish langua
   assert.match(source,/Guardar detalles de la reunión/)
   assert.match(source,/Solo miembros del grupo y liderazgo autorizado/)
 })
+
+test('Friendship Group reports normalize UI meeting types to the live database contract',async()=>{
+  const source=await read('src/app/groups/actions.ts')
+  assert.match(source,/allowedMeetingTypes=\['regular','matthew_party','picnic','barbecue','special_event','other'\]/)
+  assert.match(source,/legacyMeetingTypeAliases:Record<string,string>=\{outreach:'other',fellowship:'other',special:'special_event'\}/)
+  assert.doesNotMatch(source,/\['regular','outreach','fellowship','special'\]\.includes/)
+})
+
+test('Friendship Group reports turn duplicate date submits into a safe recovery message',async()=>{
+  const source=await read('src/app/groups/actions.ts')
+  assert.match(source,/error\?\.code==='23505'/)
+  assert.match(source,/A report for this meeting date already exists\. It was not submitted twice\./)
+  assert.match(source,/We could not save the group report\. Check the information and try again\./)
+})
