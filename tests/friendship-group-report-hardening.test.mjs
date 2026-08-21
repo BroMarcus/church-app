@@ -39,3 +39,12 @@ test('Friendship Group report submission prevents repeat taps while saving',asyn
   assert.match(page,/<ReportSubmitButton\/>/)
   assert.match(page,/One report is stored per group and meeting date\./)
 })
+
+test('Friendship Group roster removal is manager-scoped and protects the primary leader',async()=>{
+  const actions=await read('src/app/groups/[groupId]/roster/actions.ts')
+  assert.match(actions,/export async function removeRosterMember/)
+  assert.match(actions,/requireRosterManager\(groupId,lang\)/)
+  assert.match(actions,/memberUserId===leaderId/)
+  assert.match(actions,/Reassign the group’s primary leader before removing this person from the roster\./)
+  assert.match(actions,/from\('group_memberships'\)\.delete\(\)\.eq\('group_id',groupId\)\.eq\('user_id',memberUserId\)/)
+})
