@@ -36,10 +36,12 @@ test('Friendship Group weekly roles reuse the existing protected schedule system
 })
 
 test('ordinary Friendship Group members do not receive leader operation tabs or deep-link surfaces',async()=>{
-  const client=await read('src/app/groups/[groupId]/portal/portal-client.tsx')
+  const [client,page]=await Promise.all([read('src/app/groups/[groupId]/portal/portal-client.tsx'),read('src/app/groups/[groupId]/portal/page.tsx')])
   assert.match(client,/useState\(canReport\|\|!\['attendance','report'\]\.includes\(initialTab\)\?initialTab:'overview'\)/)
   assert.match(client,/const tabs=canReport\?/)
   assert.match(client,/\{canReport&&<>\<article className="fgp-card"\>\<span className="fgp-kicker"\>\{t\.quick\}/)
   assert.match(client,/tab==='attendance'&&canReport/)
   assert.match(client,/tab==='report'&&canReport/)
+  assert.match(page,/requestedTab=query\.tab&&validTabs\.has\(query\.tab\)\?query\.tab:'overview'/)
+  assert.match(page,/initialTab=canReport\|\|!\['attendance','report'\]\.includes\(requestedTab\)\?requestedTab:'overview'/)
 })
