@@ -28,7 +28,7 @@ async function requireRosterManager(groupId:string,lang:string){
   ])
   const canManage=churchMembership?.status==='active'&&(['pastor','church_admin'].includes(churchMembership.role)||group.leader_id===userId||groupMembership?.role==='leader')
   if(!canManage)redirect(rosterUrl(groupId,lang,'&error='+encodeURIComponent(safe(lang,'Leader access is required to edit this roster.','Se requiere acceso de líder para editar esta lista.'))))
-  return {supabase,userId,churchId:group.church_id}
+  return {supabase,userId,churchId:group.church_id,leaderId:group.leader_id}
 }
 
 export async function addRosterMember(formData:FormData){
@@ -65,4 +65,20 @@ export async function updateRosterMember(formData:FormData){
   }
   revalidatePath(`/groups/${groupId}`);revalidatePath(`/groups/${groupId}/roster`);revalidatePath(`/directory/${memberUserId}`);revalidatePath('/journey')
   redirect(rosterUrl(groupId,lang,'&member_saved=1'))
+}
+
+export async function removeRosterMember(formData:FormData){
+  const lang=langOf(formData),groupId=text(formData,'group_id'),memberUserId=text(formData,'user_id')
+  if(!groupId||!memberUserId)redirect('/groups')
+  const {supabase,leaderId}=await requireRosterManager(groupId,lang)
+  if(memberUserId===leaderId){
+    redirect(rosterUrl(groupId,lang,'&error='+encodeURIComponent(safe(lang,'Reassign the group’s primary leader before removing this person from the roster.','Reasigna al líder principal del grupo antes de quitar a esta persona de la lista.'))))
+  }
+  const {error}=await supabase.from('group_memberships').delete().eq('group_id',groupId).eq('user_id',memberUserId)
+  if(error){
+    console.error('removeRosterMember failed',{groupId,memberUserId,code:error.code,message:error.message})
+    redirect(rosterUrl(groupId,lang,'&error='+encodeURIComponent(safe(lang,'We could not remove that person from this group.','No pudimos quitar a esa persona de este grupo.'))))
+  }
+  revalidatePath(`/groups/${groupId}`);revalidatePath(`/groups/${groupId}/roster`);revalidatePath('/groups');revalidatePath('/journey')
+  redirect(rosterUrl(groupId,lang,'&member_removed=1'))
 }
