@@ -40,11 +40,24 @@ test('Friendship Group report submission prevents repeat taps while saving',asyn
   assert.match(page,/One report is stored per group and meeting date\./)
 })
 
+test('Friendship Group overview shows a real report-derived attendance average',async()=>{
+  const page=await read('src/app/groups/[groupId]/page.tsx')
+  assert.match(page,/attendanceAverage=reports\.length\?Math\.round/)
+  assert.match(page,/Number\(r\.attendance_count\)/)
+  assert.match(page,/avg attendance/)
+})
+
 test('Friendship Group roster removal is manager-scoped and protects the primary leader',async()=>{
-  const actions=await read('src/app/groups/[groupId]/roster/actions.ts')
+  const [actions,page]=await Promise.all([
+    read('src/app/groups/[groupId]/roster/actions.ts'),
+    read('src/app/groups/[groupId]/roster/page.tsx')
+  ])
   assert.match(actions,/export async function removeRosterMember/)
   assert.match(actions,/requireRosterManager\(groupId,lang\)/)
   assert.match(actions,/memberUserId===leaderId/)
   assert.match(actions,/Reassign the group’s primary leader before removing this person from the roster\./)
   assert.match(actions,/from\('group_memberships'\)\.delete\(\)\.eq\('group_id',groupId\)\.eq\('user_id',memberUserId\)/)
+  assert.match(page,/action=\{removeRosterMember\}/)
+  assert.match(page,/Confirm removal/)
+  assert.match(page,/church account, profile, and history stay intact/)
 })
