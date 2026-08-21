@@ -3,6 +3,7 @@ import { MobileNav, type MobileNavAccess } from './mobile-nav'
 
 const privilegedBaseRoles=new Set(['pastor','church_admin'])
 const allFeatureGatedNav=['documents','prayer','messages','serve','directory','updates','private_care','library','outreach']
+const recoveryAccess:MobileNavAccess={canLeadGroups:false,canManageTeams:false,canManageLearning:false,canManageOutreach:false,canManageCalendar:false,canViewLeadership:false,canManageChurch:false,hasForms:false,disabledFeatures:allFeatureGatedNav}
 
 export async function MobileNavShell(){
   const supabase=await createClient()
@@ -11,7 +12,8 @@ export async function MobileNavShell(){
   if(!userId)return null
   const preferredLanguage=(claims?.claims as any)?.user_metadata?.preferred_language==='es'?'es':'en'
 
-  const {data:membership}=await supabase.from('church_memberships').select('church_id,role').eq('user_id',userId).eq('status','active').limit(1).maybeSingle()
+  const {data:membership,error:membershipError}=await supabase.from('church_memberships').select('church_id,role').eq('user_id',userId).eq('status','active').limit(1).maybeSingle()
+  if(membershipError){console.info('mobile navigation membership unavailable',{code:membershipError.code});return <MobileNav access={recoveryAccess} preferredLanguage={preferredLanguage} recoveryOnly/>}
   if(!membership?.church_id)return null
 
   const churchId=membership.church_id,role=membership.role,isPrivileged=privilegedBaseRoles.has(role)
