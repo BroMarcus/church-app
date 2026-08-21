@@ -6,6 +6,8 @@ import {createClient} from '@/lib/supabase/server'
 
 const text=(formData:FormData,key:string)=>String(formData.get(key)??'').trim()
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const language=(formData:FormData)=>text(formData,'lang')==='es'?'es':'en'
+const portalUrl=(groupId:string,lang:string,extra:string)=>`/groups/${groupId}/portal?tab=overview&lang=${lang}&${extra}`
 
 export async function saveGroupGuidelines(formData:FormData){
   const supabase=await createClient()
@@ -13,9 +15,9 @@ export async function saveGroupGuidelines(formData:FormData){
   const userId=claims?.claims?.sub
   if(!userId)redirect('/login')
 
-  const groupId=text(formData,'group_id'),body=text(formData,'body')
+  const groupId=text(formData,'group_id'),body=text(formData,'body'),lang=language(formData)
   if(!uuid.test(groupId))redirect('/groups')
-  if(body.length>5000)redirect(`/groups/${groupId}/portal?tab=overview&error=`+encodeURIComponent('Group guidelines must be 5,000 characters or fewer.'))
+  if(body.length>5000)redirect(portalUrl(groupId,lang,'error_code=guidelines_too_long'))
 
   const {data:group}=await supabase.from('groups').select('id,church_id,leader_id,active').eq('id',groupId).maybeSingle()
   if(!group?.active)redirect('/groups')
@@ -26,14 +28,14 @@ export async function saveGroupGuidelines(formData:FormData){
   const canManage=churchMembership?.status==='active'&&(
     ['pastor','church_admin'].includes(churchMembership.role)||group.leader_id===userId||groupMembership?.role==='leader'
   )
-  if(!canManage)redirect(`/groups/${groupId}/portal?tab=overview&error=`+encodeURIComponent('Group leader access is required to edit these guidelines.'))
+  if(!canManage)redirect(portalUrl(groupId,lang,'error_code=guidelines_access'))
 
   const {error}=await supabase.from('group_guidelines').upsert({group_id:groupId,body,updated_by:userId,updated_at:new Date().toISOString()},{onConflict:'group_id'})
   if(error){
-    console.error('saveGroupGuidelines failed',{groupId,code:error.code,message:error.message})
-    redirect(`/groups/${groupId}/portal?tab=overview&error=`+encodeURIComponent('We could not save the group guidelines. Please try again.'))
+    console.error('saveGroupGuidelines failed',{groupId,code:error.code})
+    redirect(portalUrl(groupId,lang,'error_code=guidelines_save'))
   }
 
   revalidatePath(`/groups/${groupId}/portal`)
-  redirect(`/groups/${groupId}/portal?tab=overview&guidelines_saved=1`)
+  redirect(portalUrl(groupId,lang,'guidelines_saved=1'))
 }
