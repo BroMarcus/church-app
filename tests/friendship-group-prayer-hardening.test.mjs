@@ -44,17 +44,18 @@ test('Prayer creation, reactions, and answered actions prevent repeat taps on sl
   assert.match(page,/Marcar contestada/)
 })
 
-test('Prayer requests are private by default and group sharing stays an explicit separate choice',async()=>{
+test('Prayer requests are private by default while verified leader follow-up remains explicit',async()=>{
   const page=await read('src/app/prayer/page.tsx')
   assert.match(page,/value="private" defaultChecked/)
   assert.doesNotMatch(page,/value="public" defaultChecked/)
   assert.match(page,/Private — recommended/)
   assert.match(page,/Privada — recomendada/)
-  assert.match(page,/Prayer requests start Private\./)
-  assert.match(page,/Use the separate Friendship Group choice below if you want your group to see it\./)
-  assert.match(page,/Esta opción estará disponible después de que te unas a uno\./)
-  assert.doesNotMatch(page,/It still routes to the proper Friendship Group leader or leadership follow-up\./)
-  assert.doesNotMatch(page,/Leadership will be notified so someone can invite and connect you\./)
+  assert.match(page,/Prayer requests start Private\. Your Friendship Group leaders are still notified so they can follow up\./)
+  assert.match(page,/Your Friendship Group leader or assistant is still notified for follow-up\./)
+  assert.match(page,/Your leaders are notified either way\. Check this only if you also want the full request visible on the private prayer wall/)
+  assert.match(page,/Leadership will receive a follow-up task to help connect you with a group\./)
+  assert.match(page,/Los líderes de tu Grupo de Amistad reciben una notificación para poder dar seguimiento\./)
+  assert.match(page,/El liderazgo recibirá una tarea de seguimiento para ayudarte a conectarte con un grupo\./)
 })
 
 test('Prayer loading and crash recovery respect the selected language and preserve user data',async()=>{
