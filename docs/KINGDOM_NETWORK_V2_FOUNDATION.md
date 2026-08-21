@@ -1,6 +1,6 @@
 # Kingdom Network V2 — Foundation Rules
 
-Status: STEP 1 — FOUNDATION IN PROGRESS
+Status: STEP 1 — FOUNDATION REVISION IN REVIEW
 Branch: `kingdom-network-v2`
 Development namespace: `/v2`
 Production: HOLD
@@ -28,11 +28,69 @@ V2 does **not** replace V1 unless Marcus later chooses it. V1 remains preserved 
 13. **Role testing:** Every major section must be evaluated as New Member, Existing Member, Leader, and Pastor/Admin where applicable.
 14. **Bilingual from day one:** English and Spanish are developed together for every section.
 15. **Mobile first:** Phone experience is designed and approved first; tablet and desktop must also be complete before final section approval.
-16. **Visual direction:** V2 uses the blue/gold direction Marcus previously chose from Claude while preserving the ability to return to the original V1 look. The exact prior Claude palette is not currently preserved in the retrieved project material, so V2 styling must use centralized/reversible design tokens rather than scattering hard-coded theme decisions across features.
-17. **Navigation before features:** Permanent top-level V2 navigation must be agreed before individual feature/tab implementation begins.
-18. **Backlog discipline:** New ideas that belong to later sections are recorded in the V2 backlog instead of interrupting the current section.
+16. **Visual direction:** V2 uses the exact approved blue/gold design system listed below. The theme is centralized in V2-only tokens so it remains reversible without rewriting feature logic.
+17. **Navigation before features:** The permanent member navigation decision is now approved: five bottom tabs — Home, My Group, Learn, Serve, More — with Spanish equivalents. The implementation is configuration-driven so future per-user destinations can be supported without changing the shell.
+18. **Backlog discipline:** New ideas that belong to later sections are recorded in the V2 backlog/specification instead of interrupting the current section.
 19. **Discovery before building:** Before each future major step, ask approximately 10–20 focused questions covering purpose, user workflow, data, permissions, actions, loading/success/empty/error states, mobile, bilingual behavior, security, and visual expectations. Go beyond 20 only when a genuinely complex or security-sensitive workflow requires it.
-20. **Step 1 boundary:** Foundation work may establish the V2 branch, `/v2` shell, preview strategy, testing/data rules, navigation planning, and documentation. It must not begin real Home, Learning, Groups, Finance, AI, or other feature implementation.
+20. **Step 1 boundary:** Foundation work may establish the V2 branch, `/v2` shell, preview strategy, testing/data rules, navigation, design system, and documentation. It must not begin real Home, Learning, Groups, Finance, AI, or other feature implementation.
+
+## Locked V2 design system
+
+### Colors
+
+- `navy-900` — `#0A1730` — app background
+- `navy-850` — `#0E1D3E` — bottom navigation and input fills
+- `navy-800` — `#152A4C` — card background
+- `navy-700` — `#1D3563` — borders and dividers
+- `gold-400` — `#E3C179` — icons, accents, active states
+- `gold-500` — `#C9A253` — Kingdom Network wordmark
+- `gold-600` — `#9C7B37` — dashed borders and gradient end
+- `ink-100` — `#F5F1E6` — primary text
+- `ink-300` — `#C6CEE0` — secondary text
+- `ink-500` — `#8894B4` — muted text and inactive icons
+
+### Typography
+
+- Screen titles and section headings: **Cormorant Garamond**, weight 600, fallback Georgia serif.
+- Body and functional UI: **Work Sans**, weights 400/500/600, fallback system UI.
+- V2 should not use Inter, Roboto, or Arial for its interface styling.
+
+### Shared component rules
+
+- Cards: `navy-800`, 1px `navy-700` border, 14px radius, 16px padding.
+- Icons: stroked SVG, 1.75 stroke width, round caps/joins, 24px viewBox convention.
+- Icon tiles: 38×38px, 10px radius, `rgba(201,162,83,0.15)` fill.
+- Hero: `linear-gradient(155deg, #152A4C 0%, #0E1D3E 55%, #1B1030 130%)`, soft gold top-right glow, 16px radius.
+- Primary button: `linear-gradient(135deg, #E3C179, #9C7B37)`, 12px radius, 14px padding, `#1A1204` text at 600 weight.
+- Minimum tap target: 44px.
+
+## Locked branding rule
+
+Every V2 screen uses a fixed Kingdom Network lockup at the top-left:
+
+- crown icon in `gold-500`;
+- `KINGDOM NETWORK` — 11px, 2px letter spacing, `gold-500`, weight 600;
+- church name below — 12px, `ink-500`;
+- an optional small church logo may be shown for contrast;
+- Kingdom Network branding is not removable by individual churches in the current product direction.
+
+Church-specific names, logos, schedules, groups, curriculum, and configuration remain tenant-specific data. The current V2 foundation preview may display New Life's name as preview copy, but feature implementations must source church-specific values from data/settings rather than hardcoding them.
+
+## Navigation rule
+
+Default member navigation:
+
+**Home · My Group · Learn · Serve · More**
+
+Spanish:
+
+**Inicio · Mi Grupo · Aprender · Servir · Más**
+
+The shell is configuration-driven from the beginning so tabs can eventually point to user-specific destinations. Per-user persistence is intentionally **not** connected during Step 1 because saving tab preferences is a live write workflow and must go through the normal testing/approval process first.
+
+Customization is convenience only. A custom tab destination never grants permission to a route or record the user is not authorized to access.
+
+See `docs/KINGDOM_NETWORK_V2_NAVIGATION.md` for the full navigation contract.
 
 ## Section completion standard
 
@@ -67,15 +125,21 @@ Until a specific V2 write workflow is approved:
 - real member/church records are not edited or deleted by V2;
 - write behavior uses clearly disposable/test records;
 - no new Supabase schema, RLS, RPC, migration, or production-data change is implied by Step 1;
-- any later schema/security change must be separately scoped, conflict-checked, tested, and recorded in the Control Room.
+- any later schema/security change must be separately scoped, conflict-checked, rollback-planned, tested, and recorded in the Control Room.
 
 ## Visual reversibility rule
 
-V2 visual design must be centralized through V2-specific design tokens/components. Blue/gold styling must not be baked into V1 global styles. If Marcus later prefers the original look, the V2 presentation layer should be replaceable without rewriting feature logic.
+V2 visual design is centralized through V2-specific design tokens and reusable components. The blue/gold presentation must not be baked into V1 global styling. If Marcus later prefers the original look, the V2 presentation layer should be replaceable without rewriting feature logic.
 
 ## Navigation gate
 
-Top-level V2 navigation is **not yet approved**. Step 1 cannot be marked complete until the navigation model is discussed and accepted. No real feature/tab implementation begins before that decision.
+The **navigation decision itself is APPROVED** by Marcus through the supplied Step 1 design brief.
+
+The Step 1 foundation as a whole is still **IN REVIEW** until Marcus personally reviews and approves the updated live preview. No real feature/tab implementation begins before that approval.
+
+## Deferred Claude Friendship Group ideas
+
+The Groups List, Group Dashboard, weekly report, report inbox, real group data seeding, document uploads, inline editing, group guidelines, per-session roles/tasks, and related RLS/write behavior are valuable but belong to the future V2 Friendship Groups step. They are preserved in `docs/KINGDOM_NETWORK_V2_FRIENDSHIP_GROUP_SPEC.md` rather than being built prematurely.
 
 ## Deployment rule
 
