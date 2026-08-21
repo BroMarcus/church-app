@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { MobileNav, type MobileNavAccess } from './mobile-nav'
 
 const privilegedBaseRoles=new Set(['pastor','church_admin'])
+const allFeatureGatedNav=['documents','prayer','messages','serve','directory','updates','private_care','library','outreach']
 
 export async function MobileNavShell(){
   const supabase=await createClient()
@@ -21,8 +22,8 @@ export async function MobileNavShell(){
     supabase.from('church_feature_settings').select('feature_key,enabled').eq('church_id',churchId).eq('enabled',false),
     supabase.from('church_forms').select('*',{count:'exact',head:true}).eq('church_id',churchId).eq('published',true).is('archived_at',null)
   ])
-  if(featureResult.error)console.info('feature settings unavailable; defaulting enabled',{message:featureResult.error.message})
-  if(formsResult.error)console.info('published forms lookup unavailable',{message:formsResult.error.message})
+  if(featureResult.error)console.info('feature settings unavailable; hiding gated navigation',{code:featureResult.error.code})
+  if(formsResult.error)console.info('published forms lookup unavailable',{code:formsResult.error.code})
 
   const access:MobileNavAccess={
     canLeadGroups:isPrivileged||role==='group_leader'||manageGroups||leadOwnGroup,
@@ -32,8 +33,8 @@ export async function MobileNavShell(){
     canManageCalendar:isPrivileged||role==='ministry_leader'||role==='minister'||manageCalendar,
     canViewLeadership:isPrivileged||viewLeadership,
     canManageChurch:isPrivileged,
-    hasForms:(formsResult.count??0)>0,
-    disabledFeatures:(featureResult.data??[]).map((row:any)=>String(row.feature_key))
+    hasForms:!formsResult.error&&(formsResult.count??0)>0,
+    disabledFeatures:featureResult.error?allFeatureGatedNav:(featureResult.data??[]).map((row:any)=>String(row.feature_key))
   }
 
   return <MobileNav access={access} preferredLanguage={preferredLanguage}/>
