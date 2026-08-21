@@ -47,3 +47,14 @@ test('simplified mobile navigation exposes existing leadership destinations only
   assert.match(source,/'Leadership Home':'Inicio de Liderazgo'/)
   assert.match(source,/'Church Admin':'Administrar Iglesia'/)
 })
+
+test('mobile navigation fails closed if church feature settings cannot be read',async()=>{
+  const shell=await read('src/components/mobile-nav-shell.tsx')
+  assert.match(shell,/const allFeatureGatedNav=/)
+  assert.match(shell,/feature settings unavailable; hiding gated navigation/)
+  assert.match(shell,/\{code:featureResult\.error\.code\}/)
+  assert.match(shell,/hasForms:!formsResult\.error/)
+  assert.match(shell,/disabledFeatures:featureResult\.error\?allFeatureGatedNav:/)
+  assert.doesNotMatch(shell,/featureResult\.error\.message/)
+  assert.doesNotMatch(shell,/formsResult\.error\.message/)
+})
