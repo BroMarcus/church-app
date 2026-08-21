@@ -112,7 +112,7 @@ export default function V2FoundationPage(){
       <section className={styles.section}>
         <div className={styles.sectionHead}><h2>{t.previewTitle}</h2><p>{t.previewSub}</p></div>
         <article className={`${styles.card} ${styles.navPreview}`}>
-          <span className={styles.iconTile}><activeTab.Icon size={20} strokeWidth={1.75} aria-hidden="true"/></span>
+          <span className={styles.iconTile}><activeTab.Icon size={20} strokeWidth={1.75} aria-hidden={true}/></span>
           <div className={styles.navPreviewCopy}><strong>{activeLabel}</strong><p>{t.selected(activeLabel)}</p></div>
         </article>
       </section>
