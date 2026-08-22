@@ -16,6 +16,17 @@ test('phone proof is pastor/church-admin only',()=>{
   assert.match(page,/church_memberships/)
 })
 
+test('phone proof fails closed on auth or membership lookup errors',()=>{
+  assert.match(page,/if\(claimsError\)\{/)
+  assert.match(page,/PHONE_PROOF_AUTH_UNAVAILABLE/)
+  assert.match(page,/if\(membershipError\)\{/)
+  assert.match(page,/PHONE_PROOF_MEMBERSHIP_UNAVAILABLE/)
+  assert.match(page,/function boundedCode\(value:unknown\)/)
+  assert.match(page,/replace\(\/\[\^a-zA-Z0-9_-\]\/g,''\)\.slice\(0,48\)/)
+  assert.doesNotMatch(page,/if\(claimsError\|\|!userId\)redirect/)
+  assert.doesNotMatch(page,/if\(membershipError\|\|!membership\?\.church_id/)
+})
+
 test('phone proof persists only in browser-local storage',()=>{
   assert.match(client,/window\.localStorage\.setItem/)
   assert.match(client,/window\.localStorage\.getItem/)
