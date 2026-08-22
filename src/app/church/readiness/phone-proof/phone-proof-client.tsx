@@ -5,34 +5,57 @@ import { useEffect, useMemo, useState } from 'react'
 type Lang='en'|'es'
 type Result='untested'|'pass'|'fail'
 type CheckId='signup'|'existing'|'invite'|'reset'|'spanish'|'guide'|'setup'
-type Entry={result:Result;device:string;account:string;date:string;notes:string}
+type Entry={result:Result;device:string;account:string;date:string;site:string;notes:string}
 type State=Record<CheckId,Entry>
 
 const ids:CheckId[]=['signup','existing','invite','reset','spanish','guide','setup']
-const emptyEntry=():Entry=>({result:'untested',device:'',account:'',date:'',notes:''})
+const emptyEntry=():Entry=>({result:'untested',device:'',account:'',date:'',site:'',notes:''})
 const emptyState=():State=>Object.fromEntries(ids.map(id=>[id,emptyEntry()])) as State
 
 const copy={
   en:{
-    title:'Real-phone proof checklist',intro:'Use test accounts only. This checklist stays on this browser unless you copy the summary into the Control Room.',
-    local:'LOCAL ONLY — does not write member or church data',device:'Phone / device',account:'Test account type',date:'Date',notes:'What happened / exact failing step',
+    title:'Real-phone proof checklist',intro:'Use test accounts only. Follow each short test exactly. This checklist stays on this browser unless you copy the summary into the Control Room.',
+    local:'LOCAL ONLY — does not write member or church data',device:'Phone / device',account:'Test account type',date:'Date',site:'Tested site / preview',notes:'What happened / exact failing step',
     untested:'Not tested',pass:'PASS',fail:'FAIL',copy:'Copy evidence summary',copied:'Copied',reset:'Clear local checklist',confirm:'Clear every locally saved phone-test result on this browser?',
     complete:'required phone tests passed',remaining:'still need proof',failed:'failed',summaryTitle:'KINGDOM NETWORK PHONE PROOF',language:'Checklist language',noNotes:'No notes recorded',
-    evidence:'Add the device, test-account type, and date before marking PASS or FAIL.',failEvidence:'Add exact failure notes before marking FAIL.',proofComplete:'PHONE PROOF COMPLETE — all required flows passed with evidence.',proofIncomplete:'PHONE PROOF INCOMPLETE — do not treat this checklist as pilot acceptance yet.',proofStatus:'Phone proof status',
+    evidence:'Add the device, test-account type, date, and tested site before marking PASS or FAIL.',failEvidence:'Add exact failure notes before marking FAIL.',proofComplete:'PHONE PROOF COMPLETE — all required flows passed with evidence.',proofIncomplete:'PHONE PROOF INCOMPLETE — do not treat this checklist as pilot acceptance yet.',proofStatus:'Phone proof status',
+    how:'Test steps',expected:'Expected result',siteHelp:'The current site is filled in automatically. If you test a different preview/site, replace it so the evidence points to the build you actually tested.',
     signup:'Public signup → confirmation → Start Here → sign out/in',existing:'Existing account → church join → same account, no duplicate',invite:'Newest invitation works; replaced/old invitation recovers clearly',reset:'Forgot password → newest reset email → new password → sign in',spanish:'Spanish signup / confirmation / Start Here / first Home',guide:'Kingdom Guide recovery help in English and Spanish',setup:'Fresh Church Setup → approve recommendation → unpublished Course Builder draft'
   },
   es:{
-    title:'Lista de prueba con teléfono real',intro:'Usa solamente cuentas de prueba. Esta lista se queda en este navegador a menos que copies el resumen al Control Room.',
-    local:'SOLO LOCAL — no escribe datos de miembros ni de la iglesia',device:'Teléfono / dispositivo',account:'Tipo de cuenta de prueba',date:'Fecha',notes:'Qué pasó / paso exacto que falló',
+    title:'Lista de prueba con teléfono real',intro:'Usa solamente cuentas de prueba. Sigue cada prueba corta exactamente. Esta lista se queda en este navegador a menos que copies el resumen al Control Room.',
+    local:'SOLO LOCAL — no escribe datos de miembros ni de la iglesia',device:'Teléfono / dispositivo',account:'Tipo de cuenta de prueba',date:'Fecha',site:'Sitio / vista previa probada',notes:'Qué pasó / paso exacto que falló',
     untested:'Sin probar',pass:'PASÓ',fail:'FALLÓ',copy:'Copiar resumen de evidencia',copied:'Copiado',reset:'Borrar lista local',confirm:'¿Borrar todos los resultados guardados localmente en este navegador?',
     complete:'pruebas requeridas pasaron',remaining:'todavía necesitan prueba',failed:'fallaron',summaryTitle:'PRUEBA DE TELÉFONO — KINGDOM NETWORK',language:'Idioma de la lista',noNotes:'Sin notas',
-    evidence:'Agrega el dispositivo, tipo de cuenta de prueba y fecha antes de marcar PASÓ o FALLÓ.',failEvidence:'Agrega notas exactas de la falla antes de marcar FALLÓ.',proofComplete:'PRUEBA DE TELÉFONO COMPLETA — todos los flujos requeridos pasaron con evidencia.',proofIncomplete:'PRUEBA DE TELÉFONO INCOMPLETA — todavía no la trates como aceptación del piloto.',proofStatus:'Estado de prueba con teléfono',
+    evidence:'Agrega el dispositivo, tipo de cuenta de prueba, fecha y sitio probado antes de marcar PASÓ o FALLÓ.',failEvidence:'Agrega notas exactas de la falla antes de marcar FALLÓ.',proofComplete:'PRUEBA DE TELÉFONO COMPLETA — todos los flujos requeridos pasaron con evidencia.',proofIncomplete:'PRUEBA DE TELÉFONO INCOMPLETA — todavía no la trates como aceptación del piloto.',proofStatus:'Estado de prueba con teléfono',
+    how:'Pasos de prueba',expected:'Resultado esperado',siteHelp:'El sitio actual se llena automáticamente. Si pruebas otra vista previa u otro sitio, cámbialo para que la evidencia indique la versión que realmente probaste.',
     signup:'Registro público → confirmación → Empieza Aquí → salir/entrar',existing:'Cuenta existente → unirse a iglesia → misma cuenta, sin duplicado',invite:'Funciona la invitación más reciente; enlace viejo/reemplazado se recupera claramente',reset:'Olvidé contraseña → correo más reciente → nueva contraseña → entrar',spanish:'Registro / confirmación / Empieza Aquí / primer Inicio en español',guide:'Ayuda de recuperación de Kingdom Guide en inglés y español',setup:'Fresh Church Setup → aprobar recomendación → borrador sin publicar en Course Builder'
   }
 } as const
 
+const flowGuide:{en:Record<CheckId,{steps:string[];expected:string}>;es:Record<CheckId,{steps:string[];expected:string}>}={
+  en:{
+    signup:{steps:['Open the public signup flow on this phone and create a brand-new test account.','Open the newest confirmation email on the same phone and finish Start Here.','Sign out, then sign back in with that same account.'],expected:'The same new account reaches Home after Start Here and can sign out/in without getting stuck or creating another account.'},
+    existing:{steps:['Use a test account that already exists and is not connected to the target church.','Open the target church’s newest join link, choose sign in, and use that existing account.','Finish the join and check Home/My Journey for the church connection.'],expected:'The existing account becomes connected to the church. No second account is created.'},
+    invite:{steps:['Create or use a current test invitation and open the newest link on this phone.','If a replacement invitation exists, also open the older/replaced link.','Follow the recovery instruction from the old link, then open the newest invitation.'],expected:'The newest invitation works. An old/replaced link does not dead-end or expose technical errors and clearly directs the tester to the newest link.'},
+    reset:{steps:['From Sign In, request a password reset for a test account.','Open only the newest reset email on this phone and set a new password.','Continue to Sign In and log in with the new password.'],expected:'Reset completes once, Sign In works with the new password, and any safe church-join return context is preserved.'},
+    spanish:{steps:['Switch to Español before starting the signup flow.','Complete confirmation and Start Here while staying in Spanish.','Open the first Home screen and basic recovery/navigation controls.'],expected:'The critical first-login path stays understandable in Spanish without unexpected English-only dead ends.'},
+    guide:{steps:['Open Kingdom Guide in English and ask for help with password reset or joining a church with an existing account.','Switch to Spanish and ask the same kind of recovery question.','Trigger/use the Guide retry path if a safe test condition is available.'],expected:'Guide gives simple account-recovery guidance in the selected language and never exposes provider/database text.'},
+    setup:{steps:['As a pastor/church-admin test account, open Church Builder → Setup Inbox.','Upload safe test material, review the recommendation, and approve it once.','Open the resulting Course Builder item and inspect publication state.'],expected:'The flow is understandable on phone, repeat taps are guarded, and the generated course remains an unpublished draft.'}
+  },
+  es:{
+    signup:{steps:['Abre el registro público en este teléfono y crea una cuenta de prueba totalmente nueva.','Abre el correo de confirmación más reciente en el mismo teléfono y termina Empieza Aquí.','Cierra sesión y vuelve a entrar con esa misma cuenta.'],expected:'La misma cuenta nueva llega a Inicio después de Empieza Aquí y puede salir/entrar sin quedarse atorada ni crear otra cuenta.'},
+    existing:{steps:['Usa una cuenta de prueba que ya existe y que todavía no está conectada a la iglesia destino.','Abre el enlace más reciente para unirse a la iglesia, elige entrar y usa esa cuenta existente.','Termina la unión y revisa Inicio/Mi Jornada para confirmar la conexión.'],expected:'La cuenta existente queda conectada a la iglesia. No se crea una segunda cuenta.'},
+    invite:{steps:['Crea o usa una invitación de prueba vigente y abre el enlace más reciente en este teléfono.','Si existe una invitación de reemplazo, abre también el enlace viejo/reemplazado.','Sigue la instrucción de recuperación del enlace viejo y después abre la invitación más reciente.'],expected:'La invitación más reciente funciona. Un enlace viejo/reemplazado no deja al usuario atorado ni muestra errores técnicos y lo dirige claramente al enlace nuevo.'},
+    reset:{steps:['Desde Entrar, solicita restablecer la contraseña de una cuenta de prueba.','Abre solamente el correo de restablecimiento más reciente en este teléfono y crea una contraseña nueva.','Continúa a Entrar e inicia sesión con la contraseña nueva.'],expected:'El restablecimiento termina una sola vez, la nueva contraseña funciona y se conserva cualquier regreso seguro a un enlace de iglesia.'},
+    spanish:{steps:['Cambia a Español antes de comenzar el registro.','Completa la confirmación y Empieza Aquí manteniéndote en español.','Abre la primera pantalla de Inicio y los controles básicos de recuperación/navegación.'],expected:'La ruta crítica del primer ingreso se mantiene entendible en español sin callejones sin salida inesperados en inglés.'},
+    guide:{steps:['Abre Kingdom Guide en inglés y pide ayuda para restablecer la contraseña o unirte a una iglesia con una cuenta existente.','Cambia a español y haz una pregunta similar de recuperación.','Usa la ruta segura de reintento de Guide si existe una condición de prueba disponible.'],expected:'Guide da instrucciones sencillas de recuperación en el idioma seleccionado y nunca muestra texto técnico del proveedor o base de datos.'},
+    setup:{steps:['Como cuenta de prueba pastor/admin de iglesia, abre Church Builder → Setup Inbox.','Sube material seguro de prueba, revisa la recomendación y apruébala una sola vez.','Abre el elemento resultante en Course Builder y revisa su estado de publicación.'],expected:'El flujo se entiende en teléfono, los toques repetidos están protegidos y el curso generado permanece como borrador sin publicar.'}
+  }
+}
+
 function storageKey(churchId:string){return `kn-phone-proof:${churchId || 'unknown'}`}
-function hasBaseEvidence(entry:Entry){return Boolean(entry.device.trim()&&entry.account.trim()&&entry.date.trim())}
+function hasBaseEvidence(entry:Entry){return Boolean(entry.device.trim()&&entry.account.trim()&&entry.date.trim()&&entry.site.trim())}
 function hasFailureEvidence(entry:Entry){return hasBaseEvidence(entry)&&Boolean(entry.notes.trim())}
 function normalizeEvidence(entry:Entry):Entry{
   if(entry.result==='pass'&&!hasBaseEvidence(entry))return {...entry,result:'untested'}
@@ -42,24 +65,29 @@ function normalizeEvidence(entry:Entry):Entry{
 
 export default function PhoneProofClient({lang,churchId}:{lang:Lang;churchId:string}){
   const t=copy[lang]
+  const guide=flowGuide[lang]
   const [state,setState]=useState<State>(()=>emptyState())
   const [hydrated,setHydrated]=useState(false)
   const [copied,setCopied]=useState(false)
 
   useEffect(()=>{
     try{
+      const origin=window.location.origin.slice(0,160)
       const raw=window.localStorage.getItem(storageKey(churchId))
+      const next=emptyState()
       if(raw){
         const parsed=JSON.parse(raw) as Partial<State>
-        const next=emptyState()
         for(const id of ids){
           const value=parsed[id]
           if(value&&['untested','pass','fail'].includes(String(value.result))){
-            next[id]=normalizeEvidence({result:value.result as Result,device:String(value.device??'').slice(0,120),account:String(value.account??'').slice(0,120),date:String(value.date??'').slice(0,20),notes:String(value.notes??'').slice(0,500)})
+            next[id]=normalizeEvidence({result:value.result as Result,device:String(value.device??'').slice(0,120),account:String(value.account??'').slice(0,120),date:String(value.date??'').slice(0,20),site:String(value.site??'').slice(0,160),notes:String(value.notes??'').slice(0,500)})
           }
         }
-        setState(next)
       }
+      for(const id of ids){
+        if(!next[id].site)next[id]={...next[id],site:origin}
+      }
+      setState(next)
     }catch{}
     setHydrated(true)
   },[churchId])
@@ -90,6 +118,7 @@ export default function PhoneProofClient({lang,churchId}:{lang:Lang;churchId:str
       lines.push(`- ${t.device}: ${item.device||'—'}`)
       lines.push(`- ${t.account}: ${item.account||'—'}`)
       lines.push(`- ${t.date}: ${item.date||'—'}`)
+      lines.push(`- ${t.site}: ${item.site||'—'}`)
       lines.push(`- ${t.notes}: ${item.notes||t.noNotes}`,'')
     }
     return lines.join('\n')
@@ -108,7 +137,10 @@ export default function PhoneProofClient({lang,churchId}:{lang:Lang;churchId:str
 
   function clearAll(){
     if(!window.confirm(t.confirm))return
-    setState(emptyState())
+    const origin=window.location.origin.slice(0,160)
+    const next=emptyState()
+    for(const id of ids)next[id]={...next[id],site:origin}
+    setState(next)
     try{window.localStorage.removeItem(storageKey(churchId))}catch{}
   }
 
@@ -133,12 +165,18 @@ export default function PhoneProofClient({lang,churchId}:{lang:Lang;churchId:str
             <button type="button" className={item.result==='pass'?'active':''} disabled={!baseEvidence} aria-disabled={!baseEvidence} onClick={()=>update(id,{result:'pass'})}>{t.pass}</button>
             <button type="button" className={item.result==='fail'?'active':''} disabled={!failureEvidence} aria-disabled={!failureEvidence} onClick={()=>update(id,{result:'fail'})}>{t.fail}</button>
           </div></div>
+          <div className="test-guide">
+            <strong>{t.how}</strong>
+            <ol>{guide[id].steps.map(stepText=><li key={stepText}>{stepText}</li>)}</ol>
+            <p><strong>{t.expected}:</strong> {guide[id].expected}</p>
+          </div>
           {!baseEvidence&&<p className="evidence-hint">{t.evidence}</p>}
           {baseEvidence&&!item.notes.trim()&&<p className="evidence-hint">{t.failEvidence}</p>}
           <div className="fields">
             <label>{t.device}<input maxLength={120} value={item.device} onChange={e=>update(id,{device:e.target.value})} placeholder={lang==='es'?'Ej. iPhone 14, Safari':'e.g. iPhone 14, Safari'}/></label>
             <label>{t.account}<input maxLength={120} value={item.account} onChange={e=>update(id,{account:e.target.value})} placeholder={lang==='es'?'Ej. miembro nuevo de prueba':'e.g. new-member test account'}/></label>
             <label>{t.date}<input type="date" value={item.date} onChange={e=>update(id,{date:e.target.value})}/></label>
+            <label className="wide">{t.site}<input maxLength={160} value={item.site} onChange={e=>update(id,{site:e.target.value})}/><span className="field-help">{t.siteHelp}</span></label>
             <label className="wide">{t.notes}<textarea maxLength={500} rows={3} value={item.notes} onChange={e=>update(id,{notes:e.target.value})}/></label>
           </div>
         </article>
