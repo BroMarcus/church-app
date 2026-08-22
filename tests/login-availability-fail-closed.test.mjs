@@ -35,3 +35,11 @@ test('availability diagnostics use bounded error codes instead of provider messa
   assert.doesNotMatch(actions,/invite validation unavailable'\s*,\s*\{message:/)
   assert.doesNotMatch(actions,/signup status unavailable'\s*,\s*\{message:/)
 })
+
+test('legacy first-login inference does not treat failed reads as proof of no activity',()=>{
+  assert.match(actions,/const \[profileResult,groupsResult,enrollmentsResult\]=await Promise\.all/)
+  assert.match(actions,/const inferenceError=profileResult\.error\|\|groupsResult\.error\|\|enrollmentsResult\.error/)
+  assert.match(actions,/if\(inferenceError\)[\s\S]*legacy onboarding inference unavailable/)
+  assert.match(actions,/\}else\{[\s\S]*const hasActivity=\(groupsResult\.count\?\?0\)>0\|\|\(enrollmentsResult\.count\?\?0\)>0/)
+  assert.match(actions,/profile:profileResult\.error\?boundedCode\(profileResult\.error\.code\):'ok'/)
+})
