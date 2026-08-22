@@ -47,7 +47,7 @@ test('phone proof requires evidence before PASS or FAIL',()=>{
 test('phone proof binds evidence to the tested site or preview',()=>{
   assert.match(client,/site:string/)
   assert.match(client,/window\.location\.origin\.slice\(0,160\)/)
-  assert.match(client,/String\(value\.site\?\?' '\)/)
+  assert.match(client,/site:String\(value\.site\?\?''\)\.slice\(0,160\)/)
   assert.match(client,/Tested site \/ preview/)
   assert.match(client,/Sitio \/ vista previa probada/)
   assert.match(client,/`- \$\{t\.site\}: \$\{item\.site\|\|'—'\}`/)
@@ -55,7 +55,7 @@ test('phone proof binds evidence to the tested site or preview',()=>{
 
 test('older evidence without a tested site cannot stay passed',()=>{
   assert.match(client,/next\[id\]=normalizeEvidence\(/)
-  assert.match(client,/site:String\(value\.site\?\?' '\)\.slice\(0,160\)/)
+  assert.match(client,/site:String\(value\.site\?\?''\)\.slice\(0,160\)/)
   assert.match(client,/if\(!next\[id\]\.site\)next\[id\]=\{\.\.\.next\[id\],site:origin\}/)
 })
 
