@@ -4,7 +4,9 @@ import path from 'node:path';
 import test from 'node:test';
 
 const manifestPath = path.join(process.cwd(), 'docs', 'PILOT_COMBINED_INTEGRATION_MANIFEST.md');
+const snapshotPath = path.join(process.cwd(), 'docs', 'PILOT_COMBINED_RELEASE_SNAPSHOT.md');
 const manifest = fs.readFileSync(manifestPath, 'utf8');
+const snapshot = fs.readFileSync(snapshotPath, 'utf8');
 
 const requiredAuthorityHeads = {
   31: 'e245c419ec63bccf698a8e177ad91113f3df2b52',
@@ -36,12 +38,12 @@ const requiredSafetyPhrases = [
   'real-phone evidence was collected against a different site/build than the release candidate',
 ];
 
-test('combined integration manifest pins the authority PR heads used for reconciliation', () => {
+test('combined release snapshot pins the authority PR heads used for reconciliation', () => {
   for (const [pr, sha] of Object.entries(requiredAuthorityHeads)) {
     assert.match(
-      manifest,
+      snapshot,
       new RegExp(`\\| #${pr} \\|[^\\n]*\\| \\`${sha}\\` \\|`),
-      `manifest must pin PR #${pr} to ${sha}`,
+      `snapshot must pin PR #${pr} to ${sha}`,
     );
   }
 });
@@ -80,7 +82,7 @@ test('critical integration files contain no unresolved merge-conflict markers', 
   };
 
   for (const root of roots) walk(path.join(process.cwd(), root));
-  files.push(manifestPath);
+  files.push(manifestPath, snapshotPath);
 
   const conflicted = files.filter((file) => marker.test(fs.readFileSync(file, 'utf8')));
   assert.deepEqual(conflicted, [], `unresolved merge conflict markers found in: ${conflicted.join(', ')}`);
