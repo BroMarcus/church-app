@@ -36,7 +36,7 @@ export async function login(formData:FormData){
     let code='login_failed'
     if(normalized.includes('invalid login credentials'))code='invalid_credentials'
     else if(normalized.includes('email not confirmed'))code='email_unconfirmed'
-    else console.error('login failed',{message:error.message})
+    else console.error('login failed',{code:boundedCode(error.code)})
     redirect(loginUrl(lang,'&mode=signin'+nextPart+statusPart('error',code)))
   }
   if(next)redirect(next)
@@ -101,7 +101,7 @@ export async function signup(formData:FormData){
   const displayName=`${firstName} ${lastName}`.trim()
   const startPath=`/start?welcome=1${lang==='es'?'&lang=es':''}`
   const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath),data:{first_name:firstName,last_name:lastName,display_name:displayName,invite_id:inviteId||null,public_signup:publicSignup,onboarding_completed:false,preferred_language:lang}}})
-  if(error){console.error('signup failed',{message:error.message});redirect(loginUrl(lang,invitePart+'&mode=signup'+statusPart('error',authEmailErrorCode(error.message))))}
+  if(error){console.error('signup failed',{code:boundedCode(error.code)});redirect(loginUrl(lang,invitePart+'&mode=signup'+statusPart('error',authEmailErrorCode(error.message))))}
   if(data.user&&Array.isArray(data.user.identities)&&data.user.identities.length===0){redirect(loginUrl(lang,'&mode=signin'+statusPart('message','account_exists')))}
   if(data.session)redirect(startPath)
   redirect(loginUrl(lang,'&mode=signin'+statusPart('message','account_created')))
@@ -114,7 +114,7 @@ export async function requestPasswordReset(formData:FormData){
   const email=text(formData,'reset_email').toLowerCase()
   if(!email)redirect(loginUrl(lang,'&mode=signin'+nextPart+statusPart('error','missing_email')))
   const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:recoveryUrl(lang,next)})
-  if(error){console.error('requestPasswordReset failed',{message:error.message});redirect(loginUrl(lang,'&mode=signin'+nextPart+statusPart('error',authEmailErrorCode(error.message))))}
+  if(error){console.error('requestPasswordReset failed',{code:boundedCode(error.code)});redirect(loginUrl(lang,'&mode=signin'+nextPart+statusPart('error',authEmailErrorCode(error.message))))}
   redirect(loginUrl(lang,'&mode=signin'+nextPart+statusPart('message','reset_sent')))
 }
 
@@ -126,6 +126,6 @@ export async function resendConfirmation(formData:FormData){
   if(!email)redirect(loginUrl(lang,'&mode=signin'+nextPart+statusPart('error','missing_email')))
   const startPath=next||`/start?welcome=1${lang==='es'?'&lang=es':''}`
   const {error}=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath)}})
-  if(error){console.error('resendConfirmation failed',{message:error.message});redirect(loginUrl(lang,'&mode=signin'+nextPart+statusPart('error',authEmailErrorCode(error.message))))}
+  if(error){console.error('resendConfirmation failed',{code:boundedCode(error.code)});redirect(loginUrl(lang,'&mode=signin'+nextPart+statusPart('error',authEmailErrorCode(error.message))))}
   redirect(loginUrl(lang,'&mode=signin'+nextPart+statusPart('message','confirmation_sent')))
 }
