@@ -14,10 +14,14 @@ export async function MobileNavShell(){
 
   const {data:membership,error:membershipError}=await supabase.from('church_memberships').select('church_id,role').eq('user_id',userId).eq('status','active').limit(1).maybeSingle()
   if(membershipError){console.info('mobile navigation membership unavailable',{code:membershipError.code});return <MobileNav access={recoveryAccess} preferredLanguage={preferredLanguage} recoveryOnly/>}
-  if(!membership?.church_id)return null
+  if(!membership?.church_id)return <MobileNav access={recoveryAccess} preferredLanguage={preferredLanguage} recoveryOnly/>
 
   const churchId=membership.church_id,role=membership.role,isPrivileged=privilegedBaseRoles.has(role)
-  const permission=async(key:string)=>{const {data}=await supabase.rpc('current_user_has_church_permission',{p_church_id:churchId,p_permission_key:key});return Boolean(data)}
+  const permission=async(key:string)=>{
+    const {data,error}=await supabase.rpc('current_user_has_church_permission',{p_church_id:churchId,p_permission_key:key})
+    if(error){console.info('mobile navigation permission unavailable',{permission:key,code:error.code});return false}
+    return Boolean(data)
+  }
 
   const [manageGroups,leadOwnGroup,manageTeams,manageLearning,manageOutreach,manageCalendar,viewLeadership,featureResult,formsResult]=await Promise.all([
     permission('manage_groups'),permission('lead_own_group'),permission('manage_teams'),permission('manage_learning'),permission('manage_outreach'),permission('manage_calendar'),permission('view_leadership'),
