@@ -17,11 +17,20 @@ const authStatus={
 } as const
 
 const boundedCode=(value:unknown)=>String(value||'unknown').slice(0,80)
+function safeJoinNext(value:string|undefined){
+  if(!value||value.length>500||value.includes('\\'))return ''
+  try{
+    const base='https://kingdom.invalid'
+    const parsed=new URL(value,base)
+    if(parsed.origin!==base||!parsed.pathname.startsWith('/join/'))return ''
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`
+  }catch{return ''}
+}
 
 export default async function LoginPage({searchParams}:{searchParams:Promise<{error_code?:string;message_code?:string;invite?:string;lang?:string;mode?:string;next?:string}>}){
   const params=await searchParams
   const lang=params.lang==='es'?'es':'en',t=copy[lang]
-  const joinNext=params.next?.startsWith('/join/')&&!params.next.startsWith('//')&&!params.next.includes('..')?params.next:''
+  const joinNext=safeJoinNext(params.next)
   const statusError=(authStatus[lang] as Record<string,string>)[params.error_code??'']||''
   const statusMessage=(authStatus[lang] as Record<string,string>)[params.message_code??'']||''
   const supabase=createPublicClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}})
