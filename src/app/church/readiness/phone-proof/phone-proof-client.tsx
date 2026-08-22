@@ -18,9 +18,11 @@ const copy={
     local:'LOCAL ONLY — does not write member or church data',device:'Phone / device',account:'Test account type',date:'Date',site:'Tested site / preview',notes:'Observed result / exact failing step',build:'Tested build',
     untested:'Not tested',pass:'PASS',fail:'FAIL',copy:'Copy evidence summary',copied:'Copied',reset:'Clear local checklist',confirm:'Clear every locally saved phone-test result on this browser?',
     complete:'required phone tests passed',remaining:'still need proof',failed:'failed',summaryTitle:'KINGDOM NETWORK PHONE PROOF',language:'Checklist language',noNotes:'No notes recorded',
-    evidence:'Add the device, test-account type, date, tested site, and a short note describing what you actually observed before marking PASS or FAIL.',proofComplete:'PHONE PROOF COMPLETE — all required flows passed with evidence on one tested site.',proofIncomplete:'PHONE PROOF INCOMPLETE — do not treat this checklist as pilot acceptance yet.',proofStatus:'Phone proof status',
-    how:'Test steps',expected:'Expected result',siteHelp:'Use the exact site/preview where this test was run. All seven PASS results must come from the same site/preview for this build.',
+    evidence:'Add the device, test-account type, date, a valid http/https tested site, and a short note describing what you actually observed before marking PASS or FAIL.',proofComplete:'PHONE PROOF COMPLETE — all required flows passed with evidence on one tested site and a verified Git build.',proofIncomplete:'PHONE PROOF INCOMPLETE — do not treat this checklist as pilot acceptance yet.',proofStatus:'Phone proof status',
+    how:'Test steps',expected:'Expected result',siteHelp:'Use the exact http/https site or preview where this test was run. Different pages on the same site count as one site.',
     mixedSites:'SITE MISMATCH — completed results point to more than one site/preview. Retest or correct the site so one build is proven consistently.',siteStatus:'Site consistency',oneSite:'One tested site',manySites:'Multiple tested sites',
+    buildStatus:'Build identity',buildVerified:'Verified Git commit',buildMissing:'UNVERIFIED BUILD — this environment does not expose an exact 40-character Git commit. Phone proof cannot be marked complete here.',
+    invalidSite:'Enter a full http:// or https:// site/preview address before marking PASS or FAIL.',
     signup:'Public signup → confirmation → Start Here → sign out/in',existing:'Existing account → church join → same account, no duplicate',invite:'Newest invitation works; replaced/old invitation recovers clearly',reset:'Forgot password → newest reset email → new password → sign in',spanish:'Spanish signup / confirmation / Start Here / first Home',guide:'Kingdom Guide recovery help in English and Spanish',setup:'Fresh Church Setup → approve recommendation → unpublished Course Builder draft'
   },
   es:{
@@ -28,9 +30,11 @@ const copy={
     local:'SOLO LOCAL — no escribe datos de miembros ni de la iglesia',device:'Teléfono / dispositivo',account:'Tipo de cuenta de prueba',date:'Fecha',site:'Sitio / vista previa probada',notes:'Resultado observado / paso exacto que falló',build:'Versión probada',
     untested:'Sin probar',pass:'PASÓ',fail:'FALLÓ',copy:'Copiar resumen de evidencia',copied:'Copiado',reset:'Borrar lista local',confirm:'¿Borrar todos los resultados guardados localmente en este navegador?',
     complete:'pruebas requeridas pasaron',remaining:'todavía necesitan prueba',failed:'fallaron',summaryTitle:'PRUEBA DE TELÉFONO — KINGDOM NETWORK',language:'Idioma de la lista',noNotes:'Sin notas',
-    evidence:'Agrega el dispositivo, tipo de cuenta de prueba, fecha, sitio probado y una nota corta de lo que realmente observaste antes de marcar PASÓ o FALLÓ.',proofComplete:'PRUEBA DE TELÉFONO COMPLETA — todos los flujos requeridos pasaron con evidencia en un solo sitio.',proofIncomplete:'PRUEBA DE TELÉFONO INCOMPLETA — todavía no la trates como aceptación del piloto.',proofStatus:'Estado de prueba con teléfono',
-    how:'Pasos de prueba',expected:'Resultado esperado',siteHelp:'Usa el sitio/vista previa exacta donde hiciste esta prueba. Los siete resultados PASÓ deben venir del mismo sitio para esta versión.',
+    evidence:'Agrega el dispositivo, tipo de cuenta de prueba, fecha, un sitio http/https válido y una nota corta de lo que realmente observaste antes de marcar PASÓ o FALLÓ.',proofComplete:'PRUEBA DE TELÉFONO COMPLETA — todos los flujos requeridos pasaron con evidencia en un solo sitio y una versión Git verificada.',proofIncomplete:'PRUEBA DE TELÉFONO INCOMPLETA — todavía no la trates como aceptación del piloto.',proofStatus:'Estado de prueba con teléfono',
+    how:'Pasos de prueba',expected:'Resultado esperado',siteHelp:'Usa la dirección http/https exacta del sitio o vista previa donde hiciste esta prueba. Páginas distintas del mismo sitio cuentan como un solo sitio.',
     mixedSites:'LOS SITIOS NO COINCIDEN — los resultados completados apuntan a más de un sitio/vista previa. Vuelve a probar o corrige el sitio para comprobar una sola versión de forma consistente.',siteStatus:'Consistencia del sitio',oneSite:'Un solo sitio probado',manySites:'Varios sitios probados',
+    buildStatus:'Identidad de versión',buildVerified:'Commit Git verificado',buildMissing:'VERSIÓN NO VERIFICADA — este entorno no muestra un commit Git exacto de 40 caracteres. La prueba de teléfono no puede marcarse completa aquí.',
+    invalidSite:'Escribe una dirección completa que empiece con http:// o https:// antes de marcar PASÓ o FALLÓ.',
     signup:'Registro público → confirmación → Empieza Aquí → salir/entrar',existing:'Cuenta existente → unirse a iglesia → misma cuenta, sin duplicado',invite:'Funciona la invitación más reciente; enlace viejo/reemplazado se recupera claramente',reset:'Olvidé contraseña → correo más reciente → nueva contraseña → entrar',spanish:'Registro / confirmación / Empieza Aquí / primer Inicio en español',guide:'Ayuda de recuperación de Kingdom Guide en inglés y español',setup:'Fresh Church Setup → aprobar recomendación → borrador sin publicar en Course Builder'
   }
 } as const
@@ -57,12 +61,19 @@ const flowGuide:{en:Record<CheckId,{steps:string[];expected:string}>;es:Record<C
 }
 
 function storageKey(scope:string){return `kn-phone-proof:${scope || 'unknown'}`}
-function hasBaseEvidence(entry:Entry){return Boolean(entry.device.trim()&&entry.account.trim()&&entry.date.trim()&&entry.site.trim()&&entry.notes.trim())}
+function normalizedSite(value:string){
+  try{
+    const url=new URL(value.trim())
+    if(url.protocol!=='http:'&&url.protocol!=='https:')return ''
+    return url.origin.toLowerCase()
+  }catch{return ''}
+}
+function hasBaseEvidence(entry:Entry){return Boolean(entry.device.trim()&&entry.account.trim()&&entry.date.trim()&&normalizedSite(entry.site)&&entry.notes.trim())}
 function normalizeEvidence(entry:Entry):Entry{
   if(entry.result!=='untested'&&!hasBaseEvidence(entry))return {...entry,result:'untested'}
   return entry
 }
-function normalizedSite(value:string){return value.trim().replace(/\/$/,'').toLowerCase()}
+function isVerifiedBuild(buildId:string){return /^[0-9a-f]{40}$/i.test(buildId.trim())}
 
 export default function PhoneProofClient({lang,churchId,buildId}:{lang:Lang;churchId:string;buildId:string}){
   const t=copy[lang]
@@ -70,6 +81,7 @@ export default function PhoneProofClient({lang,churchId,buildId}:{lang:Lang;chur
   const [state,setState]=useState<State>(()=>emptyState())
   const [hydrated,setHydrated]=useState(false)
   const [copied,setCopied]=useState(false)
+  const verifiedBuild=isVerifiedBuild(buildId)
 
   useEffect(()=>{
     try{
@@ -102,7 +114,7 @@ export default function PhoneProofClient({lang,churchId,buildId}:{lang:Lang;chur
   },[state])
   const testedSites=useMemo(()=>new Set(Object.values(state).filter(v=>v.result!=='untested').map(v=>normalizedSite(v.site)).filter(Boolean)),[state])
   const oneTestedSite=testedSites.size<=1
-  const allPassed=stats.pass===ids.length&&stats.fail===0&&stats.remaining===0&&oneTestedSite
+  const allPassed=stats.pass===ids.length&&stats.fail===0&&stats.remaining===0&&oneTestedSite&&verifiedBuild
 
   function update(id:CheckId,patch:Partial<Entry>){
     setState(current=>({...current,[id]:normalizeEvidence({...current[id],...patch})}))
@@ -110,7 +122,7 @@ export default function PhoneProofClient({lang,churchId,buildId}:{lang:Lang;chur
 
   function summary(){
     const proofStatus=allPassed?t.proofComplete:t.proofIncomplete
-    const lines=[t.summaryTitle,`${t.language}: ${lang==='es'?'Español':'English'}`,`${t.build}: ${buildId}`,`${t.proofStatus}: ${proofStatus}`,`${t.siteStatus}: ${oneTestedSite?t.oneSite:t.manySites}`,`PASS: ${stats.pass}/${ids.length} | FAIL: ${stats.fail} | ${t.remaining}: ${stats.remaining}`,'']
+    const lines=[t.summaryTitle,`${t.language}: ${lang==='es'?'Español':'English'}`,`${t.build}: ${buildId}`,`${t.buildStatus}: ${verifiedBuild?t.buildVerified:t.buildMissing}`,`${t.proofStatus}: ${proofStatus}`,`${t.siteStatus}: ${oneTestedSite?t.oneSite:t.manySites}`,`PASS: ${stats.pass}/${ids.length} | FAIL: ${stats.fail} | ${t.remaining}: ${stats.remaining}`,'']
     for(const id of ids){
       const item=state[id]
       const result=item.result==='pass'?t.pass:item.result==='fail'?t.fail:t.untested
@@ -151,6 +163,7 @@ export default function PhoneProofClient({lang,churchId,buildId}:{lang:Lang;chur
     </section>
 
     <div className={`local-note ${allPassed?'complete':''}`} role="status" aria-live="polite">{allPassed?t.proofComplete:t.proofIncomplete}</div>
+    {!verifiedBuild&&<div className="evidence-hint" role="alert">{t.buildMissing}</div>}
     {!oneTestedSite&&<div className="evidence-hint" role="alert">{t.mixedSites}</div>}
     <div className="local-note">{t.local}</div>
 
@@ -158,6 +171,7 @@ export default function PhoneProofClient({lang,churchId,buildId}:{lang:Lang;chur
       {ids.map((id,index)=>{
         const item=state[id]
         const evidenceReady=hasBaseEvidence(item)
+        const validSite=Boolean(normalizedSite(item.site))
         return <article className={`proof-item ${item.result}`} key={id}>
           <div className="proof-item-head"><div><span className="step">{index+1}</span><h2>{t[id]}</h2></div><div className="result-buttons" role="group" aria-label={`${index+1}. ${t[id]}`}>
             <button type="button" className={item.result==='untested'?'active':''} onClick={()=>update(id,{result:'untested'})}>{t.untested}</button>
@@ -174,7 +188,7 @@ export default function PhoneProofClient({lang,churchId,buildId}:{lang:Lang;chur
             <label>{t.device}<input maxLength={120} value={item.device} onChange={e=>update(id,{device:e.target.value})} placeholder={lang==='es'?'Ej. iPhone 14, Safari':'e.g. iPhone 14, Safari'}/></label>
             <label>{t.account}<input maxLength={120} value={item.account} onChange={e=>update(id,{account:e.target.value})} placeholder={lang==='es'?'Ej. miembro nuevo de prueba':'e.g. new-member test account'}/></label>
             <label>{t.date}<input type="date" value={item.date} onChange={e=>update(id,{date:e.target.value})}/></label>
-            <label className="wide">{t.site}<input maxLength={160} value={item.site} onChange={e=>update(id,{site:e.target.value})}/><span className="field-help">{t.siteHelp}</span></label>
+            <label className="wide">{t.site}<input type="url" inputMode="url" maxLength={160} value={item.site} aria-invalid={Boolean(item.site)&&!validSite} onChange={e=>update(id,{site:e.target.value})}/><span className="field-help">{t.siteHelp}</span>{Boolean(item.site)&&!validSite&&<span className="evidence-hint">{t.invalidSite}</span>}</label>
             <label className="wide">{t.notes}<textarea maxLength={500} rows={3} value={item.notes} onChange={e=>update(id,{notes:e.target.value})}/></label>
           </div>
         </article>
