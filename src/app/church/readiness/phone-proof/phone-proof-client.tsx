@@ -24,6 +24,7 @@ const copy={
     buildStatus:'Build identity',buildVerified:'Verified Git commit',buildMissing:'UNVERIFIED BUILD — this environment does not expose an exact 40-character Git commit. Phone proof cannot be marked complete here.',
     staleBuild:'OLD BUILD EVIDENCE RESET — one or more saved PASS/FAIL results belonged to a different or unknown Git build. Their notes were kept, but the result was returned to Not tested so this build must be proven again.',
     currentBuildOnly:'PASS/FAIL is stamped to this exact Git build. If the deployed build changes, completed results automatically return to Not tested.',
+    editReset:'If you change the device, account, date, site, or notes after PASS/FAIL, that result returns to Not tested and must be proven again.',
     invalidSite:'Enter a full http:// or https:// site/preview address before marking PASS or FAIL.',
     signup:'Public signup → confirmation → Start Here → sign out/in',existing:'Existing account → church join → same account, no duplicate',invite:'Newest invitation works; replaced/old invitation recovers clearly',reset:'Forgot password → newest reset email → new password → sign in',spanish:'Spanish signup / confirmation / Start Here / first Home',guide:'Kingdom Guide recovery help in English and Spanish',setup:'Fresh Church Setup → approve recommendation → unpublished Course Builder draft'
   },
@@ -38,6 +39,7 @@ const copy={
     buildStatus:'Identidad de versión',buildVerified:'Commit Git verificado',buildMissing:'VERSIÓN NO VERIFICADA — este entorno no muestra un commit Git exacto de 40 caracteres. La prueba de teléfono no puede marcarse completa aquí.',
     staleBuild:'EVIDENCIA DE VERSIÓN ANTERIOR REINICIADA — uno o más resultados PASÓ/FALLÓ pertenecían a otra versión Git o a una versión desconocida. Se conservaron las notas, pero el resultado volvió a Sin probar para comprobar esta versión otra vez.',
     currentBuildOnly:'PASÓ/FALLÓ queda ligado a esta versión Git exacta. Si cambia la versión desplegada, los resultados completados vuelven automáticamente a Sin probar.',
+    editReset:'Si cambias el dispositivo, cuenta, fecha, sitio o notas después de PASÓ/FALLÓ, el resultado vuelve a Sin probar y debes comprobarlo otra vez.',
     invalidSite:'Escribe una dirección completa que empiece con http:// o https:// antes de marcar PASÓ o FALLÓ.',
     signup:'Registro público → confirmación → Empieza Aquí → salir/entrar',existing:'Cuenta existente → unirse a iglesia → misma cuenta, sin duplicado',invite:'Funciona la invitación más reciente; enlace viejo/reemplazado se recupera claramente',reset:'Olvidé contraseña → correo más reciente → nueva contraseña → entrar',spanish:'Registro / confirmación / Empieza Aquí / primer Inicio en español',guide:'Ayuda de recuperación de Kingdom Guide en inglés y español',setup:'Fresh Church Setup → aprobar recomendación → borrador sin publicar en Course Builder'
   }
@@ -129,8 +131,13 @@ export default function PhoneProofClient({lang,churchId,buildId}:{lang:Lang;chur
   const allCurrentBuild=Object.values(state).filter(v=>v.result!=='untested').every(v=>evidenceMatchesBuild(v,buildId))
   const allPassed=stats.pass===ids.length&&stats.fail===0&&stats.remaining===0&&oneTestedSite&&verifiedBuild&&allCurrentBuild
 
-  function update(id:CheckId,patch:Partial<Entry>){
-    setState(current=>({...current,[id]:normalizeEvidence({...current[id],...patch},buildId)}))
+  function updateEvidence(id:CheckId,patch:Partial<Pick<Entry,'device'|'account'|'date'|'site'|'notes'>>){
+    setState(current=>{
+      const item=current[id]
+      const evidenceChanged=Object.entries(patch).some(([key,value])=>item[key as keyof Entry]!==value)
+      const next={...item,...patch,result:evidenceChanged&&item.result!=='untested'?'untested':item.result,build:evidenceChanged&&item.result!=='untested'?'':item.build}
+      return {...current,[id]:normalizeEvidence(next,buildId)}
+    })
   }
 
   function markResult(id:CheckId,result:Result){
@@ -191,7 +198,7 @@ export default function PhoneProofClient({lang,churchId,buildId}:{lang:Lang;chur
     {staleBuildEvidence&&<div className="evidence-hint" role="alert">{t.staleBuild}</div>}
     {!oneTestedSite&&<div className="evidence-hint" role="alert">{t.mixedSites}</div>}
     <div className="local-note">{t.local}</div>
-    <div className="field-help">{t.currentBuildOnly}</div>
+    <div className="field-help">{t.currentBuildOnly} {t.editReset}</div>
 
     <section className="proof-list">
       {ids.map((id,index)=>{
@@ -211,12 +218,12 @@ export default function PhoneProofClient({lang,churchId,buildId}:{lang:Lang;chur
           </div>
           {!evidenceReady&&<p className="evidence-hint">{verifiedBuild?t.evidence:t.buildMissing}</p>}
           <div className="fields">
-            <label>{t.device}<input maxLength={120} value={item.device} onChange={e=>update(id,{device:e.target.value})} placeholder={lang==='es'?'Ej. iPhone 14, Safari':'e.g. iPhone 14, Safari'}/></label>
-            <label>{t.account}<input maxLength={120} value={item.account} onChange={e=>update(id,{account:e.target.value})} placeholder={lang==='es'?'Ej. miembro nuevo de prueba':'e.g. new-member test account'}/></label>
-            <label>{t.date}<input type="date" value={item.date} onChange={e=>update(id,{date:e.target.value})}/></label>
-            <label className="wide">{t.site}<input type="url" inputMode="url" maxLength={160} value={item.site} aria-invalid={Boolean(item.site)&&!validSite} onChange={e=>update(id,{site:e.target.value})}/><span className="field-help">{t.siteHelp}</span>{Boolean(item.site)&&!validSite&&<span className="evidence-hint">{t.invalidSite}</span>}</label>
+            <label>{t.device}<input maxLength={120} value={item.device} onChange={e=>updateEvidence(id,{device:e.target.value})} placeholder={lang==='es'?'Ej. iPhone 14, Safari':'e.g. iPhone 14, Safari'}/></label>
+            <label>{t.account}<input maxLength={120} value={item.account} onChange={e=>updateEvidence(id,{account:e.target.value})} placeholder={lang==='es'?'Ej. miembro nuevo de prueba':'e.g. new-member test account'}/></label>
+            <label>{t.date}<input type="date" value={item.date} onChange={e=>updateEvidence(id,{date:e.target.value})}/></label>
+            <label className="wide">{t.site}<input type="url" inputMode="url" maxLength={160} value={item.site} aria-invalid={Boolean(item.site)&&!validSite} onChange={e=>updateEvidence(id,{site:e.target.value})}/><span className="field-help">{t.siteHelp}</span>{Boolean(item.site)&&!validSite&&<span className="evidence-hint">{t.invalidSite}</span>}</label>
             <label className="wide">{t.build}<input value={item.build||currentBuild} readOnly aria-readonly="true"/></label>
-            <label className="wide">{t.notes}<textarea maxLength={500} rows={3} value={item.notes} onChange={e=>update(id,{notes:e.target.value})}/></label>
+            <label className="wide">{t.notes}<textarea maxLength={500} rows={3} value={item.notes} onChange={e=>updateEvidence(id,{notes:e.target.value})}/></label>
           </div>
         </article>
       })}
