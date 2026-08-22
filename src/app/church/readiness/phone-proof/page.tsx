@@ -70,6 +70,6 @@ export default async function PhoneProofPage({searchParams}:{searchParams:Promis
       </nav>
     </section>
 
-    <PhoneProofClient lang={lang} churchId={evidenceScope}/>
+    <PhoneProofClient lang={lang} churchId={evidenceScope} buildId={buildId}/>
   </main>
 }
