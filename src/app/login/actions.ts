@@ -45,14 +45,24 @@ export async function login(formData:FormData){
     const onboardingState=data.user?.user_metadata?.onboarding_completed
     if(onboardingState===false)redirect(`/start?welcome=1${lang==='es'?'&lang=es':''}`)
     if(onboardingState===undefined){
-      const [{data:profile},{count:groups},{count:enrollments}]=await Promise.all([
+      const [profileResult,groupsResult,enrollmentsResult]=await Promise.all([
         supabase.from('profiles').select('first_name,last_name,display_name,bio').eq('id',userId).maybeSingle(),
         supabase.from('group_memberships').select('*',{count:'exact',head:true}).eq('user_id',userId),
         supabase.from('course_enrollments').select('*',{count:'exact',head:true}).eq('user_id',userId)
       ])
-      const hasBasicProfile=Boolean(profile?.first_name&&profile?.last_name)
-      const hasActivity=(groups??0)>0||(enrollments??0)>0||Boolean(profile?.bio)
-      if(hasBasicProfile&&!hasActivity)redirect(`/start?welcome=1${lang==='es'?'&lang=es':''}`)
+      const inferenceError=profileResult.error||groupsResult.error||enrollmentsResult.error
+      if(inferenceError){
+        console.error('legacy onboarding inference unavailable',{
+          profile:profileResult.error?boundedCode(profileResult.error.code):'ok',
+          groups:groupsResult.error?boundedCode(groupsResult.error.code):'ok',
+          enrollments:enrollmentsResult.error?boundedCode(enrollmentsResult.error.code):'ok'
+        })
+      }else{
+        const profile=profileResult.data
+        const hasBasicProfile=Boolean(profile?.first_name&&profile?.last_name)
+        const hasActivity=(groupsResult.count??0)>0||(enrollmentsResult.count??0)>0||Boolean(profile?.bio)
+        if(hasBasicProfile&&!hasActivity)redirect(`/start?welcome=1${lang==='es'?'&lang=es':''}`)
+      }
     }
   }
   redirect(lang==='es'?'/?lang=es':'/')
