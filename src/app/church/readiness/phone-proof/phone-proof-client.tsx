@@ -5,11 +5,11 @@ import { useEffect, useMemo, useState } from 'react'
 type Lang='en'|'es'
 type Result='untested'|'pass'|'fail'
 type CheckId='signup'|'existing'|'invite'|'reset'|'spanish'|'guide'|'setup'
-type Entry={result:Result;device:string;account:string;date:string;site:string;notes:string}
+type Entry={result:Result;device:string;account:string;date:string;site:string;notes:string;build:string}
 type State=Record<CheckId,Entry>
 
 const ids:CheckId[]=['signup','existing','invite','reset','spanish','guide','setup']
-const emptyEntry=():Entry=>({result:'untested',device:'',account:'',date:'',site:'',notes:''})
+const emptyEntry=():Entry=>({result:'untested',device:'',account:'',date:'',site:'',notes:'',build:''})
 const emptyState=():State=>Object.fromEntries(ids.map(id=>[id,emptyEntry()])) as State
 
 const copy={
@@ -18,10 +18,12 @@ const copy={
     local:'LOCAL ONLY — does not write member or church data',device:'Phone / device',account:'Test account type',date:'Date',site:'Tested site / preview',notes:'Observed result / exact failing step',build:'Tested build',
     untested:'Not tested',pass:'PASS',fail:'FAIL',copy:'Copy evidence summary',copied:'Copied',reset:'Clear local checklist',confirm:'Clear every locally saved phone-test result on this browser?',
     complete:'required phone tests passed',remaining:'still need proof',failed:'failed',summaryTitle:'KINGDOM NETWORK PHONE PROOF',language:'Checklist language',noNotes:'No notes recorded',
-    evidence:'Add the device, test-account type, date, a valid http/https tested site, and a short note describing what you actually observed before marking PASS or FAIL.',proofComplete:'PHONE PROOF COMPLETE — all required flows passed with evidence on one tested site and a verified Git build.',proofIncomplete:'PHONE PROOF INCOMPLETE — do not treat this checklist as pilot acceptance yet.',proofStatus:'Phone proof status',
+    evidence:'Add the device, test-account type, date, a valid http/https tested site, and a short note describing what you actually observed before marking PASS or FAIL.',proofComplete:'PHONE PROOF COMPLETE — all required flows passed with evidence on one tested site and this exact verified Git build.',proofIncomplete:'PHONE PROOF INCOMPLETE — do not treat this checklist as pilot acceptance yet.',proofStatus:'Phone proof status',
     how:'Test steps',expected:'Expected result',siteHelp:'Use the exact http/https site or preview where this test was run. Different pages on the same site count as one site.',
     mixedSites:'SITE MISMATCH — completed results point to more than one site/preview. Retest or correct the site so one build is proven consistently.',siteStatus:'Site consistency',oneSite:'One tested site',manySites:'Multiple tested sites',
     buildStatus:'Build identity',buildVerified:'Verified Git commit',buildMissing:'UNVERIFIED BUILD — this environment does not expose an exact 40-character Git commit. Phone proof cannot be marked complete here.',
+    staleBuild:'OLD BUILD EVIDENCE RESET — one or more saved PASS/FAIL results belonged to a different or unknown Git build. Their notes were kept, but the result was returned to Not tested so this build must be proven again.',
+    currentBuildOnly:'PASS/FAIL is stamped to this exact Git build. If the deployed build changes, completed results automatically return to Not tested.',
     invalidSite:'Enter a full http:// or https:// site/preview address before marking PASS or FAIL.',
     signup:'Public signup → confirmation → Start Here → sign out/in',existing:'Existing account → church join → same account, no duplicate',invite:'Newest invitation works; replaced/old invitation recovers clearly',reset:'Forgot password → newest reset email → new password → sign in',spanish:'Spanish signup / confirmation / Start Here / first Home',guide:'Kingdom Guide recovery help in English and Spanish',setup:'Fresh Church Setup → approve recommendation → unpublished Course Builder draft'
   },
@@ -30,10 +32,12 @@ const copy={
     local:'SOLO LOCAL — no escribe datos de miembros ni de la iglesia',device:'Teléfono / dispositivo',account:'Tipo de cuenta de prueba',date:'Fecha',site:'Sitio / vista previa probada',notes:'Resultado observado / paso exacto que falló',build:'Versión probada',
     untested:'Sin probar',pass:'PASÓ',fail:'FALLÓ',copy:'Copiar resumen de evidencia',copied:'Copiado',reset:'Borrar lista local',confirm:'¿Borrar todos los resultados guardados localmente en este navegador?',
     complete:'pruebas requeridas pasaron',remaining:'todavía necesitan prueba',failed:'fallaron',summaryTitle:'PRUEBA DE TELÉFONO — KINGDOM NETWORK',language:'Idioma de la lista',noNotes:'Sin notas',
-    evidence:'Agrega el dispositivo, tipo de cuenta de prueba, fecha, un sitio http/https válido y una nota corta de lo que realmente observaste antes de marcar PASÓ o FALLÓ.',proofComplete:'PRUEBA DE TELÉFONO COMPLETA — todos los flujos requeridos pasaron con evidencia en un solo sitio y una versión Git verificada.',proofIncomplete:'PRUEBA DE TELÉFONO INCOMPLETA — todavía no la trates como aceptación del piloto.',proofStatus:'Estado de prueba con teléfono',
+    evidence:'Agrega el dispositivo, tipo de cuenta de prueba, fecha, un sitio http/https válido y una nota corta de lo que realmente observaste antes de marcar PASÓ o FALLÓ.',proofComplete:'PRUEBA DE TELÉFONO COMPLETA — todos los flujos requeridos pasaron con evidencia en un solo sitio y esta versión Git exacta verificada.',proofIncomplete:'PRUEBA DE TELÉFONO INCOMPLETA — todavía no la trates como aceptación del piloto.',proofStatus:'Estado de prueba con teléfono',
     how:'Pasos de prueba',expected:'Resultado esperado',siteHelp:'Usa la dirección http/https exacta del sitio o vista previa donde hiciste esta prueba. Páginas distintas del mismo sitio cuentan como un solo sitio.',
     mixedSites:'LOS SITIOS NO COINCIDEN — los resultados completados apuntan a más de un sitio/vista previa. Vuelve a probar o corrige el sitio para comprobar una sola versión de forma consistente.',siteStatus:'Consistencia del sitio',oneSite:'Un solo sitio probado',manySites:'Varios sitios probados',
     buildStatus:'Identidad de versión',buildVerified:'Commit Git verificado',buildMissing:'VERSIÓN NO VERIFICADA — este entorno no muestra un commit Git exacto de 40 caracteres. La prueba de teléfono no puede marcarse completa aquí.',
+    staleBuild:'EVIDENCIA DE VERSIÓN ANTERIOR REINICIADA — uno o más resultados PASÓ/FALLÓ pertenecían a otra versión Git o a una versión desconocida. Se conservaron las notas, pero el resultado volvió a Sin probar para comprobar esta versión otra vez.',
+    currentBuildOnly:'PASÓ/FALLÓ queda ligado a esta versión Git exacta. Si cambia la versión desplegada, los resultados completados vuelven automáticamente a Sin probar.',
     invalidSite:'Escribe una dirección completa que empiece con http:// o https:// antes de marcar PASÓ o FALLÓ.',
     signup:'Registro público → confirmación → Empieza Aquí → salir/entrar',existing:'Cuenta existente → unirse a iglesia → misma cuenta, sin duplicado',invite:'Funciona la invitación más reciente; enlace viejo/reemplazado se recupera claramente',reset:'Olvidé contraseña → correo más reciente → nueva contraseña → entrar',spanish:'Registro / confirmación / Empieza Aquí / primer Inicio en español',guide:'Ayuda de recuperación de Kingdom Guide en inglés y español',setup:'Fresh Church Setup → aprobar recomendación → borrador sin publicar en Course Builder'
   }
@@ -68,12 +72,14 @@ function normalizedSite(value:string){
     return url.origin.toLowerCase()
   }catch{return ''}
 }
+function isVerifiedBuild(buildId:string){return /^[0-9a-f]{40}$/i.test(buildId.trim())}
 function hasBaseEvidence(entry:Entry){return Boolean(entry.device.trim()&&entry.account.trim()&&entry.date.trim()&&normalizedSite(entry.site)&&entry.notes.trim())}
-function normalizeEvidence(entry:Entry):Entry{
-  if(entry.result!=='untested'&&!hasBaseEvidence(entry))return {...entry,result:'untested'}
+function evidenceMatchesBuild(entry:Entry,buildId:string){return isVerifiedBuild(buildId)&&entry.build.trim().toLowerCase()===buildId.trim().toLowerCase()}
+function normalizeEvidence(entry:Entry,buildId:string):Entry{
+  if(entry.result!=='untested'&&(!hasBaseEvidence(entry)||!evidenceMatchesBuild(entry,buildId)))return {...entry,result:'untested',build:''}
+  if(entry.result==='untested'&&entry.build)return {...entry,build:''}
   return entry
 }
-function isVerifiedBuild(buildId:string){return /^[0-9a-f]{40}$/i.test(buildId.trim())}
 
 export default function PhoneProofClient({lang,churchId,buildId}:{lang:Lang;churchId:string;buildId:string}){
   const t=copy[lang]
@@ -81,27 +87,33 @@ export default function PhoneProofClient({lang,churchId,buildId}:{lang:Lang;chur
   const [state,setState]=useState<State>(()=>emptyState())
   const [hydrated,setHydrated]=useState(false)
   const [copied,setCopied]=useState(false)
+  const [staleBuildEvidence,setStaleBuildEvidence]=useState(false)
   const verifiedBuild=isVerifiedBuild(buildId)
+  const currentBuild=buildId.trim().toLowerCase()
 
   useEffect(()=>{
     try{
       const origin=window.location.origin.slice(0,160)
       const raw=window.localStorage.getItem(storageKey(churchId))
       const next=emptyState()
+      let stale=false
       if(raw){
         const parsed=JSON.parse(raw) as Partial<State>
         for(const id of ids){
           const value=parsed[id]
           if(value&&['untested','pass','fail'].includes(String(value.result))){
-            next[id]=normalizeEvidence({result:value.result as Result,device:String(value.device??'').slice(0,120),account:String(value.account??'').slice(0,120),date:String(value.date??'').slice(0,20),site:String(value.site??'').slice(0,160),notes:String(value.notes??'').slice(0,500)})
+            const candidate:Entry={result:value.result as Result,device:String(value.device??'').slice(0,120),account:String(value.account??'').slice(0,120),date:String(value.date??'').slice(0,20),site:String(value.site??'').slice(0,160),notes:String(value.notes??'').slice(0,500),build:String(value.build??'').slice(0,40)}
+            if(candidate.result!=='untested'&&!evidenceMatchesBuild(candidate,buildId))stale=true
+            next[id]=normalizeEvidence(candidate,buildId)
           }
         }
       }
       for(const id of ids){if(!next[id].site)next[id]={...next[id],site:origin}}
+      setStaleBuildEvidence(stale)
       setState(next)
     }catch{}
     setHydrated(true)
-  },[churchId])
+  },[churchId,buildId])
 
   useEffect(()=>{
     if(!hydrated)return
@@ -114,10 +126,20 @@ export default function PhoneProofClient({lang,churchId,buildId}:{lang:Lang;chur
   },[state])
   const testedSites=useMemo(()=>new Set(Object.values(state).filter(v=>v.result!=='untested').map(v=>normalizedSite(v.site)).filter(Boolean)),[state])
   const oneTestedSite=testedSites.size<=1
-  const allPassed=stats.pass===ids.length&&stats.fail===0&&stats.remaining===0&&oneTestedSite&&verifiedBuild
+  const allCurrentBuild=Object.values(state).filter(v=>v.result!=='untested').every(v=>evidenceMatchesBuild(v,buildId))
+  const allPassed=stats.pass===ids.length&&stats.fail===0&&stats.remaining===0&&oneTestedSite&&verifiedBuild&&allCurrentBuild
 
   function update(id:CheckId,patch:Partial<Entry>){
-    setState(current=>({...current,[id]:normalizeEvidence({...current[id],...patch})}))
+    setState(current=>({...current,[id]:normalizeEvidence({...current[id],...patch},buildId)}))
+  }
+
+  function markResult(id:CheckId,result:Result){
+    setState(current=>{
+      const item=current[id]
+      if(result!=='untested'&&(!verifiedBuild||!hasBaseEvidence(item)))return current
+      const next={...item,result,build:result==='untested'?'':currentBuild}
+      return {...current,[id]:normalizeEvidence(next,buildId)}
+    })
   }
 
   function summary(){
@@ -131,6 +153,7 @@ export default function PhoneProofClient({lang,churchId,buildId}:{lang:Lang;chur
       lines.push(`- ${t.account}: ${item.account||'—'}`)
       lines.push(`- ${t.date}: ${item.date||'—'}`)
       lines.push(`- ${t.site}: ${item.site||'—'}`)
+      lines.push(`- ${t.build}: ${item.build||'—'}`)
       lines.push(`- ${t.notes}: ${item.notes||t.noNotes}`,'')
     }
     return lines.join('\n')
@@ -152,6 +175,7 @@ export default function PhoneProofClient({lang,churchId,buildId}:{lang:Lang;chur
     const next=emptyState()
     for(const id of ids)next[id]={...next[id],site:origin}
     setState(next)
+    setStaleBuildEvidence(false)
     try{window.localStorage.removeItem(storageKey(churchId))}catch{}
   }
 
@@ -164,31 +188,34 @@ export default function PhoneProofClient({lang,churchId,buildId}:{lang:Lang;chur
 
     <div className={`local-note ${allPassed?'complete':''}`} role="status" aria-live="polite">{allPassed?t.proofComplete:t.proofIncomplete}</div>
     {!verifiedBuild&&<div className="evidence-hint" role="alert">{t.buildMissing}</div>}
+    {staleBuildEvidence&&<div className="evidence-hint" role="alert">{t.staleBuild}</div>}
     {!oneTestedSite&&<div className="evidence-hint" role="alert">{t.mixedSites}</div>}
     <div className="local-note">{t.local}</div>
+    <div className="field-help">{t.currentBuildOnly}</div>
 
     <section className="proof-list">
       {ids.map((id,index)=>{
         const item=state[id]
-        const evidenceReady=hasBaseEvidence(item)
+        const evidenceReady=hasBaseEvidence(item)&&verifiedBuild
         const validSite=Boolean(normalizedSite(item.site))
         return <article className={`proof-item ${item.result}`} key={id}>
           <div className="proof-item-head"><div><span className="step">{index+1}</span><h2>{t[id]}</h2></div><div className="result-buttons" role="group" aria-label={`${index+1}. ${t[id]}`}>
-            <button type="button" className={item.result==='untested'?'active':''} onClick={()=>update(id,{result:'untested'})}>{t.untested}</button>
-            <button type="button" className={item.result==='pass'?'active':''} disabled={!evidenceReady} aria-disabled={!evidenceReady} onClick={()=>update(id,{result:'pass'})}>{t.pass}</button>
-            <button type="button" className={item.result==='fail'?'active':''} disabled={!evidenceReady} aria-disabled={!evidenceReady} onClick={()=>update(id,{result:'fail'})}>{t.fail}</button>
+            <button type="button" className={item.result==='untested'?'active':''} onClick={()=>markResult(id,'untested')}>{t.untested}</button>
+            <button type="button" className={item.result==='pass'?'active':''} disabled={!evidenceReady} aria-disabled={!evidenceReady} onClick={()=>markResult(id,'pass')}>{t.pass}</button>
+            <button type="button" className={item.result==='fail'?'active':''} disabled={!evidenceReady} aria-disabled={!evidenceReady} onClick={()=>markResult(id,'fail')}>{t.fail}</button>
           </div></div>
           <div className="test-guide">
             <strong>{t.how}</strong>
             <ol>{guide[id].steps.map(stepText=><li key={stepText}>{stepText}</li>)}</ol>
             <p><strong>{t.expected}:</strong> {guide[id].expected}</p>
           </div>
-          {!evidenceReady&&<p className="evidence-hint">{t.evidence}</p>}
+          {!evidenceReady&&<p className="evidence-hint">{verifiedBuild?t.evidence:t.buildMissing}</p>}
           <div className="fields">
             <label>{t.device}<input maxLength={120} value={item.device} onChange={e=>update(id,{device:e.target.value})} placeholder={lang==='es'?'Ej. iPhone 14, Safari':'e.g. iPhone 14, Safari'}/></label>
             <label>{t.account}<input maxLength={120} value={item.account} onChange={e=>update(id,{account:e.target.value})} placeholder={lang==='es'?'Ej. miembro nuevo de prueba':'e.g. new-member test account'}/></label>
             <label>{t.date}<input type="date" value={item.date} onChange={e=>update(id,{date:e.target.value})}/></label>
             <label className="wide">{t.site}<input type="url" inputMode="url" maxLength={160} value={item.site} aria-invalid={Boolean(item.site)&&!validSite} onChange={e=>update(id,{site:e.target.value})}/><span className="field-help">{t.siteHelp}</span>{Boolean(item.site)&&!validSite&&<span className="evidence-hint">{t.invalidSite}</span>}</label>
+            <label className="wide">{t.build}<input value={item.build||currentBuild} readOnly aria-readonly="true"/></label>
             <label className="wide">{t.notes}<textarea maxLength={500} rows={3} value={item.notes} onChange={e=>update(id,{notes:e.target.value})}/></label>
           </div>
         </article>
