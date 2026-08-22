@@ -43,3 +43,11 @@ test('legacy first-login inference does not treat failed reads as proof of no ac
   assert.match(actions,/\}else\{[\s\S]*const hasActivity=\(groupsResult\.count\?\?0\)>0\|\|\(enrollmentsResult\.count\?\?0\)>0/)
   assert.match(actions,/profile:profileResult\.error\?boundedCode\(profileResult\.error\.code\):'ok'/)
 })
+
+test('login page canonicalizes join return paths before carrying them through auth recovery',()=>{
+  assert.match(page,/function safeJoinNext\(value:string\|undefined\)/)
+  assert.match(page,/const parsed=new URL\(value,base\)/)
+  assert.match(page,/parsed\.origin!==base\|\|!parsed\.pathname\.startsWith\('\/join\/'\)/)
+  assert.match(page,/const joinNext=safeJoinNext\(params\.next\)/)
+  assert.doesNotMatch(page,/params\.next\?\.startsWith\('\/join\/'\).*includes\('\.\.'\)/)
+})
