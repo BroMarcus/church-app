@@ -5,11 +5,11 @@ import { useEffect, useMemo, useState } from 'react'
 type Lang='en'|'es'
 type Result='untested'|'pass'|'fail'
 type CheckId='signup'|'existing'|'invite'|'reset'|'spanish'|'guide'|'setup'
-type Entry={result:Result;device:string;account:string;date:string;site:string;notes:string;build:string}
+type Entry={result:Result;device:string;account:string;date:string;site:string;notes:string;build:string}&{englishTested:boolean;spanishTested:boolean}
 type State=Record<CheckId,Entry>
 
 const ids:CheckId[]=['signup','existing','invite','reset','spanish','guide','setup']
-const emptyEntry=():Entry=>({result:'untested',device:'',account:'',date:'',site:'',notes:'',build:''})
+const emptyEntry=():Entry=>({result:'untested',device:'',account:'',date:'',site:'',notes:'',build:'',englishTested:false,spanishTested:false})
 const emptyState=():State=>Object.fromEntries(ids.map(id=>[id,emptyEntry()])) as State
 
 const copy={
@@ -18,14 +18,16 @@ const copy={
     local:'LOCAL ONLY — does not write member or church data',device:'Phone / device',account:'Test account type',date:'Date',site:'Tested site / preview',notes:'Observed result / exact failing step',build:'Tested build',
     untested:'Not tested',pass:'PASS',fail:'FAIL',copy:'Copy evidence summary',copied:'Copied',reset:'Clear local checklist',confirm:'Clear every locally saved phone-test result on this browser?',
     complete:'required phone tests passed',remaining:'still need proof',failed:'failed',summaryTitle:'KINGDOM NETWORK PHONE PROOF',language:'Checklist language',noNotes:'No notes recorded',
-    evidence:'Add the device, test-account type, date, a valid http/https tested site, and a short note describing what you actually observed before marking PASS or FAIL.',proofComplete:'PHONE PROOF COMPLETE — all required flows passed with evidence on one tested site and this exact verified Git build.',proofIncomplete:'PHONE PROOF INCOMPLETE — do not treat this checklist as pilot acceptance yet.',proofStatus:'Phone proof status',
+    evidence:'Add the device, test-account type, date, a valid http/https tested site, and a short note describing what you actually observed. Mark which language(s) you actually tested. PASS requires both English and Spanish; FAIL can be recorded as soon as either tested language fails.',proofComplete:'PHONE PROOF COMPLETE — all required flows passed in both English and Spanish with evidence on one tested site and this exact verified Git build.',proofIncomplete:'PHONE PROOF INCOMPLETE — do not treat this checklist as pilot acceptance yet.',proofStatus:'Phone proof status',
     how:'Test steps',expected:'Expected result',siteHelp:'Use the exact http/https site or preview where this test was run. Different pages on the same site count as one site.',
     mixedSites:'SITE MISMATCH — completed results point to more than one site/preview. Retest or correct the site so one build is proven consistently.',siteStatus:'Site consistency',oneSite:'One tested site',manySites:'Multiple tested sites',
     buildStatus:'Build identity',buildVerified:'Verified Git commit',buildMissing:'UNVERIFIED BUILD — this environment does not expose an exact 40-character Git commit. Phone proof cannot be marked complete here.',
-    staleBuild:'OLD BUILD EVIDENCE RESET — one or more saved PASS/FAIL results belonged to a different or unknown Git build. Their notes were kept, but the result was returned to Not tested so this build must be proven again.',
+    staleBuild:'OLD BUILD EVIDENCE RESET — one or more saved PASS/FAIL results belonged to a different or unknown Git build, or did not prove the required language coverage. Their notes were kept, but the result was returned to Not tested so this build must be proven again.',
     currentBuildOnly:'PASS/FAIL is stamped to this exact Git build. If the deployed build changes, completed results automatically return to Not tested.',
-    editReset:'If you change the device, account, date, site, or notes after PASS/FAIL, that result returns to Not tested and must be proven again.',
+    editReset:'If you change the device, account, date, site, notes, or tested-language evidence after PASS/FAIL, that result returns to Not tested and must be proven again.',
     invalidSite:'Enter a full http:// or https:// site/preview address before marking PASS or FAIL.',
+    languageProof:'Languages actually tested',englishTested:'English tested',spanishTested:'Spanish tested',languageHelp:'PASS stays disabled until both English and Spanish are checked. If either language fails, check the language you tested and record FAIL with the exact failing step.',
+    languageSummary:'Language evidence',
     signup:'Public signup → confirmation → Start Here → sign out/in',existing:'Existing account → church join → same account, no duplicate',invite:'Newest invitation works; replaced/old invitation recovers clearly',reset:'Forgot password → newest reset email → new password → sign in',spanish:'Spanish signup / confirmation / Start Here / first Home',guide:'Kingdom Guide recovery help in English and Spanish',setup:'Fresh Church Setup → approve recommendation → unpublished Course Builder draft'
   },
   es:{
@@ -33,14 +35,16 @@ const copy={
     local:'SOLO LOCAL — no escribe datos de miembros ni de la iglesia',device:'Teléfono / dispositivo',account:'Tipo de cuenta de prueba',date:'Fecha',site:'Sitio / vista previa probada',notes:'Resultado observado / paso exacto que falló',build:'Versión probada',
     untested:'Sin probar',pass:'PASÓ',fail:'FALLÓ',copy:'Copiar resumen de evidencia',copied:'Copiado',reset:'Borrar lista local',confirm:'¿Borrar todos los resultados guardados localmente en este navegador?',
     complete:'pruebas requeridas pasaron',remaining:'todavía necesitan prueba',failed:'fallaron',summaryTitle:'PRUEBA DE TELÉFONO — KINGDOM NETWORK',language:'Idioma de la lista',noNotes:'Sin notas',
-    evidence:'Agrega el dispositivo, tipo de cuenta de prueba, fecha, un sitio http/https válido y una nota corta de lo que realmente observaste antes de marcar PASÓ o FALLÓ.',proofComplete:'PRUEBA DE TELÉFONO COMPLETA — todos los flujos requeridos pasaron con evidencia en un solo sitio y esta versión Git exacta verificada.',proofIncomplete:'PRUEBA DE TELÉFONO INCOMPLETA — todavía no la trates como aceptación del piloto.',proofStatus:'Estado de prueba con teléfono',
+    evidence:'Agrega el dispositivo, tipo de cuenta de prueba, fecha, un sitio http/https válido y una nota corta de lo que realmente observaste. Marca el idioma o idiomas que realmente probaste. PASÓ requiere inglés y español; FALLÓ puede registrarse en cuanto falle cualquiera de los idiomas probados.',proofComplete:'PRUEBA DE TELÉFONO COMPLETA — todos los flujos requeridos pasaron en inglés y español con evidencia en un solo sitio y esta versión Git exacta verificada.',proofIncomplete:'PRUEBA DE TELÉFONO INCOMPLETA — todavía no la trates como aceptación del piloto.',proofStatus:'Estado de prueba con teléfono',
     how:'Pasos de prueba',expected:'Resultado esperado',siteHelp:'Usa la dirección http/https exacta del sitio o vista previa donde hiciste esta prueba. Páginas distintas del mismo sitio cuentan como un solo sitio.',
     mixedSites:'LOS SITIOS NO COINCIDEN — los resultados completados apuntan a más de un sitio/vista previa. Vuelve a probar o corrige el sitio para comprobar una sola versión de forma consistente.',siteStatus:'Consistencia del sitio',oneSite:'Un solo sitio probado',manySites:'Varios sitios probados',
     buildStatus:'Identidad de versión',buildVerified:'Commit Git verificado',buildMissing:'VERSIÓN NO VERIFICADA — este entorno no muestra un commit Git exacto de 40 caracteres. La prueba de teléfono no puede marcarse completa aquí.',
-    staleBuild:'EVIDENCIA DE VERSIÓN ANTERIOR REINICIADA — uno o más resultados PASÓ/FALLÓ pertenecían a otra versión Git o a una versión desconocida. Se conservaron las notas, pero el resultado volvió a Sin probar para comprobar esta versión otra vez.',
+    staleBuild:'EVIDENCIA ANTERIOR REINICIADA — uno o más resultados PASÓ/FALLÓ pertenecían a otra versión Git, a una versión desconocida o no comprobaban la cobertura de idioma requerida. Se conservaron las notas, pero el resultado volvió a Sin probar para comprobar esta versión otra vez.',
     currentBuildOnly:'PASÓ/FALLÓ queda ligado a esta versión Git exacta. Si cambia la versión desplegada, los resultados completados vuelven automáticamente a Sin probar.',
-    editReset:'Si cambias el dispositivo, cuenta, fecha, sitio o notas después de PASÓ/FALLÓ, el resultado vuelve a Sin probar y debes comprobarlo otra vez.',
+    editReset:'Si cambias el dispositivo, cuenta, fecha, sitio, notas o evidencia de idioma después de PASÓ/FALLÓ, el resultado vuelve a Sin probar y debes comprobarlo otra vez.',
     invalidSite:'Escribe una dirección completa que empiece con http:// o https:// antes de marcar PASÓ o FALLÓ.',
+    languageProof:'Idiomas realmente probados',englishTested:'Inglés probado',spanishTested:'Español probado',languageHelp:'PASÓ permanece desactivado hasta marcar inglés y español. Si falla cualquier idioma, marca el idioma que probaste y registra FALLÓ con el paso exacto que falló.',
+    languageSummary:'Evidencia de idioma',
     signup:'Registro público → confirmación → Empieza Aquí → salir/entrar',existing:'Cuenta existente → unirse a iglesia → misma cuenta, sin duplicado',invite:'Funciona la invitación más reciente; enlace viejo/reemplazado se recupera claramente',reset:'Olvidé contraseña → correo más reciente → nueva contraseña → entrar',spanish:'Registro / confirmación / Empieza Aquí / primer Inicio en español',guide:'Ayuda de recuperación de Kingdom Guide en inglés y español',setup:'Fresh Church Setup → aprobar recomendación → borrador sin publicar en Course Builder'
   }
 } as const
@@ -76,9 +80,12 @@ function normalizedSite(value:string){
 }
 function isVerifiedBuild(buildId:string){return /^[0-9a-f]{40}$/i.test(buildId.trim())}
 function hasBaseEvidence(entry:Entry){return Boolean(entry.device.trim()&&entry.account.trim()&&entry.date.trim()&&normalizedSite(entry.site)&&entry.notes.trim())}
+function hasAnyLanguageEvidence(entry:Entry){return entry.englishTested||entry.spanishTested}
+function hasBothLanguages(entry:Entry){return entry.englishTested&&entry.spanishTested}
 function evidenceMatchesBuild(entry:Entry,buildId:string){return isVerifiedBuild(buildId)&&entry.build.trim().toLowerCase()===buildId.trim().toLowerCase()}
 function normalizeEvidence(entry:Entry,buildId:string):Entry{
-  if(entry.result!=='untested'&&(!hasBaseEvidence(entry)||!evidenceMatchesBuild(entry,buildId)))return {...entry,result:'untested',build:''}
+  const resultHasRequiredLanguage=entry.result==='pass'?hasBothLanguages(entry):entry.result==='fail'?hasAnyLanguageEvidence(entry):true
+  if(entry.result!=='untested'&&(!hasBaseEvidence(entry)||!resultHasRequiredLanguage||!evidenceMatchesBuild(entry,buildId)))return {...entry,result:'untested',build:''}
   if(entry.result==='untested'&&entry.build)return {...entry,build:''}
   return entry
 }
@@ -104,9 +111,21 @@ export default function PhoneProofClient({lang,churchId,buildId}:{lang:Lang;chur
         for(const id of ids){
           const value=parsed[id]
           if(value&&['untested','pass','fail'].includes(String(value.result))){
-            const candidate:Entry={result:value.result as Result,device:String(value.device??'').slice(0,120),account:String(value.account??'').slice(0,120),date:String(value.date??'').slice(0,20),site:String(value.site??'').slice(0,160),notes:String(value.notes??'').slice(0,500),build:String(value.build??'').slice(0,40)}
+            const candidate:Entry={
+              result:value.result as Result,
+              device:String(value.device??'').slice(0,120),
+              account:String(value.account??'').slice(0,120),
+              date:String(value.date??'').slice(0,20),
+              site:String(value.site??'').slice(0,160),
+              notes:String(value.notes??'').slice(0,500),
+              build:String(value.build??'').slice(0,40),
+              englishTested:Boolean(value.englishTested),
+              spanishTested:Boolean(value.spanishTested)
+            }
             if(candidate.result!=='untested'&&!evidenceMatchesBuild(candidate,buildId))stale=true
-            next[id]=normalizeEvidence(candidate,buildId)
+            const normalized=normalizeEvidence(candidate,buildId)
+            if(candidate.result!=='untested'&&normalized.result==='untested')stale=true
+            next[id]=normalized
           }
         }
       }
@@ -129,9 +148,10 @@ export default function PhoneProofClient({lang,churchId,buildId}:{lang:Lang;chur
   const testedSites=useMemo(()=>new Set(Object.values(state).filter(v=>v.result!=='untested').map(v=>normalizedSite(v.site)).filter(Boolean)),[state])
   const oneTestedSite=testedSites.size<=1
   const allCurrentBuild=Object.values(state).filter(v=>v.result!=='untested').every(v=>evidenceMatchesBuild(v,buildId))
-  const allPassed=stats.pass===ids.length&&stats.fail===0&&stats.remaining===0&&oneTestedSite&&verifiedBuild&&allCurrentBuild
+  const allBilingual=Object.values(state).filter(v=>v.result==='pass').every(v=>hasBothLanguages(v))
+  const allPassed=stats.pass===ids.length&&stats.fail===0&&stats.remaining===0&&oneTestedSite&&verifiedBuild&&allCurrentBuild&&allBilingual
 
-  function updateEvidence(id:CheckId,patch:Partial<Pick<Entry,'device'|'account'|'date'|'site'|'notes'>>){
+  function updateEvidence(id:CheckId,patch:Partial<Pick<Entry,'device'|'account'|'date'|'site'|'notes'|'englishTested'|'spanishTested'>>){
     setState(current=>{
       const item=current[id]
       const evidenceChanged=Object.entries(patch).some(([key,value])=>item[key as keyof Entry]!==value)
@@ -143,7 +163,8 @@ export default function PhoneProofClient({lang,churchId,buildId}:{lang:Lang;chur
   function markResult(id:CheckId,result:Result){
     setState(current=>{
       const item=current[id]
-      if(result!=='untested'&&(!verifiedBuild||!hasBaseEvidence(item)))return current
+      const languageReady=result==='pass'?hasBothLanguages(item):result==='fail'?hasAnyLanguageEvidence(item):true
+      if(result!=='untested'&&(!verifiedBuild||!hasBaseEvidence(item)||!languageReady))return current
       const next={...item,result,build:result==='untested'?'':currentBuild}
       return {...current,[id]:normalizeEvidence(next,buildId)}
     })
@@ -161,6 +182,7 @@ export default function PhoneProofClient({lang,churchId,buildId}:{lang:Lang;chur
       lines.push(`- ${t.date}: ${item.date||'—'}`)
       lines.push(`- ${t.site}: ${item.site||'—'}`)
       lines.push(`- ${t.build}: ${item.build||'—'}`)
+      lines.push(`- ${t.languageSummary}: ${item.englishTested?'EN ✓':'EN —'} | ${item.spanishTested?'ES ✓':'ES —'}`)
       lines.push(`- ${t.notes}: ${item.notes||t.noNotes}`,'')
     }
     return lines.join('\n')
@@ -204,12 +226,14 @@ export default function PhoneProofClient({lang,churchId,buildId}:{lang:Lang;chur
       {ids.map((id,index)=>{
         const item=state[id]
         const evidenceReady=hasBaseEvidence(item)&&verifiedBuild
+        const passReady=evidenceReady&&hasBothLanguages(item)
+        const failReady=evidenceReady&&hasAnyLanguageEvidence(item)
         const validSite=Boolean(normalizedSite(item.site))
         return <article className={`proof-item ${item.result}`} key={id}>
           <div className="proof-item-head"><div><span className="step">{index+1}</span><h2>{t[id]}</h2></div><div className="result-buttons" role="group" aria-label={`${index+1}. ${t[id]}`}>
             <button type="button" className={item.result==='untested'?'active':''} onClick={()=>markResult(id,'untested')}>{t.untested}</button>
-            <button type="button" className={item.result==='pass'?'active':''} disabled={!evidenceReady} aria-disabled={!evidenceReady} onClick={()=>markResult(id,'pass')}>{t.pass}</button>
-            <button type="button" className={item.result==='fail'?'active':''} disabled={!evidenceReady} aria-disabled={!evidenceReady} onClick={()=>markResult(id,'fail')}>{t.fail}</button>
+            <button type="button" className={item.result==='pass'?'active':''} disabled={!passReady} aria-disabled={!passReady} onClick={()=>markResult(id,'pass')}>{t.pass}</button>
+            <button type="button" className={item.result==='fail'?'active':''} disabled={!failReady} aria-disabled={!failReady} onClick={()=>markResult(id,'fail')}>{t.fail}</button>
           </div></div>
           <div className="test-guide">
             <strong>{t.how}</strong>
@@ -217,6 +241,13 @@ export default function PhoneProofClient({lang,churchId,buildId}:{lang:Lang;chur
             <p><strong>{t.expected}:</strong> {guide[id].expected}</p>
           </div>
           {!evidenceReady&&<p className="evidence-hint">{verifiedBuild?t.evidence:t.buildMissing}</p>}
+          {evidenceReady&&!passReady&&<p className="evidence-hint">{t.languageHelp}</p>}
+          <fieldset className="wide" disabled={!evidenceReady}>
+            <legend>{t.languageProof}</legend>
+            <label><input type="checkbox" checked={item.englishTested} onChange={e=>updateEvidence(id,{englishTested:e.target.checked})}/>{t.englishTested}</label>
+            <label><input type="checkbox" checked={item.spanishTested} onChange={e=>updateEvidence(id,{spanishTested:e.target.checked})}/>{t.spanishTested}</label>
+            <span className="field-help">{t.languageHelp}</span>
+          </fieldset>
           <div className="fields">
             <label>{t.device}<input maxLength={120} value={item.device} onChange={e=>updateEvidence(id,{device:e.target.value})} placeholder={lang==='es'?'Ej. iPhone 14, Safari':'e.g. iPhone 14, Safari'}/></label>
             <label>{t.account}<input maxLength={120} value={item.account} onChange={e=>updateEvidence(id,{account:e.target.value})} placeholder={lang==='es'?'Ej. miembro nuevo de prueba':'e.g. new-member test account'}/></label>
