@@ -46,8 +46,8 @@ test('phone proof bounds tester-entered evidence',()=>{
 test('phone proof requires observed evidence before PASS or FAIL',()=>{
   assert.match(client,/function hasBaseEvidence\(entry:Entry\)/)
   assert.match(client,/normalizedSite\(entry\.site\).*entry\.notes\.trim\(\)/)
-  assert.match(client,/entry\.result!=='untested'&&!hasBaseEvidence\(entry\)/)
-  assert.match(client,/const evidenceReady=hasBaseEvidence\(item\)/)
+  assert.match(client,/!hasBaseEvidence\(entry\)/)
+  assert.match(client,/const evidenceReady=hasBaseEvidence\(item\)&&verifiedBuild/)
   assert.match(client,/disabled=\{!evidenceReady\}/)
   assert.match(client,/Observed result \/ exact failing step/)
   assert.match(client,/Resultado observado \/ paso exacto que falló/)
@@ -81,13 +81,13 @@ test('phone proof treats different routes on one preview origin as one site',()=
 test('phone proof blocks mixed-site pilot acceptance',()=>{
   assert.match(client,/const testedSites=useMemo/)
   assert.match(client,/const oneTestedSite=testedSites\.size<=1/)
-  assert.match(client,/&&oneTestedSite&&verifiedBuild/)
+  assert.match(client,/&&oneTestedSite&&verifiedBuild&&allCurrentBuild/)
   assert.match(client,/SITE MISMATCH/)
   assert.match(client,/LOS SITIOS NO COINCIDEN/)
   assert.match(client,/siteStatus/)
 })
 
-test('phone proof isolates browser evidence by deployed build and exports that build',()=>{
+test('phone proof reads deployed build identity and exports it',()=>{
   assert.match(page,/VERCEL_GIT_COMMIT_SHA/)
   assert.match(page,/NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA/)
   assert.match(page,/const evidenceScope=/)
@@ -98,11 +98,30 @@ test('phone proof isolates browser evidence by deployed build and exports that b
   assert.match(page,/Versión probada/)
 })
 
+test('each PASS or FAIL is stamped to the exact current Git build',()=>{
+  assert.match(client,/type Entry=\{result:Result;device:string;account:string;date:string;site:string;notes:string;build:string\}/)
+  assert.match(client,/function evidenceMatchesBuild\(entry:Entry,buildId:string\)/)
+  assert.match(client,/entry\.build\.trim\(\)\.toLowerCase\(\)===buildId\.trim\(\)\.toLowerCase\(\)/)
+  assert.match(client,/build:String\(value\.build\?\?''\)\.slice\(0,40\)/)
+  assert.match(client,/build:result==='untested'\?'':currentBuild/)
+  assert.match(client,/`- \$\{t\.build\}: \$\{item\.build\|\|'—'\}`/)
+  assert.match(client,/value=\{item\.build\|\|currentBuild\} readOnly/)
+})
+
+test('saved results from a different or unknown build are downgraded to untested',()=>{
+  assert.match(client,/if\(candidate\.result!=='untested'&&!evidenceMatchesBuild\(candidate,buildId\)\)stale=true/)
+  assert.match(client,/!evidenceMatchesBuild\(entry,buildId\)/)
+  assert.match(client,/result:'untested',build:''/)
+  assert.match(client,/OLD BUILD EVIDENCE RESET/)
+  assert.match(client,/EVIDENCIA DE VERSIÓN ANTERIOR REINICIADA/)
+  assert.match(client,/staleBuildEvidence&&/)
+})
+
 test('phone proof cannot complete without an exact Git commit identity',()=>{
   assert.match(client,/function isVerifiedBuild\(buildId:string\)/)
   assert.match(client,/\^\[0-9a-f\]\{40\}\$/)
   assert.match(client,/const verifiedBuild=isVerifiedBuild\(buildId\)/)
-  assert.match(client,/&&verifiedBuild/)
+  assert.match(client,/&&verifiedBuild&&allCurrentBuild/)
   assert.match(client,/UNVERIFIED BUILD/)
   assert.match(client,/VERSIÓN NO VERIFICADA/)
   assert.match(client,/buildStatus/)
@@ -121,7 +140,7 @@ test('phone proof offers safe launch links without changing tested flows',()=>{
 })
 
 test('older evidence without a tested site cannot stay passed',()=>{
-  assert.match(client,/next\[id\]=normalizeEvidence\(/)
+  assert.match(client,/next\[id\]=normalizeEvidence\(candidate,buildId\)/)
   assert.match(client,/site:String\(value\.site\?\?''\)\.slice\(0,160\)/)
   assert.match(client,/if\(!next\[id\]\.site\)next\[id\]=\{\.\.\.next\[id\],site:origin\}/)
 })
@@ -140,7 +159,8 @@ test('phone proof gives short bilingual guided steps and expected result for eve
 })
 
 test('phone proof exposes explicit complete versus incomplete gate',()=>{
-  assert.match(client,/const allPassed=stats\.pass===ids\.length&&stats\.fail===0&&stats\.remaining===0&&oneTestedSite&&verifiedBuild/)
+  assert.match(client,/const allCurrentBuild=/)
+  assert.match(client,/const allPassed=stats\.pass===ids\.length&&stats\.fail===0&&stats\.remaining===0&&oneTestedSite&&verifiedBuild&&allCurrentBuild/)
   assert.match(client,/PHONE PROOF COMPLETE/)
   assert.match(client,/PHONE PROOF INCOMPLETE/)
   assert.match(client,/PRUEBA DE TELÉFONO COMPLETA/)
