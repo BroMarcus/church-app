@@ -43,13 +43,31 @@ test('runbook covers the pilot critical auth onboarding guide and setup flows',(
   ]) assert.match(runbook,new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')))
 })
 
-test('runbook explicitly requires Spanish retesting of critical flows',()=>{
-  const repeatSpanish=(runbook.match(/Repeat[^\n]*in Spanish/g)||[]).length
-  const spanishCopy=(runbook.match(/Repite[^\n]*español/g)||[]).length
-  assert.ok(repeatSpanish>=4)
-  assert.ok(spanishCopy>=4)
-  assert.match(runbook,/start the flow in Español and keep it in Spanish/)
+test('runbook requires both English and Spanish before PASS',()=>{
+  assert.match(runbook,/PASS only after the expected result succeeds in BOTH English and Spanish/)
+  assert.match(runbook,/PASÓ después de obtener el resultado esperado en INGLÉS Y ESPAÑOL/)
+  assert.match(runbook,/record PASS only after both English and Spanish succeeded/)
+  assert.match(runbook,/registra PASÓ solamente después de que funcionen inglés y español/)
+  assert.match(runbook,/For PASS evidence, state that both English and Spanish completed successfully/)
+  assert.match(runbook,/Para evidencia de PASÓ, indica que inglés y español terminaron correctamente/)
+})
+
+test('runbook explicitly retests each critical flow in Spanish',()=>{
+  assert.match(runbook,/Repeat the full critical first-login path in Spanish/)
+  assert.match(runbook,/Repeat the full join flow in Spanish/)
+  assert.match(runbook,/Repeat the newest-link and old\/replaced-link member recovery in Spanish/)
+  assert.match(runbook,/Repeat the full recovery path in Spanish/)
+  assert.match(runbook,/Switch to Spanish and ask equivalent recovery questions/)
+  assert.match(runbook,/Repeat the complete safe setup flow in Spanish/)
   assert.match(runbook,/empieza el flujo en Español y mantenlo en español/)
+})
+
+test('runbook limits Fresh Church Setup proof to harmless designated test data',()=>{
+  assert.match(runbook,/Use Fresh Church Setup only in a designated test church\/account/)
+  assert.match(runbook,/Do not use real member records or irreplaceable church material/)
+  assert.match(runbook,/Usa Fresh Church Setup solamente en una iglesia\/cuenta de prueba/)
+  assert.match(runbook,/No uses registros de miembros reales ni material irremplazable de la iglesia/)
+  assert.match(runbook,/using another harmless test upload or designated test item/)
 })
 
 test('runbook protects secrets and private church data in failure reports',()=>{
@@ -68,6 +86,15 @@ test('runbook tells testers to stop on duplicate-account, repeated-submit, raw-e
   assert.match(runbook,/asks you to create another account/)
   assert.match(runbook,/English-only dead end/)
   assert.match(runbook,/publishes a course instead of leaving an unpublished draft/)
+})
+
+test('runbook warns when deployed Git build identity is not verifiable',()=>{
+  assert.match(runbook,/function isVerifiedBuild\(buildId:string\)/)
+  assert.match(runbook,/\^\[0-9a-f\]\{40\}\$/)
+  assert.match(runbook,/const verifiedBuild=isVerifiedBuild\(buildId\)/)
+  assert.match(runbook,/!verifiedBuild&&<p className="evidence-hint" role="alert">/)
+  assert.match(runbook,/Do not record pilot PASS evidence until the tested build is identifiable/)
+  assert.match(runbook,/No registres evidencia de PASÓ hasta poder identificar la versión probada/)
 })
 
 test('runbook shows the deployed Git build and does not perform production writes',()=>{
