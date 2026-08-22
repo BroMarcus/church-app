@@ -53,6 +53,27 @@ test('phone proof binds evidence to the tested site or preview',()=>{
   assert.match(client,/`- \$\{t\.site\}: \$\{item\.site\|\|'—'\}`/)
 })
 
+test('phone proof isolates browser evidence by deployed build',()=>{
+  assert.match(page,/VERCEL_GIT_COMMIT_SHA/)
+  assert.match(page,/NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA/)
+  assert.match(page,/const evidenceScope=/)
+  assert.match(page,/churchId=\{evidenceScope\}/)
+  assert.match(page,/Tested build/)
+  assert.match(page,/Versión probada/)
+})
+
+test('phone proof offers safe launch links without changing tested flows',()=>{
+  assert.match(page,/mode=signup/)
+  assert.match(page,/mode=signin/)
+  assert.match(page,/\/start\?lang=/)
+  assert.match(page,/\/guide\?lang=/)
+  assert.match(page,/\/church\/join-center\?lang=/)
+  assert.match(page,/\/church\/setup-inbox\?lang=/)
+  assert.match(page,/target="_blank"/)
+  assert.match(page,/use test accounts only/)
+  assert.match(page,/usa solamente cuentas de prueba/)
+})
+
 test('older evidence without a tested site cannot stay passed',()=>{
   assert.match(client,/next\[id\]=normalizeEvidence\(/)
   assert.match(client,/site:String\(value\.site\?\?''\)\.slice\(0,160\)/)
