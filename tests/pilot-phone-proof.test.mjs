@@ -32,16 +32,14 @@ test('phone proof bounds tester-entered evidence',()=>{
   assert.match(client,/\.slice\(0,500\)/)
 })
 
-test('phone proof requires evidence before PASS or FAIL',()=>{
+test('phone proof requires observed evidence before PASS or FAIL',()=>{
   assert.match(client,/function hasBaseEvidence\(entry:Entry\)/)
-  assert.match(client,/entry\.site\.trim\(\)/)
-  assert.match(client,/function hasFailureEvidence\(entry:Entry\)/)
-  assert.match(client,/function normalizeEvidence\(entry:Entry\):Entry/)
-  assert.match(client,/entry\.result==='pass'&&!hasBaseEvidence\(entry\)/)
-  assert.match(client,/entry\.result==='fail'&&!hasFailureEvidence\(entry\)/)
-  assert.match(client,/disabled=\{!baseEvidence\}/)
-  assert.match(client,/disabled=\{!failureEvidence\}/)
-  assert.match(client,/normalizeEvidence\(\{\.\.\.current\[id\],\.\.\.patch\}\)/)
+  assert.match(client,/entry\.site\.trim\(\).*entry\.notes\.trim\(\)/)
+  assert.match(client,/entry\.result!=='untested'&&!hasBaseEvidence\(entry\)/)
+  assert.match(client,/const evidenceReady=hasBaseEvidence\(item\)/)
+  assert.match(client,/disabled=\{!evidenceReady\}/)
+  assert.match(client,/Observed result \/ exact failing step/)
+  assert.match(client,/Resultado observado \/ paso exacto que falló/)
 })
 
 test('phone proof binds evidence to the tested site or preview',()=>{
@@ -53,11 +51,23 @@ test('phone proof binds evidence to the tested site or preview',()=>{
   assert.match(client,/`- \$\{t\.site\}: \$\{item\.site\|\|'—'\}`/)
 })
 
-test('phone proof isolates browser evidence by deployed build',()=>{
+test('phone proof blocks mixed-site pilot acceptance',()=>{
+  assert.match(client,/function normalizedSite\(value:string\)/)
+  assert.match(client,/const testedSites=useMemo/)
+  assert.match(client,/const oneTestedSite=testedSites\.size<=1/)
+  assert.match(client,/&&oneTestedSite/)
+  assert.match(client,/SITE MISMATCH/)
+  assert.match(client,/LOS SITIOS NO COINCIDEN/)
+  assert.match(client,/siteStatus/)
+})
+
+test('phone proof isolates browser evidence by deployed build and exports that build',()=>{
   assert.match(page,/VERCEL_GIT_COMMIT_SHA/)
   assert.match(page,/NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA/)
   assert.match(page,/const evidenceScope=/)
-  assert.match(page,/churchId=\{evidenceScope\}/)
+  assert.match(page,/buildId=\{buildId\}/)
+  assert.match(client,/buildId:string/)
+  assert.match(client,/`\$\{t\.build\}: \$\{buildId\}`/)
   assert.match(page,/Tested build/)
   assert.match(page,/Versión probada/)
 })
@@ -94,7 +104,7 @@ test('phone proof gives short bilingual guided steps and expected result for eve
 })
 
 test('phone proof exposes explicit complete versus incomplete gate',()=>{
-  assert.match(client,/const allPassed=stats\.pass===ids\.length&&stats\.fail===0&&stats\.remaining===0/)
+  assert.match(client,/const allPassed=stats\.pass===ids\.length&&stats\.fail===0&&stats\.remaining===0&&oneTestedSite/)
   assert.match(client,/PHONE PROOF COMPLETE/)
   assert.match(client,/PHONE PROOF INCOMPLETE/)
   assert.match(client,/PRUEBA DE TELÉFONO COMPLETA/)
