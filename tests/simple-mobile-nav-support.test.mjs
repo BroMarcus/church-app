@@ -60,17 +60,26 @@ test('mobile navigation fails closed if church feature settings cannot be read',
   assert.doesNotMatch(shell,/formsResult\.error\.message/)
 })
 
-test('mobile navigation keeps only safe recovery paths when membership lookup fails',async()=>{
+test('mobile navigation keeps only safe recovery paths when membership lookup fails or no active church exists',async()=>{
   const nav=await read('src/components/mobile-nav.tsx')
   const shell=await read('src/components/mobile-nav-shell.tsx')
   assert.match(shell,/error:membershipError/)
   assert.match(shell,/mobile navigation membership unavailable/)
   assert.match(shell,/\{code:membershipError\.code\}/)
   assert.match(shell,/const recoveryAccess:MobileNavAccess=/)
-  assert.match(shell,/recoveryOnly/)
+  assert.match(shell,/if\(!membership\?\.church_id\)return <MobileNav access=\{recoveryAccess\} preferredLanguage=\{preferredLanguage\} recoveryOnly\/>/)
+  assert.doesNotMatch(shell,/if\(!membership\?\.church_id\)return null/)
   assert.doesNotMatch(shell,/membershipError\.message/)
   assert.match(nav,/recoveryOnly=false/)
   assert.match(nav,/const main:Entry\[]=recoveryOnly\?\[\['\/','Home',Home\]\]:/)
   assert.match(nav,/const sections:Section\[]=recoveryOnly\?\[\{label:'Help',items:\[\['\/start','Start Here',Sparkles\],\['\/feedback','Help & Feedback',MessageSquareText\]\]\}\]:/)
   assert.doesNotMatch(nav,/recoveryOnly\?\[\{label:'Help',items:\[[^\]]*\/guide/)
+})
+
+test('navigation permission read failures fail closed and log only bounded diagnostics',async()=>{
+  const shell=await read('src/components/mobile-nav-shell.tsx')
+  assert.match(shell,/mobile navigation permission unavailable/)
+  assert.match(shell,/\{permission:key,code:error\.code\}/)
+  assert.match(shell,/return false/)
+  assert.doesNotMatch(shell,/error\.message/)
 })
