@@ -9,6 +9,11 @@ const copy={
   es:{opening:'Abriendo tu enlace seguro…',invalid:'Este enlace no es válido o ya venció. Solicita un correo nuevo para cambiar tu contraseña.',choose:'Escribe una contraseña nueva abajo.',invalidBack:'Este enlace no es válido o ya venció. Vuelve a Iniciar sesión y solicita un correo nuevo.',short:'La contraseña debe tener al menos 8 caracteres.',mismatch:'Las dos contraseñas no coinciden.',failed:'No pudimos cambiar la contraseña. Solicita un correo nuevo e inténtalo otra vez.',updated:'Contraseña actualizada. Tu contraseña anterior ya no funcionará.',success:'Contraseña actualizada. Continúa para iniciar sesión con tu nueva contraseña.',title:'Cambiar tu contraseña',newPassword:'Nueva contraseña',again:'Escríbela otra vez',showPassword:'Mostrar contraseña',hidePassword:'Ocultar contraseña',updating:'Actualizando…',update:'Actualizar contraseña',continue:'Continuar a Iniciar sesión',back:'Volver a Iniciar sesión'}
 } as const
 
+function diagnosticCode(error:unknown){
+  if(error&&typeof error==='object'&&'code' in error)return String((error as {code?:unknown}).code||'unknown').slice(0,80)
+  return error instanceof Error?error.name.slice(0,80):'unknown'
+}
+
 function safeJoinNext(value:string|null){
   if(!value||value.length>500||value.includes('\\'))return ''
   try{
@@ -46,7 +51,7 @@ export default function UpdatePasswordPage(){
         if(code){
           const {error}=await supabase.auth.exchangeCodeForSession(code)
           if(error){
-            console.error('password reset session exchange failed',{message:error.message})
+            console.error('password reset session exchange failed',{code:diagnosticCode(error)})
             if(mounted){setReady(false);setMessage(c.invalid)}
             return
           }
@@ -54,12 +59,12 @@ export default function UpdatePasswordPage(){
           window.history.replaceState({},'',`${url.pathname}${url.search}${url.hash}`)
         }
         const {data,error}=await supabase.auth.getSession()
-        if(error)console.error('password reset session lookup failed',{message:error.message})
+        if(error)console.error('password reset session lookup failed',{code:diagnosticCode(error)})
         if(!mounted)return
         if(data.session){setReady(true);setMessage(c.choose)}
         else{setReady(false);setMessage(c.invalidBack)}
       }catch(error){
-        console.error('password reset initialization failed',{message:error instanceof Error?error.message:String(error)})
+        console.error('password reset initialization failed',{code:diagnosticCode(error)})
         if(mounted){setReady(false);setMessage(c.invalidBack)}
       }
     }
@@ -84,19 +89,19 @@ export default function UpdatePasswordPage(){
     try{
       const {error}=await supabase.auth.updateUser({password})
       if(error){
-        console.error('password update failed',{message:error.message})
+        console.error('password update failed',{code:diagnosticCode(error)})
         setMessage(t.failed)
         return
       }
       const {error:signOutError}=await supabase.auth.signOut()
-      if(signOutError)console.error('post-reset sign out failed',{message:signOutError.message})
+      if(signOutError)console.error('post-reset sign out failed',{code:diagnosticCode(signOutError)})
       setPassword('')
       setConfirm('')
       setReady(false)
       setCompleted(true)
       setMessage(t.success)
     }catch(error){
-      console.error('password update request failed',{message:error instanceof Error?error.message:String(error)})
+      console.error('password update request failed',{code:diagnosticCode(error)})
       setMessage(t.failed)
     }finally{
       setBusy(false)
