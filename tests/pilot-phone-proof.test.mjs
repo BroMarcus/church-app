@@ -108,6 +108,16 @@ test('each PASS or FAIL is stamped to the exact current Git build',()=>{
   assert.match(client,/value=\{item\.build\|\|currentBuild\} readOnly/)
 })
 
+test('editing evidence after PASS or FAIL invalidates the completed result',()=>{
+  assert.match(client,/function updateEvidence\(id:CheckId/)
+  assert.match(client,/const evidenceChanged=Object\.entries\(patch\)\.some/)
+  assert.match(client,/result:evidenceChanged&&item\.result!=='untested'\?'untested':item\.result/)
+  assert.match(client,/build:evidenceChanged&&item\.result!=='untested'\?'':item\.build/)
+  assert.match(client,/If you change the device, account, date, site, or notes after PASS\/FAIL/)
+  assert.match(client,/Si cambias el dispositivo, cuenta, fecha, sitio o notas después de PASÓ\/FALLÓ/)
+  assert.doesNotMatch(client,/onChange=\{e=>update\(id,/)
+})
+
 test('saved results from a different or unknown build are downgraded to untested',()=>{
   assert.match(client,/if\(candidate\.result!=='untested'&&!evidenceMatchesBuild\(candidate,buildId\)\)stale=true/)
   assert.match(client,/!evidenceMatchesBuild\(entry,buildId\)/)
