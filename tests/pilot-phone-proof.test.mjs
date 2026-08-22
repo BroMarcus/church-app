@@ -34,12 +34,23 @@ test('phone proof bounds tester-entered evidence',()=>{
 
 test('phone proof requires observed evidence before PASS or FAIL',()=>{
   assert.match(client,/function hasBaseEvidence\(entry:Entry\)/)
-  assert.match(client,/entry\.site\.trim\(\).*entry\.notes\.trim\(\)/)
+  assert.match(client,/normalizedSite\(entry\.site\).*entry\.notes\.trim\(\)/)
   assert.match(client,/entry\.result!=='untested'&&!hasBaseEvidence\(entry\)/)
   assert.match(client,/const evidenceReady=hasBaseEvidence\(item\)/)
   assert.match(client,/disabled=\{!evidenceReady\}/)
   assert.match(client,/Observed result \/ exact failing step/)
   assert.match(client,/Resultado observado \/ paso exacto que falló/)
+})
+
+test('phone proof requires a real http or https tested site',()=>{
+  assert.match(client,/function normalizedSite\(value:string\)/)
+  assert.match(client,/new URL\(value\.trim\(\)\)/)
+  assert.match(client,/url\.protocol!=='http:'&&url\.protocol!=='https:'/)
+  assert.match(client,/return url\.origin\.toLowerCase\(\)/)
+  assert.match(client,/type="url"/)
+  assert.match(client,/aria-invalid=/)
+  assert.match(client,/Enter a full http:\/\/ or https:\/\/ site\/preview address/)
+  assert.match(client,/Escribe una dirección completa que empiece con http:\/\/ o https:\/\//)
 })
 
 test('phone proof binds evidence to the tested site or preview',()=>{
@@ -51,11 +62,15 @@ test('phone proof binds evidence to the tested site or preview',()=>{
   assert.match(client,/`- \$\{t\.site\}: \$\{item\.site\|\|'—'\}`/)
 })
 
+test('phone proof treats different routes on one preview origin as one site',()=>{
+  assert.match(client,/return url\.origin\.toLowerCase\(\)/)
+  assert.doesNotMatch(client,/replace\(\/\\\/$\//)
+})
+
 test('phone proof blocks mixed-site pilot acceptance',()=>{
-  assert.match(client,/function normalizedSite\(value:string\)/)
   assert.match(client,/const testedSites=useMemo/)
   assert.match(client,/const oneTestedSite=testedSites\.size<=1/)
-  assert.match(client,/&&oneTestedSite/)
+  assert.match(client,/&&oneTestedSite&&verifiedBuild/)
   assert.match(client,/SITE MISMATCH/)
   assert.match(client,/LOS SITIOS NO COINCIDEN/)
   assert.match(client,/siteStatus/)
@@ -70,6 +85,16 @@ test('phone proof isolates browser evidence by deployed build and exports that b
   assert.match(client,/`\$\{t\.build\}: \$\{buildId\}`/)
   assert.match(page,/Tested build/)
   assert.match(page,/Versión probada/)
+})
+
+test('phone proof cannot complete without an exact Git commit identity',()=>{
+  assert.match(client,/function isVerifiedBuild\(buildId:string\)/)
+  assert.match(client,/\^\[0-9a-f\]\{40\}\$/)
+  assert.match(client,/const verifiedBuild=isVerifiedBuild\(buildId\)/)
+  assert.match(client,/&&verifiedBuild/)
+  assert.match(client,/UNVERIFIED BUILD/)
+  assert.match(client,/VERSIÓN NO VERIFICADA/)
+  assert.match(client,/buildStatus/)
 })
 
 test('phone proof offers safe launch links without changing tested flows',()=>{
@@ -104,7 +129,7 @@ test('phone proof gives short bilingual guided steps and expected result for eve
 })
 
 test('phone proof exposes explicit complete versus incomplete gate',()=>{
-  assert.match(client,/const allPassed=stats\.pass===ids\.length&&stats\.fail===0&&stats\.remaining===0&&oneTestedSite/)
+  assert.match(client,/const allPassed=stats\.pass===ids\.length&&stats\.fail===0&&stats\.remaining===0&&oneTestedSite&&verifiedBuild/)
   assert.match(client,/PHONE PROOF COMPLETE/)
   assert.match(client,/PHONE PROOF INCOMPLETE/)
   assert.match(client,/PRUEBA DE TELÉFONO COMPLETA/)
