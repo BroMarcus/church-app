@@ -34,6 +34,11 @@ const copy={
 function storageKey(churchId:string){return `kn-phone-proof:${churchId || 'unknown'}`}
 function hasBaseEvidence(entry:Entry){return Boolean(entry.device.trim()&&entry.account.trim()&&entry.date.trim())}
 function hasFailureEvidence(entry:Entry){return hasBaseEvidence(entry)&&Boolean(entry.notes.trim())}
+function normalizeEvidence(entry:Entry):Entry{
+  if(entry.result==='pass'&&!hasBaseEvidence(entry))return {...entry,result:'untested'}
+  if(entry.result==='fail'&&!hasFailureEvidence(entry))return {...entry,result:'untested'}
+  return entry
+}
 
 export default function PhoneProofClient({lang,churchId}:{lang:Lang;churchId:string}){
   const t=copy[lang]
@@ -50,10 +55,7 @@ export default function PhoneProofClient({lang,churchId}:{lang:Lang;churchId:str
         for(const id of ids){
           const value=parsed[id]
           if(value&&['untested','pass','fail'].includes(String(value.result))){
-            const entry={result:value.result as Result,device:String(value.device??'').slice(0,120),account:String(value.account??'').slice(0,120),date:String(value.date??'').slice(0,20),notes:String(value.notes??'').slice(0,500)}
-            if(entry.result==='pass'&&!hasBaseEvidence(entry))entry.result='untested'
-            if(entry.result==='fail'&&!hasFailureEvidence(entry))entry.result='untested'
-            next[id]=entry
+            next[id]=normalizeEvidence({result:value.result as Result,device:String(value.device??'').slice(0,120),account:String(value.account??'').slice(0,120),date:String(value.date??'').slice(0,20),notes:String(value.notes??'').slice(0,500)})
           }
         }
         setState(next)
@@ -74,7 +76,7 @@ export default function PhoneProofClient({lang,churchId}:{lang:Lang;churchId:str
   const allPassed=stats.pass===ids.length&&stats.fail===0&&stats.remaining===0
 
   function update(id:CheckId,patch:Partial<Entry>){
-    setState(current=>({...current,[id]:{...current[id],...patch}}))
+    setState(current=>({...current,[id]:normalizeEvidence({...current[id],...patch})}))
   }
 
   function summary(){
