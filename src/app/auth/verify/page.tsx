@@ -1,6 +1,20 @@
 import Link from 'next/link'
 import { verifyAuthLink } from './actions'
 
+const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
+
+function safeJoinNext(raw:string|undefined){
+  if(!raw||raw.length>500)return ''
+  try{
+    const canonical=new URL(siteUrl)
+    const requested=new URL(raw,canonical)
+    if(requested.origin!==canonical.origin||!requested.pathname.startsWith('/join/'))return ''
+    return `${requested.pathname}${requested.search}${requested.hash}`
+  }catch{
+    return ''
+  }
+}
+
 const copy={
   en:{reset:'Reset your password',confirm:'Confirm your account',resetBody:'Tap continue to securely open the password reset form.',confirmBody:'Tap continue to securely confirm your email address.',invalid:'This account link is incomplete or invalid.',continueReset:'Continue password reset',confirmEmail:'Confirm email',fresh:'Please return to Sign in and request one fresh email.',security:'For your security, Kingdom Network does not complete one-time account links until you tap the button above.',back:'Back to sign in'},
   es:{reset:'Cambiar tu contraseña',confirm:'Confirmar tu cuenta',resetBody:'Toca Continuar para abrir de forma segura el formulario para cambiar tu contraseña.',confirmBody:'Toca Continuar para confirmar de forma segura tu correo electrónico.',invalid:'Este enlace está incompleto o no es válido.',continueReset:'Continuar para cambiar contraseña',confirmEmail:'Confirmar correo',fresh:'Vuelve a Iniciar sesión y solicita un correo nuevo.',security:'Por tu seguridad, Kingdom Network no completa enlaces de un solo uso hasta que toques el botón de arriba.',back:'Volver a Iniciar sesión'}
@@ -12,6 +26,8 @@ export default async function VerifyPage({searchParams}:{searchParams:Promise<{t
   const t=copy[lang]
   const hasLink=Boolean(params.token_hash&&params.type)
   const isRecovery=params.type==='recovery'
+  const joinNext=safeJoinNext(params.next)
+  const backHref=`/login?lang=${lang}&mode=signin${joinNext?`&next=${encodeURIComponent(joinNext)}`:''}`
 
-  return <main className="login-wrap"><div className="login card"><div className="pill">KINGDOM NETWORK</div><h1>{isRecovery?t.reset:t.confirm}</h1><p className="muted">{hasLink?(isRecovery?t.resetBody:t.confirmBody):t.invalid}</p>{hasLink?<form action={verifyAuthLink}><input type="hidden" name="token_hash" value={params.token_hash}/><input type="hidden" name="type" value={params.type}/><input type="hidden" name="next" value={params.next??'/'}/><input type="hidden" name="lang" value={lang}/><button className="btn" type="submit">{isRecovery?t.continueReset:t.confirmEmail}</button></form>:<div className="notice error">{t.fresh}</div>}<p className="small muted" style={{marginTop:16}}>{t.security}</p><p className="small muted" style={{marginTop:16}}><Link href={`/login?lang=${lang}`}>{t.back}</Link></p></div></main>
+  return <main className="login-wrap"><div className="login card"><div className="pill">KINGDOM NETWORK</div><h1>{isRecovery?t.reset:t.confirm}</h1><p className="muted">{hasLink?(isRecovery?t.resetBody:t.confirmBody):t.invalid}</p>{hasLink?<form action={verifyAuthLink}><input type="hidden" name="token_hash" value={params.token_hash}/><input type="hidden" name="type" value={params.type}/><input type="hidden" name="next" value={params.next??'/'}/><input type="hidden" name="lang" value={lang}/><button className="btn" type="submit">{isRecovery?t.continueReset:t.confirmEmail}</button></form>:<div className="notice error" role="alert">{t.fresh}</div>}<p className="small muted" style={{marginTop:16}}>{t.security}</p><p className="small muted" style={{marginTop:16}}><Link href={backHref}>{t.back}</Link></p></div></main>
 }
