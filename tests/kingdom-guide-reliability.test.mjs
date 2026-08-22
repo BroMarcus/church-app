@@ -17,6 +17,18 @@ test('Kingdom Guide distinguishes resource read failure from a real empty result
   assert.match(source,/Intentar búsqueda otra vez/)
 })
 
+test('Kingdom Guide fails closed when the active church membership read fails',async()=>{
+  const source=await read('src/app/guide/page.tsx')
+  assert.match(source,/membershipError&&membershipError\.code!=='PGRST116'/)
+  assert.match(source,/We could not safely check your church connection right now\./)
+  assert.match(source,/No pudimos revisar con seguridad tu conexión con la iglesia en este momento\./)
+  assert.match(source,/Nothing was changed\./)
+  assert.match(source,/No se cambió nada\./)
+  assert.match(source,/Try Kingdom Guide again/)
+  assert.match(source,/Intentar Guía Kingdom otra vez/)
+  assert.match(source,/withLang\('\/feedback'\)/)
+})
+
 test('Kingdom Guide keeps backend diagnostics bounded',async()=>{
   const source=await read('src/app/guide/page.tsx')
   assert.match(source,/Kingdom Guide resource search failed.*code:/s)
