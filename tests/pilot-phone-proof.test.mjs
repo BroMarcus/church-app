@@ -30,6 +30,24 @@ test('phone proof bounds tester-entered evidence',()=>{
   assert.match(client,/\.slice\(0,500\)/)
 })
 
+test('phone proof requires evidence before PASS or FAIL',()=>{
+  assert.match(client,/function hasBaseEvidence\(entry:Entry\)/)
+  assert.match(client,/function hasFailureEvidence\(entry:Entry\)/)
+  assert.match(client,/disabled=\{!baseEvidence\}/)
+  assert.match(client,/disabled=\{!failureEvidence\}/)
+  assert.match(client,/entry\.result==='pass'&&!hasBaseEvidence\(entry\)/)
+  assert.match(client,/entry\.result==='fail'&&!hasFailureEvidence\(entry\)/)
+})
+
+test('phone proof exposes explicit complete versus incomplete gate',()=>{
+  assert.match(client,/const allPassed=stats\.pass===ids\.length&&stats\.fail===0&&stats\.remaining===0/)
+  assert.match(client,/PHONE PROOF COMPLETE/)
+  assert.match(client,/PHONE PROOF INCOMPLETE/)
+  assert.match(client,/PRUEBA DE TELÉFONO COMPLETA/)
+  assert.match(client,/PRUEBA DE TELÉFONO INCOMPLETA/)
+  assert.match(client,/proofStatus/)
+})
+
 test('phone proof offers English and Spanish and exportable summary',()=>{
   assert.match(page,/lang==='es'/)
   assert.match(client,/Real-phone proof checklist/)
