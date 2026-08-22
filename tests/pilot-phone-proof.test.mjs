@@ -33,10 +33,12 @@ test('phone proof bounds tester-entered evidence',()=>{
 test('phone proof requires evidence before PASS or FAIL',()=>{
   assert.match(client,/function hasBaseEvidence\(entry:Entry\)/)
   assert.match(client,/function hasFailureEvidence\(entry:Entry\)/)
-  assert.match(client,/disabled=\{!baseEvidence\}/)
-  assert.match(client,/disabled=\{!failureEvidence\}/)
+  assert.match(client,/function normalizeEvidence\(entry:Entry\):Entry/)
   assert.match(client,/entry\.result==='pass'&&!hasBaseEvidence\(entry\)/)
   assert.match(client,/entry\.result==='fail'&&!hasFailureEvidence\(entry\)/)
+  assert.match(client,/disabled=\{!baseEvidence\}/)
+  assert.match(client,/disabled=\{!failureEvidence\}/)
+  assert.match(client,/normalizeEvidence\(\{\.\.\.current\[id\],\.\.\.patch\}\)/)
 })
 
 test('phone proof exposes explicit complete versus incomplete gate',()=>{
