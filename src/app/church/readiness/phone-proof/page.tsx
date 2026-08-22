@@ -7,12 +7,12 @@ import './phone-proof.css'
 const copy={
   en:{
     title:'Real-phone proof',body:'Run every required pilot flow on a real phone and keep enough evidence to reproduce any failure.',back:'← Pilot Readiness',home:'Home',english:'English',spanish:'Español',
-    build:'Tested build',buildHelp:'Saved results are kept separate for this deployed build.',launchTitle:'Open a test flow',launchHelp:'These links only open the starting screen in a new tab. Keep this checklist open and use test accounts only.',
+    build:'Tested build',buildHelp:'Saved results are kept separate for this deployed build.',launchTitle:'Open a test flow',launchHelp:'These links only open the starting screen in a new tab. Keep this checklist open and use test accounts only.',runbook:'Open safe test runbook',runbookHelp:'New tester? Open the bilingual runbook first. It explains account setup, test order, PASS rules, failure capture, and what secret/private information must never be pasted into the Control Room.',
     signup:'Signup',signin:'Sign in / password reset',start:'Start Here',guide:'Kingdom Guide',join:'Join Center',setup:'Setup Inbox'
   },
   es:{
     title:'Prueba con teléfono real',body:'Prueba cada flujo requerido del piloto en un teléfono real y guarda suficiente evidencia para reproducir cualquier falla.',back:'← Preparación del Piloto',home:'Inicio',english:'English',spanish:'Español',
-    build:'Versión probada',buildHelp:'Los resultados guardados se mantienen separados para esta versión desplegada.',launchTitle:'Abrir una prueba',launchHelp:'Estos enlaces solamente abren la pantalla inicial en una pestaña nueva. Mantén abierta esta lista y usa solamente cuentas de prueba.',
+    build:'Versión probada',buildHelp:'Los resultados guardados se mantienen separados para esta versión desplegada.',launchTitle:'Abrir una prueba',launchHelp:'Estos enlaces solamente abren la pantalla inicial en una pestaña nueva. Mantén abierta esta lista y usa solamente cuentas de prueba.',runbook:'Abrir guía segura de prueba',runbookHelp:'¿Es tu primera prueba? Abre primero la guía bilingüe. Explica las cuentas, el orden, cuándo marcar PASÓ, cómo guardar una falla y qué información secreta/privada nunca debes pegar en el Control Room.',
     signup:'Registro',signin:'Entrar / restablecer contraseña',start:'Empieza Aquí',guide:'Kingdom Guide',join:'Centro de Invitaciones',setup:'Bandeja de Configuración'
   }
 } as const
@@ -68,6 +68,12 @@ export default async function PhoneProofPage({searchParams}:{searchParams:Promis
 
     <section className="local-note" aria-label={t.build}>
       <strong>{t.build}:</strong> <code>{buildId}</code><br/>{t.buildHelp}
+    </section>
+
+    <section className="local-note">
+      <strong>{t.runbook}</strong>
+      <p>{t.runbookHelp}</p>
+      <div className="proof-links"><Link href={`/church/readiness/phone-proof/runbook?lang=${lang}`}>{t.runbook}</Link></div>
     </section>
 
     <section className="local-note">
