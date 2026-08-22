@@ -25,13 +25,16 @@ test('phone proof persists only in browser-local storage',()=>{
 
 test('phone proof bounds tester-entered evidence',()=>{
   assert.match(client,/maxLength=\{120\}/)
+  assert.match(client,/maxLength=\{160\}/)
   assert.match(client,/maxLength=\{500\}/)
   assert.match(client,/\.slice\(0,120\)/)
+  assert.match(client,/\.slice\(0,160\)/)
   assert.match(client,/\.slice\(0,500\)/)
 })
 
 test('phone proof requires evidence before PASS or FAIL',()=>{
   assert.match(client,/function hasBaseEvidence\(entry:Entry\)/)
+  assert.match(client,/entry\.site\.trim\(\)/)
   assert.match(client,/function hasFailureEvidence\(entry:Entry\)/)
   assert.match(client,/function normalizeEvidence\(entry:Entry\):Entry/)
   assert.match(client,/entry\.result==='pass'&&!hasBaseEvidence\(entry\)/)
@@ -39,6 +42,34 @@ test('phone proof requires evidence before PASS or FAIL',()=>{
   assert.match(client,/disabled=\{!baseEvidence\}/)
   assert.match(client,/disabled=\{!failureEvidence\}/)
   assert.match(client,/normalizeEvidence\(\{\.\.\.current\[id\],\.\.\.patch\}\)/)
+})
+
+test('phone proof binds evidence to the tested site or preview',()=>{
+  assert.match(client,/site:string/)
+  assert.match(client,/window\.location\.origin\.slice\(0,160\)/)
+  assert.match(client,/String\(value\.site\?\?' '\)/)
+  assert.match(client,/Tested site \/ preview/)
+  assert.match(client,/Sitio \/ vista previa probada/)
+  assert.match(client,/`- \$\{t\.site\}: \$\{item\.site\|\|'—'\}`/)
+})
+
+test('older evidence without a tested site cannot stay passed',()=>{
+  assert.match(client,/next\[id\]=normalizeEvidence\(/)
+  assert.match(client,/site:String\(value\.site\?\?' '\)\.slice\(0,160\)/)
+  assert.match(client,/if\(!next\[id\]\.site\)next\[id\]=\{\.\.\.next\[id\],site:origin\}/)
+})
+
+test('phone proof gives short bilingual guided steps and expected result for every flow',()=>{
+  assert.match(client,/const flowGuide/)
+  assert.match(client,/Test steps/)
+  assert.match(client,/Pasos de prueba/)
+  assert.match(client,/Expected result/)
+  assert.match(client,/Resultado esperado/)
+  assert.match(client,/guide\[id\]\.steps\.map/)
+  assert.match(client,/guide\[id\]\.expected/)
+  for(const flow of ['signup','existing','invite','reset','spanish','guide','setup']){
+    assert.match(client,new RegExp(`${flow}:\\{steps:\\[`))
+  }
 })
 
 test('phone proof exposes explicit complete versus incomplete gate',()=>{
