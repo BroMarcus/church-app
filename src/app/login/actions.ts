@@ -19,6 +19,7 @@ function safeJoinNext(value:string){
 }
 const recoveryUrl=(lang:'en'|'es',next='')=>`${siteUrl}/auth/update-password?lang=${lang}${safeJoinNext(next)?`&next=${encodeURIComponent(safeJoinNext(next))}`:''}`
 const statusPart=(kind:'error'|'message',code:string)=>`&${kind}_code=${encodeURIComponent(code)}`
+const boundedCode=(value:unknown)=>String(value||'unknown').slice(0,80)
 function authEmailErrorCode(message:string){
   const normalized=message.toLowerCase()
   return normalized.includes('rate limit')||normalized.includes('over_email_send_rate_limit')||normalized.includes('security purposes')?'email_rate_limit':'email_failed'
@@ -71,9 +72,17 @@ export async function signup(formData:FormData){
   let publicSignup=false
   if(inviteId){
     const {data:valid,error:inviteError}=await supabase.rpc('validate_invite_email',{p_invite_id:inviteId,p_email:email})
-    if(inviteError||!valid)fail('invite_invalid')
+    if(inviteError){
+      console.error('signup invite validation unavailable',{code:boundedCode(inviteError.code)})
+      fail('invite_check_unavailable')
+    }
+    if(!valid)fail('invite_invalid')
   }else{
-    const {data:status}=await supabase.rpc('get_public_signup_status')
+    const {data:status,error:statusError}=await supabase.rpc('get_public_signup_status')
+    if(statusError){
+      console.error('public signup status unavailable',{code:boundedCode(statusError.code)})
+      fail('signup_status_unavailable')
+    }
     const row=Array.isArray(status)?status[0]:status
     if(!row?.open)fail('signup_closed')
     publicSignup=true
