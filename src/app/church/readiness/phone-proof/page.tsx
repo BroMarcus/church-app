@@ -17,14 +17,23 @@ const copy={
   }
 } as const
 
+function boundedCode(value:unknown){
+  const code=typeof value==='object'&&value&&'code' in value?String((value as {code?:unknown}).code??'UNKNOWN'):'UNKNOWN'
+  return code.replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48)||'UNKNOWN'
+}
+
 export default async function PhoneProofPage({searchParams}:{searchParams:Promise<{lang?:string}>}){
   const params=await searchParams
   const lang:'en'|'es'=params.lang==='es'?'es':'en'
   const t=copy[lang]
   const supabase=await createClient()
   const {data:claims,error:claimsError}=await supabase.auth.getClaims()
+  if(claimsError){
+    console.error('[phone-proof] auth unavailable',{code:boundedCode(claimsError)})
+    throw new Error('PHONE_PROOF_AUTH_UNAVAILABLE')
+  }
   const userId=claims?.claims?.sub
-  if(claimsError||!userId)redirect(`/login?lang=${lang}&mode=signin`)
+  if(!userId)redirect(`/login?lang=${lang}&mode=signin`)
 
   const {data:membership,error:membershipError}=await supabase
     .from('church_memberships')
@@ -34,7 +43,11 @@ export default async function PhoneProofPage({searchParams}:{searchParams:Promis
     .limit(1)
     .maybeSingle()
 
-  if(membershipError||!membership?.church_id||!['pastor','church_admin'].includes(membership.role)){
+  if(membershipError){
+    console.error('[phone-proof] membership unavailable',{code:boundedCode(membershipError)})
+    throw new Error('PHONE_PROOF_MEMBERSHIP_UNAVAILABLE')
+  }
+  if(!membership?.church_id||!['pastor','church_admin'].includes(membership.role)){
     redirect(lang==='es'?'/?lang=es':'/')
   }
 
