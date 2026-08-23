@@ -46,6 +46,18 @@ test('password reset completion enforces the same new-password ceiling',()=>{
   assert.ok(updatePassword.includes('La contraseña debe tener 128 caracteres o menos.'))
 })
 
+test('password reset completion does not rerun initialization and overwrite success state',()=>{
+  assert.match(updatePassword,/useEffect\(\(\)=>\{[\s\S]*?return\(\)=>\{mounted=false;listener\.subscription\.unsubscribe\(\)\}\n  \},\[\]\)/)
+  assert.doesNotMatch(updatePassword,/\},\[completed\]\)/)
+})
+
+test('password reset reports a failed post-reset sign-out instead of claiming a clean sign-in handoff',()=>{
+  assert.ok(updatePassword.includes('setSignOutIncomplete(true)'))
+  assert.ok(updatePassword.includes('Your password was updated, but we could not safely finish signing this browser out.'))
+  assert.ok(updatePassword.includes('Tu contraseña fue actualizada, pero no pudimos cerrar esta sesión del navegador de forma segura.'))
+  assert.ok(updatePassword.includes("signOutIncomplete?securityHref:signInHref"))
+})
+
 test('bilingual messages explain bounded-input failures without provider text',()=>{
   assert.ok(page.includes('Your first and last name must each be 80 characters or fewer.'))
   assert.ok(page.includes('Tu nombre y apellido deben tener 80 caracteres o menos cada uno.'))
