@@ -6,6 +6,7 @@ import test from 'node:test'
 const read=(file)=>fs.readFileSync(path.join(process.cwd(),file),'utf8')
 const page=read('src/app/start/page.tsx')
 const actions=read('src/app/start/actions.ts')
+const submit=read('src/app/start/start-submit-button.tsx')
 
 test('Start Here does not echo arbitrary query-string error or message text',()=>{
   assert.doesNotMatch(page,/params\.error\b/)
@@ -42,4 +43,21 @@ test('Spanish Start Here presents common church roles in Spanish',()=>{
   assert.match(page,/member:'Miembro'/)
   assert.match(page,/leader:'Líder'/)
   assert.match(page,/roleLabel\(membership\.role,lang\)/)
+})
+
+test('first-login tour stays focused on core member-safe destinations',()=>{
+  const tourLine=page.split('\n').find((line)=>line.trim().startsWith('const tour='))||''
+  for(const path of ['/','/learning','/groups','/calendar','/guide','/prayer','/documents','/updates','/notifications']) assert.match(tourLine,new RegExp(`'${path.replaceAll('/','\\/')}'`))
+  for(const path of ['/outreach','/teams','/network','/fundraising']) assert.doesNotMatch(tourLine,new RegExp(`'${path.replaceAll('/','\\/')}'`))
+  assert.match(page,/You do not need every tool on your first day/)
+  assert.match(page,/No necesitas todas las herramientas el primer día/)
+})
+
+test('finish onboarding blocks repeat taps and gives bilingual pending guidance',()=>{
+  assert.match(page,/StartSubmitButton label=\{t\.finish\} pendingLabel=\{t\.saving\}/)
+  assert.match(page,/Saving — keep this page open/)
+  assert.match(page,/Guardando — mantén esta página abierta/)
+  assert.match(submit,/useFormStatus/)
+  assert.match(submit,/disabled=\{pending\}/)
+  assert.match(submit,/pending\?pendingLabel:label/)
 })
