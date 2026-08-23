@@ -12,6 +12,14 @@ test('verification UI only hands a canonical church join destination to the serv
   assert.match(page,/requested\.origin!==canonical\.origin\|\|!requested\.pathname\.startsWith\('\/join\/'\)/)
 })
 
+test('one-time verification uses a pending submit guard and simple bilingual slow-phone guidance',()=>{
+  assert.match(page,/import \{ PendingSubmit \}/)
+  assert.match(page,/<PendingSubmit label=/)
+  assert.match(page,/pendingLabel=/)
+  assert.match(page,/Tap it once and keep this page open/)
+  assert.match(page,/Tócalo una sola vez y mantén esta página abierta/)
+})
+
 test('server independently constrains recovery to church join and signup to Start Here or join',()=>{
   assert.match(actions,/rawType==='recovery'\?joinNext:safeSignupDestination/)
   assert.match(actions,/parsed\.pathname==='\/start'\|\|parsed\.pathname\.startsWith\('\/join\/'\)/)
