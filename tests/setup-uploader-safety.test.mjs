@@ -18,3 +18,10 @@ test('Fresh Church Setup keeps upload diagnostics bounded instead of logging raw
   assert.match(source, /code:boundedCode\(insert\.error\)/);
   assert.match(source, /code:boundedCode\(cleanup\.error\)/);
 });
+
+test('Fresh Church Setup warns pilot testers not to upload sensitive real-world records', () => {
+  assert.match(source, /For pilot testing:/);
+  assert.match(source, /Do not upload real member records, private pastoral notes, finance files, passwords, or access codes\./);
+  assert.match(source, /Para pruebas del piloto:/);
+  assert.match(source, /No subas expedientes reales de miembros, notas pastorales privadas, archivos financieros, contraseñas ni códigos de acceso\./);
+});
