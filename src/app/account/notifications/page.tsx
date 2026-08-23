@@ -7,11 +7,13 @@ import {NotificationSubmitButton} from './notification-submit-button'
 import './preferences.css'
 
 const statusCopy={
+  auth_unavailable:{en:'We could not safely verify your account right now. Nothing was changed. Please try again.',es:'No pudimos verificar tu cuenta de forma segura en este momento. No se cambió nada. Inténtalo otra vez.'},
   save_failed:{en:'We could not save your notification preferences right now. Nothing was changed. Please try again.',es:'No pudimos guardar tus preferencias de notificación en este momento. No se cambió nada. Inténtalo otra vez.'},
   generic:{en:'We could not complete that notification change. Nothing was changed. Please try again.',es:'No pudimos completar ese cambio de notificaciones. No se cambió nada. Inténtalo otra vez.'},
 } as const
 
 type NotificationStatus=keyof typeof statusCopy
+const bounded=(value:unknown)=>String(value||'unknown').slice(0,80)
 
 export default async function NotificationPreferencesPage({searchParams}:{searchParams:Promise<{saved?:string;status?:string;error?:string;lang?:string}>}){
   const query=await searchParams,es=query.lang==='es',t=(en:string,sp:string)=>es?sp:en,l=(path:string)=>es?`${path}${path.includes('?')?'&':'?'}lang=es`:path
@@ -26,13 +28,12 @@ export default async function NotificationPreferencesPage({searchParams}:{search
     ['documents',t('Documents','Documentos'),t('Document verification and review status.','Estado de verificación y revisión de documentos.'),FileCheck,'growth'],
     ['pastoral_care',t('Private Care','Cuidado Privado'),t('Updates about your private pastoral-care requests.','Cambios en tus solicitudes privadas de cuidado pastoral.'),HandHeart,'care']
   ] as const
-  const supabase=await createClient(),{data:claims}=await supabase.auth.getClaims(),userId=claims?.claims?.sub
+  const recovery=(code:string)=>{console.error('Notification preferences unavailable',{code});return <main className="shell"><section className="card" style={{maxWidth:720,margin:'40px auto',padding:24}}><div className="pill">{t('NOTIFICATIONS','NOTIFICACIONES')}</div><h1>{t('We could not load your notification preferences.','No pudimos cargar tus preferencias de notificación.')}</h1><p className="muted">{t('Nothing was changed. Please try again.','No se cambió nada. Inténtalo otra vez.')}</p><div className="row"><Link className="btn" href={l('/account/notifications')}>{t('Try again','Intentar otra vez')}</Link><Link className="ghost" href={l('/')}>{t('Home','Inicio')}</Link></div></section></main>}
+  const supabase=await createClient(),{data:claims,error:claimsError}=await supabase.auth.getClaims(),userId=claims?.claims?.sub
+  if(claimsError)return recovery(`claims:${bounded(claimsError.code)}`)
   if(!userId)redirect(l('/login'))
   const prefsResult=await supabase.from('notification_preferences').select('*').eq('user_id',userId).maybeSingle()
-  if(prefsResult.error){
-    console.error('Notification preferences lookup failed',{code:prefsResult.error.code})
-    return <main className="shell"><section className="card" style={{maxWidth:720,margin:'40px auto',padding:24}}><div className="pill">{t('NOTIFICATIONS','NOTIFICACIONES')}</div><h1>{t('We could not load your notification preferences.','No pudimos cargar tus preferencias de notificación.')}</h1><p className="muted">{t('Nothing was changed. Please try again.','No se cambió nada. Inténtalo otra vez.')}</p><div className="row"><Link className="btn" href={l('/account/notifications')}>{t('Try again','Intentar otra vez')}</Link><Link className="ghost" href={l('/')}>{t('Home','Inicio')}</Link></div></section></main>
-  }
+  if(prefsResult.error)return recovery(`preferences:${bounded(prefsResult.error.code)}`)
   const prefs=prefsResult.data,on=(key:string)=>prefs?Boolean((prefs as Record<string,unknown>)[key]):true
   const groups=[['community',t('MESSAGES & COMMUNITY','MENSAJES Y COMUNIDAD')],['church',t('CHURCH LIFE','VIDA DE IGLESIA')],['growth',t('SERVING & GROWTH','SERVICIO Y CRECIMIENTO')],['care',t('PRIVATE CARE','CUIDADO PRIVADO')]] as const
   const status=(query.status&&Object.prototype.hasOwnProperty.call(statusCopy,query.status)?query.status:query.error?'generic':null) as NotificationStatus|null
