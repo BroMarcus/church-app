@@ -63,12 +63,32 @@ test('Spanish Start Here presents common church roles in Spanish',()=>{
   assert.match(page,/roleLabel\(membership\.role,lang\)/)
 })
 
-test('first-login tour stays focused on core member-safe destinations',()=>{
+test('first login puts one simple Home action before optional setup and hides extra learning behind details',()=>{
+  assert.match(page,/quickTitle:'That is all you need for now\.'/)
+  assert.match(page,/quickTitle:'Eso es todo lo que necesitas por ahora\.'/)
+  assert.match(page,/finish:'Take me Home'/)
+  assert.match(page,/finish:'Ir a Inicio'/)
+  const quickIndex=page.indexOf('className="card start-note"')
+  const optionalIndex=page.indexOf('<details className="card start-how">')
+  assert.ok(quickIndex>=0&&optionalIndex>quickIndex,'primary Home completion action should appear before optional detail sections')
+  assert.match(page,/OPTIONAL: SET UP MORE/)
+  assert.match(page,/OPCIONAL: CONFIGURAR MÁS/)
+  assert.match(page,/LEARN THE APP LATER/)
+  assert.match(page,/APRENDE LA APLICACIÓN DESPUÉS/)
+})
+
+test('optional first-login setup stays focused and avoids leader/admin feature overload',()=>{
+  const optionalLine=page.split('\n').find((line)=>line.trim().startsWith('const optional='))||''
+  for(const path of ['/profile','/journey','/groups']) assert.match(optionalLine,new RegExp(`'${path.replaceAll('/','\\/')}'`))
+  for(const path of ['/finance','/outreach','/teams','/network','/fundraising','/church/member-control']) assert.doesNotMatch(optionalLine,new RegExp(`'${path.replaceAll('/','\\/')}'`))
+})
+
+test('collapsed app tour stays limited to five core member-safe destinations',()=>{
   const tourLine=page.split('\n').find((line)=>line.trim().startsWith('const tour='))||''
-  for(const path of ['/','/learning','/groups','/calendar','/guide','/prayer','/documents','/updates','/notifications']) assert.match(tourLine,new RegExp(`'${path.replaceAll('/','\\/')}'`))
-  for(const path of ['/outreach','/teams','/network','/fundraising']) assert.doesNotMatch(tourLine,new RegExp(`'${path.replaceAll('/','\\/')}'`))
-  assert.match(page,/You do not need every tool on your first day/)
-  assert.match(page,/No necesitas todas las herramientas el primer día/)
+  for(const path of ['/','/learning','/groups','/guide','/prayer']) assert.match(tourLine,new RegExp(`'${path.replaceAll('/','\\/')}'`))
+  for(const path of ['/calendar','/documents','/updates','/notifications','/outreach','/teams','/network','/fundraising']) assert.doesNotMatch(tourLine,new RegExp(`'${path.replaceAll('/','\\/')}'`))
+  assert.match(page,/You can come back to Start Here anytime/)
+  assert.match(page,/Puedes volver a Empieza Aquí cuando quieras/)
 })
 
 test('finish onboarding blocks repeat taps and gives bilingual pending guidance',()=>{
