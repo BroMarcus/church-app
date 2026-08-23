@@ -14,10 +14,12 @@ test('public church join page does not turn backend availability failures into a
   assert.ok(page.includes('No pudimos verificar de forma segura este enlace de la iglesia en este momento.'))
 })
 
-test('join signup action separates unavailable status, unknown church, and intentionally closed signup',()=>{
+test('join signup action separates unavailable or malformed status from unknown church and intentionally closed signup',()=>{
   assert.match(actions,/if\(statusError\)[\s\S]*fail\('signup_status_unavailable'\)/)
-  assert.match(actions,/if\(!church\?\.church_id\)fail\('missing_church'\)/)
-  assert.match(actions,/if\(!church\?\.open\)fail\('signup_closed'\)/)
+  assert.match(actions,/if\(!church\)[\s\S]*empty_signup_status[\s\S]*fail\('signup_status_unavailable'\)/)
+  assert.match(actions,/if\(!church\.church_id\)fail\('missing_church'\)/)
+  assert.match(actions,/if\(typeof church\.open!==['"]boolean['"]\)[\s\S]*malformed_signup_status[\s\S]*fail\('signup_status_unavailable'\)/)
+  assert.match(actions,/if\(!church\.open\)fail\('signup_closed'\)/)
 })
 
 test('public church join bounds slug and account inputs before RPC or Auth calls',()=>{
@@ -50,6 +52,7 @@ test('public join diagnostics are bounded and do not log provider messages',()=>
   assert.match(page,/boundedCode\(claimsError\.code\)/)
   assert.match(actions,/boundedCode\(statusError\.code\)/)
   assert.match(actions,/boundedCode\(error\.code\)/)
+  assert.match(actions,/replace\(\/\[\^a-zA-Z0-9_-\]\/g,''\)\.slice\(0,48\)/)
   assert.doesNotMatch(actions,/console\.error\([^\n]+message:error\.message/)
   assert.doesNotMatch(page,/console\.error\([^\n]+message:/)
 })
