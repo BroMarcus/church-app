@@ -15,14 +15,21 @@ const statusCopy={
  en:{onboarding_save_failed:'We could not save that step. Nothing was removed or changed. Please try again.',connection_unavailable:'We could not safely verify your account right now. Nothing was changed. Please try again.'},
  es:{onboarding_save_failed:'No pudimos guardar ese paso. No se borró ni cambió nada. Inténtalo otra vez.',connection_unavailable:'No pudimos verificar tu cuenta de forma segura en este momento. No se cambió nada. Inténtalo otra vez.'}
 } as const
+const messageCopy={
+ en:{joined_existing:'You are connected to this church with your existing Kingdom Network account. Keep using this same account—do not create another one.',already_joined:'You are already connected to this church. Keep using this same Kingdom Network account—no second account is needed.'},
+ es:{joined_existing:'Ya estás conectado a esta iglesia con tu cuenta existente de Kingdom Network. Sigue usando esta misma cuenta—no crees otra.',already_joined:'Ya estabas conectado a esta iglesia. Sigue usando esta misma cuenta de Kingdom Network—no necesitas una segunda cuenta.'}
+} as const
 const boundedCode=(value:unknown)=>String(value||'unknown').slice(0,80)
 const roleLabel=(role:unknown,lang:'en'|'es')=>{
  const value=String(role||'member')
- const labels:Record<'en'|'es',Record<string,string>>={en:{member:'Member',pastor:'Pastor',church_admin:'Church Admin',leader:'Leader',minister:'Minister'},es:{member:'Miembro',pastor:'Pastor',church_admin:'Administrador de iglesia',leader:'Líder',minister:'Ministro'}}
+ const labels:Record<'en'|'es',Record<string,string>>={
+  en:{member:'Member',pastor:'Pastor',church_admin:'Church Admin',leader:'Leader',group_leader:'Friendship Group Leader',assistant_leader:'Assistant Leader',ministry_leader:'Ministry Leader',minister:'Minister',finance_admin:'Finance Admin',platform_admin:'Platform Admin'},
+  es:{member:'Miembro',pastor:'Pastor',church_admin:'Administrador de iglesia',leader:'Líder',group_leader:'Líder de Grupo de Amistad',assistant_leader:'Líder asistente',ministry_leader:'Líder de ministerio',minister:'Ministro',finance_admin:'Administrador de finanzas',platform_admin:'Administrador de plataforma'}
+ }
  return labels[lang][value]||value.replaceAll('_',' ')
 }
 
-export default async function StartPage({searchParams}:{searchParams:Promise<{lang?:string;error_code?:string}>}){
+export default async function StartPage({searchParams}:{searchParams:Promise<{lang?:string;error_code?:string;message_code?:string}>}){
  const params=await searchParams,supabase=await createClient()
  const {data:{user},error:authError}=await supabase.auth.getUser()
  const preferred=user?.user_metadata?.preferred_language==='es'?'es':'en'
@@ -39,11 +46,12 @@ export default async function StartPage({searchParams}:{searchParams:Promise<{la
  const church:any=Array.isArray(membership.churches)?membership.churches[0]:membership.churches
  const name=profile?.display_name||[profile?.first_name,profile?.last_name].filter(Boolean).join(' ')||(lang==='es'?'Miembro':'Member'),isAdmin=['pastor','church_admin'].includes(String(membership.role))
  const statusError=(statusCopy[lang] as Record<string,string>)[params.error_code??'']||''
+ const statusMessage=(messageCopy[lang] as Record<string,string>)[params.message_code??'']||''
  const first=[[UserRound,t.profile,t.profileBody,'/profile'],[Sparkles,t.journey,t.journeyBody,'/journey'],[CheckCircle2,t.today,t.todayBody,'/today']] as const
  const week=[[UserRound,t.week1,t.week1Body,'/profile'],[UsersRound,t.week2,t.week2Body,'/groups'],[BookOpen,t.week3,t.week3Body,'/learning'],[Sparkles,t.week4,t.week4Body,'/guide']] as const
  const tour=[[Home,t.home,t.homeBody,'/'],[BookOpen,t.learning,t.learningBody,'/learning'],[UsersRound,t.groups,t.groupsBody,'/groups'],[CalendarDays,t.calendar,t.calendarBody,'/calendar'],[Sparkles,t.guide,t.guideBody,'/guide'],[HandHeart,t.prayer,t.prayerBody,'/prayer'],[FileText,t.documents,t.documentsBody,'/documents'],[MessageSquareText,t.updates,t.updatesBody,'/updates'],[Bell,t.alerts,t.alertsBody,'/notifications']] as const
  return <main className="shell start-shell"><header className="topbar"><div><Link href={lang==='es'?'/?lang=es':'/'} className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??t.church} • {t.start}</div></div><div className="row"><Languages size={15}/><Link className="ghost" href="/start?lang=en">{t.english}</Link><Link className="ghost" href="/start?lang=es">{t.spanish}</Link></div></header>
- <section className="card start-hero"><div><div className="pill">START HERE • EMPIEZA AQUÍ</div><h1>{t.title}</h1><p className="muted">{t.subtitle}</p></div><div className="start-ready"><CheckCircle2 size={28}/><strong>{t.ready}</strong></div></section>{statusError&&<div className="notice error" role="alert"><strong>{t.error}:</strong> {statusError}</div>}
+ <section className="card start-hero"><div><div className="pill">START HERE • EMPIEZA AQUÍ</div><h1>{t.title}</h1><p className="muted">{t.subtitle}</p></div><div className="start-ready"><CheckCircle2 size={28}/><strong>{t.ready}</strong></div></section>{statusError&&<div className="notice error" role="alert"><strong>{t.error}:</strong> {statusError}</div>}{statusMessage&&<div className="notice success" role="status" aria-live="polite">{statusMessage}</div>}
  <section className="card start-account"><div><div className="pill">{t.member.toUpperCase()}</div><h2>{name}</h2><p className="muted">{church?.name??t.church} • {roleLabel(membership.role,lang)}</p></div><CheckCircle2 size={34}/></section>
  {isAdmin&&<section className="card start-admin"><div className="start-admin-copy"><div className="start-icon"><Church size={20}/></div><div><div className="pill">{t.adminPill}</div><h2>{t.adminTitle}</h2><p className="muted">{t.adminBody}</p></div></div><Link className="btn" href={withLang('/church/launch')}>{t.adminButton}</Link></section>}
  <section><div className="pill start-section-label">{t.walk}</div><div className="start-first">{first.map(([Icon,title,body,path])=><Link key={path} className="card start-step start-primary-step" href={withLang(path)}><div className="start-icon"><Icon size={20}/></div><div><strong>{title}</strong><span>{body}</span></div></Link>)}</div></section>
