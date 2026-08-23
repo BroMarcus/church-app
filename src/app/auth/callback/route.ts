@@ -3,19 +3,38 @@ import { createClient } from '@/lib/supabase/server'
 
 const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
 const boundedCode=(value:unknown)=>String(value||'unknown').slice(0,80)
+const MAX_AUTH_VALUE_LENGTH=1000
 
-function allowedAuthDestination(path:string){
-  return path==='/start'||path.startsWith('/start?')||path.startsWith('/join/')||path==='/auth/update-password'||path.startsWith('/auth/update-password?')
-}
-
-function safeNext(raw:string|null,fallback:string){
-  if(!raw)return fallback
+function safeLocalPath(raw:string|null){
+  if(!raw||raw.length>MAX_AUTH_VALUE_LENGTH||raw.includes('\\'))return ''
   try{
     const canonical=new URL(siteUrl)
     const requested=new URL(raw,canonical)
-    if(requested.origin!==canonical.origin)return fallback
-    const local=`${requested.pathname}${requested.search}${requested.hash}`
-    return allowedAuthDestination(local)?local:fallback
+    if(requested.origin!==canonical.origin)return ''
+    return `${requested.pathname}${requested.search}${requested.hash}`
+  }catch{
+    return ''
+  }
+}
+
+function safeJoinDestination(raw:string|null){
+  const local=safeLocalPath(raw)
+  if(!local)return ''
+  try{
+    const parsed=new URL(local,'https://kingdom.invalid')
+    return parsed.pathname.startsWith('/join/')?local:''
+  }catch{
+    return ''
+  }
+}
+
+function safeSignupDestination(raw:string|null,fallback:string){
+  const local=safeLocalPath(raw)
+  if(!local)return fallback
+  try{
+    const parsed=new URL(local,'https://kingdom.invalid')
+    if(parsed.pathname==='/start'||parsed.pathname.startsWith('/join/'))return local
+    return fallback
   }catch{
     return fallback
   }
@@ -26,15 +45,18 @@ export async function GET(request:NextRequest){
   const code=url.searchParams.get('code')
   const lang=url.searchParams.get('lang')==='es'?'es':'en'
   const mode=url.searchParams.get('mode')==='recovery'?'recovery':'signup'
-  const fallback=mode==='recovery'?`/auth/update-password?lang=${lang}`:`/start?welcome=1${lang==='es'?'&lang=es':''}`
-  const next=safeNext(url.searchParams.get('next'),fallback)
-  const joinNext=next.startsWith('/join/')?next:''
+  const signupFallback=`/start?welcome=1${lang==='es'?'&lang=es':''}`
+  const rawNext=url.searchParams.get('next')
+  const joinNext=safeJoinDestination(rawNext)
+  const next=mode==='recovery'
+    ?`/auth/update-password?lang=${lang}${joinNext?`&next=${encodeURIComponent(joinNext)}`:''}`
+    :safeSignupDestination(rawNext,signupFallback)
   const loginError=(errorCode:string)=>{
     const nextPart=joinNext?`&next=${encodeURIComponent(joinNext)}`:''
     return NextResponse.redirect(new URL(`/login?lang=${lang}&mode=signin${nextPart}&error_code=${encodeURIComponent(errorCode)}`,siteUrl))
   }
 
-  if(!code)return loginError('callback_incomplete')
+  if(!code||code.length>MAX_AUTH_VALUE_LENGTH)return loginError('callback_incomplete')
 
   const supabase=await createClient()
   const {error}=await supabase.auth.exchangeCodeForSession(code)
