@@ -33,7 +33,8 @@ export async function createKnownPersonInvite(formData:FormData){
     console.error('known-person invite permission lookup failed',{errorCode:boundedCode(permissionError.code)})
     redirect(path(lang,'access_unavailable'))
   }
-  const canInvite=['pastor','church_admin'].includes(membership.role)||Boolean(custom)
+  const isChurchAdmin=['pastor','church_admin'].includes(membership.role)
+  const canInvite=isChurchAdmin||Boolean(custom)
   if(!canInvite)redirect(path(lang,'not_authorized'))
 
   const requestedRole=text(formData,'role')||'member'
@@ -42,6 +43,10 @@ export async function createKnownPersonInvite(formData:FormData){
   const lastName=text(formData,'last_name')
   const phone=text(formData,'phone')
   if(!allowedInviteRoles.has(requestedRole))redirect(path(lang,'role_not_allowed'))
+  // `manage_members` can authorize inviting a person, but it must not become a way
+  // to preassign leadership authority. Elevated starting roles remain Pastor/Church Admin only,
+  // matching the role options rendered by the page.
+  if(requestedRole!=='member'&&!isChurchAdmin)redirect(path(lang,'role_not_allowed'))
   if(!validEmail(email))redirect(path(lang,'invalid_email'))
   if(!validText(firstName,80)||!validText(lastName,80)||!validText(phone,40))redirect(path(lang,'input_too_long'))
 
