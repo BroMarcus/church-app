@@ -5,7 +5,7 @@ const MAX_AUTH_VALUE_LENGTH=1000
 const allowedTypes=new Set(['email','recovery','invite','magiclink','email_change'])
 
 function safeLocalPath(raw:string|null){
-  if(!raw||raw.length>MAX_AUTH_VALUE_LENGTH||raw.includes('\\'))return ''
+  if(!raw||raw.length>MAX_AUTH_VALUE_LENGTH||!raw.startsWith('/')||raw.startsWith('//')||raw.includes('\\'))return ''
   try{
     const canonical=new URL(siteUrl)
     const requested=new URL(raw,canonical)
