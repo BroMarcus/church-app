@@ -9,5 +9,5 @@ type Props={
 
 export function StartSubmitButton({label,pendingLabel}:Props){
   const {pending}=useFormStatus()
-  return <button className="btn" type="submit" disabled={pending} aria-disabled={pending}>{pending?pendingLabel:label}</button>
+  return <button className="btn" type="submit" disabled={pending} aria-disabled={pending} aria-busy={pending} aria-live="polite">{pending?pendingLabel:label}</button>
 }
