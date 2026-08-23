@@ -8,9 +8,15 @@ const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel
 const langOf=(f:FormData)=>text(f,'lang')==='es'?'es':'en'
 const loginUrl=(lang:string,extra='')=>`/login?lang=${lang}${extra}`
 const callbackUrl=(lang:'en'|'es',mode:'signup'|'recovery',next:string)=>`${siteUrl}/auth/callback?lang=${lang}&mode=${mode}&next=${encodeURIComponent(next)}`
+const EMAIL_MAX=254
+const NAME_MAX=80
+const NEW_PASSWORD_MAX=128
+const EXISTING_PASSWORD_MAX=4096
+const INVITE_MAX=128
+const JOIN_NEXT_MAX=500
 function safeJoinNext(value:string){
   try{
-    if(!value.startsWith('/')||value.startsWith('//')||value.includes('\\'))return ''
+    if(!value||value.length>JOIN_NEXT_MAX||!value.startsWith('/')||value.startsWith('//')||value.includes('\\'))return ''
     const base='https://kingdom.invalid'
     const parsed=new URL(value,base)
     if(parsed.origin!==base||!parsed.pathname.startsWith('/join/'))return ''
@@ -20,6 +26,13 @@ function safeJoinNext(value:string){
 const recoveryUrl=(lang:'en'|'es',next='')=>`${siteUrl}/auth/update-password?lang=${lang}${safeJoinNext(next)?`&next=${encodeURIComponent(safeJoinNext(next))}`:''}`
 const statusPart=(kind:'error'|'message',code:string)=>`&${kind}_code=${encodeURIComponent(code)}`
 const boundedCode=(value:unknown)=>String(value||'unknown').slice(0,80)
+function emailIssue(email:string){
+  if(!email)return 'missing_email'
+  if(email.length>EMAIL_MAX||/\s/.test(email))return 'invalid_email'
+  const at=email.indexOf('@')
+  if(at<=0||at!==email.lastIndexOf('@')||at===email.length-1)return 'invalid_email'
+  return ''
+}
 function authEmailErrorCode(message:string){
   const normalized=message.toLowerCase()
   return normalized.includes('rate limit')||normalized.includes('over_email_send_rate_limit')||normalized.includes('security purposes')?'email_rate_limit':'email_failed'
@@ -30,6 +43,10 @@ export async function login(formData:FormData){
   const lang=langOf(formData),next=safeJoinNext(text(formData,'next'))
   const nextPart=next?`&next=${encodeURIComponent(next)}`:''
   const email=text(formData,'email').toLowerCase(),password=String(formData.get('password')??'')
+  const emailError=emailIssue(email)
+  if(emailError)redirect(loginUrl(lang,'&mode=signin'+nextPart+statusPart('error',emailError)))
+  if(!password)redirect(loginUrl(lang,'&mode=signin'+nextPart+statusPart('error','missing_password')))
+  if(password.length>EXISTING_PASSWORD_MAX)redirect(loginUrl(lang,'&mode=signin'+nextPart+statusPart('error','password_too_long')))
   const {data,error}=await supabase.auth.signInWithPassword({email,password})
   if(error){
     const normalized=error.message.toLowerCase()
@@ -71,12 +88,17 @@ export async function login(formData:FormData){
 export async function signup(formData:FormData){
   const supabase=await createClient()
   const lang=langOf(formData)
-  const email=text(formData,'email').toLowerCase(),password=String(formData.get('password')??''),confirmPassword=String(formData.get('confirm_password')??''),firstName=text(formData,'first_name'),lastName=text(formData,'last_name'),inviteId=text(formData,'invite_id')
+  const email=text(formData,'email').toLowerCase(),password=String(formData.get('password')??''),confirmPassword=String(formData.get('confirm_password')??''),firstName=text(formData,'first_name'),lastName=text(formData,'last_name'),rawInviteId=text(formData,'invite_id')
+  const inviteId=rawInviteId.length<=INVITE_MAX?rawInviteId:''
   const invitePart=inviteId?`&invite=${encodeURIComponent(inviteId)}`:''
   const fail=(code:string)=>redirect(loginUrl(lang,invitePart+'&mode=signup'+statusPart('error',code)))
+  if(rawInviteId&&!inviteId)fail('invite_invalid')
   if(!firstName||!lastName)fail('missing_name')
-  if(!email)fail('missing_email')
+  if(firstName.length>NAME_MAX||lastName.length>NAME_MAX)fail('name_too_long')
+  const emailError=emailIssue(email)
+  if(emailError)fail(emailError)
   if(password.length<8)fail('weak_password')
+  if(password.length>NEW_PASSWORD_MAX||confirmPassword.length>NEW_PASSWORD_MAX)fail('password_too_long')
   if(password!==confirmPassword)fail('password_mismatch')
 
   let publicSignup=false
@@ -112,7 +134,8 @@ export async function requestPasswordReset(formData:FormData){
   const lang=langOf(formData),next=safeJoinNext(text(formData,'next'))
   const nextPart=next?`&next=${encodeURIComponent(next)}`:''
   const email=text(formData,'reset_email').toLowerCase()
-  if(!email)redirect(loginUrl(lang,'&mode=signin'+nextPart+statusPart('error','missing_email')))
+  const emailError=emailIssue(email)
+  if(emailError)redirect(loginUrl(lang,'&mode=signin'+nextPart+statusPart('error',emailError)))
   const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:recoveryUrl(lang,next)})
   if(error){console.error('requestPasswordReset failed',{code:boundedCode(error.code)});redirect(loginUrl(lang,'&mode=signin'+nextPart+statusPart('error',authEmailErrorCode(error.message))))}
   redirect(loginUrl(lang,'&mode=signin'+nextPart+statusPart('message','reset_sent')))
@@ -123,7 +146,8 @@ export async function resendConfirmation(formData:FormData){
   const lang=langOf(formData),next=safeJoinNext(text(formData,'next'))
   const nextPart=next?`&next=${encodeURIComponent(next)}`:''
   const email=text(formData,'reset_email').toLowerCase()
-  if(!email)redirect(loginUrl(lang,'&mode=signin'+nextPart+statusPart('error','missing_email')))
+  const emailError=emailIssue(email)
+  if(emailError)redirect(loginUrl(lang,'&mode=signin'+nextPart+statusPart('error',emailError)))
   const startPath=next||`/start?welcome=1${lang==='es'?'&lang=es':''}`
   const {error}=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath)}})
   if(error){console.error('resendConfirmation failed',{code:boundedCode(error.code)});redirect(loginUrl(lang,'&mode=signin'+nextPart+statusPart('error',authEmailErrorCode(error.message))))}
