@@ -5,13 +5,13 @@ import { PasswordField } from '@/components/password-field'
 import { createClient } from '@/lib/supabase/client'
 
 const copy={
-  en:{opening:'Opening your secure reset link…',invalid:'This reset link is invalid or expired. Please request one fresh reset email.',choose:'Choose a new password below.',invalidBack:'This reset link is invalid or expired. Go back to Sign in and request one fresh reset email.',short:'Password must be at least 8 characters.',tooLong:'Password must be 128 characters or fewer.',mismatch:'The two passwords do not match.',failed:'We could not update the password. Please request a fresh reset email and try again.',updated:'Password updated. Your old password will no longer work.',success:'Password updated. Continue to sign in with your new password.',signOutIncomplete:'Your password was updated, but we could not safely finish signing this browser out. Open Account Security, choose “Sign out everywhere,” then sign in again with your new password.',title:'Reset your password',newPassword:'New password',again:'Type it again',showPassword:'Show password',hidePassword:'Hide password',updating:'Updating…',update:'Update password',continue:'Continue to sign in',accountSecurity:'Open Account Security',back:'Back to sign in'},
-  es:{opening:'Abriendo tu enlace seguro…',invalid:'Este enlace no es válido o ya venció. Solicita un correo nuevo para cambiar tu contraseña.',choose:'Escribe una contraseña nueva abajo.',invalidBack:'Este enlace no es válido o ya venció. Vuelve a Iniciar sesión y solicita un correo nuevo.',short:'La contraseña debe tener al menos 8 caracteres.',tooLong:'La contraseña debe tener 128 caracteres o menos.',mismatch:'Las dos contraseñas no coinciden.',failed:'No pudimos cambiar la contraseña. Solicita un correo nuevo e inténtalo otra vez.',updated:'Contraseña actualizada. Tu contraseña anterior ya no funcionará.',success:'Contraseña actualizada. Continúa para iniciar sesión con tu nueva contraseña.',signOutIncomplete:'Tu contraseña fue actualizada, pero no pudimos cerrar esta sesión del navegador de forma segura. Abre Seguridad de la Cuenta, elige “Cerrar sesión en todas partes” y luego inicia sesión otra vez con tu contraseña nueva.',title:'Cambiar tu contraseña',newPassword:'Nueva contraseña',again:'Escríbela otra vez',showPassword:'Mostrar contraseña',hidePassword:'Ocultar contraseña',updating:'Actualizando…',update:'Actualizar contraseña',continue:'Continuar a Iniciar sesión',accountSecurity:'Abrir Seguridad de la Cuenta',back:'Volver a Iniciar sesión'}
+  en:{opening:'Opening your secure reset link…',invalid:'This reset link is invalid or expired. Please request one fresh reset email.',choose:'Choose a new password below.',invalidBack:'This reset link is invalid or expired. Go back to Sign in and request one fresh reset email.',sessionUnavailable:'We could not safely check your reset session right now. Keep this page open and try again once. If it still does not work, return to Sign in and request one fresh reset email.',short:'Password must be at least 8 characters.',tooLong:'Password must be 128 characters or fewer.',mismatch:'The two passwords do not match.',failed:'We could not update the password right now. Keep this page open and try once more. If the reset link later expires, request one fresh reset email.',updated:'Password updated. Your old password will no longer work.',success:'Password updated. Continue to sign in with your new password.',signOutIncomplete:'Your password was updated, but we could not safely finish signing this browser out. Open Account Security, choose “Sign out everywhere,” then sign in again with your new password.',title:'Reset your password',newPassword:'New password',again:'Type it again',showPassword:'Show password',hidePassword:'Hide password',updating:'Updating…',update:'Update password',retry:'Try again',continue:'Continue to sign in',accountSecurity:'Open Account Security',back:'Back to sign in'},
+  es:{opening:'Abriendo tu enlace seguro…',invalid:'Este enlace no es válido o ya venció. Solicita un correo nuevo para cambiar tu contraseña.',choose:'Escribe una contraseña nueva abajo.',invalidBack:'Este enlace no es válido o ya venció. Vuelve a Iniciar sesión y solicita un correo nuevo.',sessionUnavailable:'No pudimos verificar de forma segura tu sesión para cambiar la contraseña. Mantén esta página abierta e inténtalo una vez más. Si todavía no funciona, vuelve a Iniciar sesión y solicita un correo nuevo.',short:'La contraseña debe tener al menos 8 caracteres.',tooLong:'La contraseña debe tener 128 caracteres o menos.',mismatch:'Las dos contraseñas no coinciden.',failed:'No pudimos cambiar la contraseña en este momento. Mantén esta página abierta e inténtalo una vez más. Si después vence el enlace, solicita un correo nuevo.',updated:'Contraseña actualizada. Tu contraseña anterior ya no funcionará.',success:'Contraseña actualizada. Continúa para iniciar sesión con tu nueva contraseña.',signOutIncomplete:'Tu contraseña fue actualizada, pero no pudimos cerrar esta sesión del navegador de forma segura. Abre Seguridad de la Cuenta, elige “Cerrar sesión en todas partes” y luego inicia sesión otra vez con tu contraseña nueva.',title:'Cambiar tu contraseña',newPassword:'Nueva contraseña',again:'Escríbela otra vez',showPassword:'Mostrar contraseña',hidePassword:'Ocultar contraseña',updating:'Actualizando…',update:'Actualizar contraseña',retry:'Intentar otra vez',continue:'Continuar a Iniciar sesión',accountSecurity:'Abrir Seguridad de la Cuenta',back:'Volver a Iniciar sesión'}
 } as const
 
 function diagnosticCode(error:unknown){
-  if(error&&typeof error==='object'&&'code' in error)return String((error as {code?:unknown}).code||'unknown').slice(0,80)
-  return error instanceof Error?error.name.slice(0,80):'unknown'
+  if(error&&typeof error==='object'&&'code' in error)return String((error as {code?:unknown}).code||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,80)||'unknown'
+  return error instanceof Error?error.name.replace(/[^a-zA-Z0-9_-]/g,'').slice(0,80)||'unknown':'unknown'
 }
 
 function safeJoinNext(value:string|null){
@@ -30,6 +30,7 @@ export default function UpdatePasswordPage(){
   const [ready,setReady]=useState(false)
   const [completed,setCompleted]=useState(false)
   const [signOutIncomplete,setSignOutIncomplete]=useState(false)
+  const [retryAvailable,setRetryAvailable]=useState(false)
   const [password,setPassword]=useState('')
   const [confirm,setConfirm]=useState('')
   const [message,setMessage]=useState<string>(copy.en.opening)
@@ -47,26 +48,31 @@ export default function UpdatePasswordPage(){
       setJoinNext(next)
       const c=copy[nextLang]
       setMessage(c.opening)
+      setRetryAvailable(false)
       try{
         const code=url.searchParams.get('code')
         if(code){
           const {error}=await supabase.auth.exchangeCodeForSession(code)
           if(error){
             console.error('password reset session exchange failed',{code:diagnosticCode(error)})
-            if(mounted){setReady(false);setMessage(c.invalid)}
+            if(mounted){setReady(false);setRetryAvailable(true);setMessage(c.sessionUnavailable)}
             return
           }
           url.searchParams.delete('code')
           window.history.replaceState({},'',`${url.pathname}${url.search}${url.hash}`)
         }
         const {data,error}=await supabase.auth.getSession()
-        if(error)console.error('password reset session lookup failed',{code:diagnosticCode(error)})
+        if(error){
+          console.error('password reset session lookup failed',{code:diagnosticCode(error)})
+          if(mounted){setReady(false);setRetryAvailable(true);setMessage(c.sessionUnavailable)}
+          return
+        }
         if(!mounted)return
-        if(data.session){setReady(true);setMessage(c.choose)}
-        else{setReady(false);setMessage(c.invalidBack)}
+        if(data.session){setRetryAvailable(false);setReady(true);setMessage(c.choose)}
+        else{setRetryAvailable(false);setReady(false);setMessage(c.invalidBack)}
       }catch(error){
         console.error('password reset initialization failed',{code:diagnosticCode(error)})
-        if(mounted){setReady(false);setMessage(c.invalidBack)}
+        if(mounted){setReady(false);setRetryAvailable(true);setMessage(c.sessionUnavailable)}
       }
     }
     void check()
@@ -75,7 +81,7 @@ export default function UpdatePasswordPage(){
       if((event==='PASSWORD_RECOVERY'||event==='SIGNED_IN')&&session){
         const url=new URL(window.location.href)
         const nextLang=url.searchParams.get('lang')==='es'?'es':'en'
-        setLang(nextLang);setJoinNext(safeJoinNext(url.searchParams.get('next')));setReady(true);setMessage(copy[nextLang].choose)
+        setLang(nextLang);setJoinNext(safeJoinNext(url.searchParams.get('next')));setRetryAvailable(false);setReady(true);setMessage(copy[nextLang].choose)
       }
     })
     return()=>{mounted=false;listener.subscription.unsubscribe()}
@@ -118,5 +124,6 @@ export default function UpdatePasswordPage(){
   const nextPart=joinNext?`&next=${encodeURIComponent(joinNext)}`:''
   const signInHref=`/login?lang=${lang}&mode=signin${nextPart}`
   const securityHref=`/account/security?lang=${lang}${nextPart}`
-  return <main className="login-wrap"><div className="login card"><div className="pill">KINGDOM NETWORK</div><h1>{t.title}</h1><div className={`notice ${ready||completed?'success':'error'}`} role={completed&&!signOutIncomplete?'status':'alert'} aria-live="polite">{message}</div>{ready&&!completed&&<form onSubmit={save}><PasswordField name="password" label={t.newPassword} minLength={8} maxLength={128} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><PasswordField name="confirm_password" label={t.again} minLength={8} maxLength={128} autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><button className="btn" type="submit" disabled={busy}>{busy?t.updating:t.update}</button></form>}{completed?<p style={{marginTop:16}}><a className="btn" href={signOutIncomplete?securityHref:signInHref}>{signOutIncomplete?t.accountSecurity:t.continue}</a></p>:<p className="small muted" style={{marginTop:16}}><a href={signInHref}>{t.back}</a></p>}</div></main>
+  const noticeTone=ready||(completed&&!signOutIncomplete)?'success':'error'
+  return <main className="login-wrap"><div className="login card"><div className="pill">KINGDOM NETWORK</div><h1>{t.title}</h1><div className={`notice ${noticeTone}`} role={ready||completed&&!signOutIncomplete?'status':'alert'} aria-live="polite">{message}</div>{retryAvailable&&!completed&&<p style={{marginTop:16}}><button className="btn" type="button" onClick={()=>window.location.reload()}>{t.retry}</button></p>}{ready&&!completed&&<form onSubmit={save}><PasswordField name="password" label={t.newPassword} minLength={8} maxLength={128} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><PasswordField name="confirm_password" label={t.again} minLength={8} maxLength={128} autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><button className="btn" type="submit" disabled={busy} aria-disabled={busy} aria-busy={busy}><span aria-live="polite">{busy?t.updating:t.update}</span></button></form>}{completed?<p style={{marginTop:16}}><a className="btn" href={signOutIncomplete?securityHref:signInHref}>{signOutIncomplete?t.accountSecurity:t.continue}</a></p>:<p className="small muted" style={{marginTop:16}}><a href={signInHref}>{t.back}</a></p>}</div></main>
 }
