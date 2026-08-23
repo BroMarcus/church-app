@@ -11,8 +11,16 @@ const invitePage=fs.readFileSync(path.join(process.cwd(),'src/app/church/invites
 test('private invitation server action independently verifies manage_members authority',()=>{
   assert.match(privateActions,/current_user_has_church_permission/)
   assert.match(privateActions,/p_permission_key:'manage_members'/)
-  assert.match(privateActions,/const canInvite=\['pastor','church_admin'\]\.includes\(membership\.role\)\|\|Boolean\(custom\)/)
+  assert.match(privateActions,/const isChurchAdmin=\['pastor','church_admin'\]\.includes\(membership\.role\)/)
+  assert.match(privateActions,/const canInvite=isChurchAdmin\|\|Boolean\(custom\)/)
   assert.match(privateActions,/if\(!canInvite\)redirect\(path\(lang,'not_authorized'\)\)/)
+})
+
+test('custom member managers cannot forge elevated starting roles',()=>{
+  assert.match(privateActions,/if\(requestedRole!==['"]member['"]&&!isChurchAdmin\)redirect\(path\(lang,'role_not_allowed'\)\)/)
+  assert.match(privatePage,/const roleOptions=\['pastor','church_admin'\]\.includes\(membership\.role\)\?leadershipInviteOptions:\[\['member'/)
+  assert.ok(privatePage.includes('Pastor and Church Admin are never preassigned by invitation.'))
+  assert.ok(privatePage.includes('Pastor y Administrador nunca se preasignan por invitación.'))
 })
 
 test('private invitation access reads fail closed instead of looking unauthorized or successful',()=>{
