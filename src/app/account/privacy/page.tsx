@@ -7,29 +7,27 @@ import {PrivacySubmitButton} from './privacy-submit-button'
 import './privacy.css'
 
 const statusCopy={
+  auth_unavailable:{en:'We could not safely verify your account right now. Nothing was changed. Please try again.',es:'No pudimos verificar tu cuenta de forma segura en este momento. No se cambió nada. Inténtalo otra vez.'},
   invalid_messaging:{en:'Choose one of the available messaging options and try again.',es:'Elige una de las opciones de mensajes disponibles e inténtalo otra vez.'},
   save_failed:{en:'We could not save your privacy settings right now. Nothing was changed. Please try again.',es:'No pudimos guardar tu configuración de privacidad en este momento. No se cambió nada. Inténtalo otra vez.'},
   generic:{en:'We could not complete that privacy change. Nothing was changed. Please try again.',es:'No pudimos completar ese cambio de privacidad. No se cambió nada. Inténtalo otra vez.'},
 } as const
 
 type PrivacyStatus=keyof typeof statusCopy
+const bounded=(value:unknown)=>String(value||'unknown').slice(0,80)
 
 export default async function PrivacyPage({searchParams}:{searchParams:Promise<{saved?:string;status?:string;error?:string;lang?:string}>}){
   const query=await searchParams,es=query.lang==='es',t=(en:string,sp:string)=>es?sp:en,l=(path:string)=>es?`${path}${path.includes('?')?'&':'?'}lang=es`:path
-  const supabase=await createClient(),{data:claims}=await supabase.auth.getClaims(),userId=claims?.claims?.sub
+  const recovery=(code:string)=>{console.error('Privacy page unavailable',{code});return <main className="shell"><section className="card" style={{maxWidth:720,margin:'40px auto',padding:24}}><div className="pill">{t('PRIVACY','PRIVACIDAD')}</div><h1>{t('We could not load your privacy settings.','No pudimos cargar tu configuración de privacidad.')}</h1><p className="muted">{t('Nothing was changed. Please try again.','No se cambió nada. Inténtalo otra vez.')}</p><div className="row"><Link className="btn" href={l('/account/privacy')}>{t('Try again','Intentar otra vez')}</Link><Link className="ghost" href={l('/')}>{t('Home','Inicio')}</Link></div></section></main>}
+  const supabase=await createClient(),{data:claims,error:claimsError}=await supabase.auth.getClaims(),userId=claims?.claims?.sub
+  if(claimsError)return recovery(`claims:${bounded(claimsError.code)}`)
   if(!userId)redirect(l('/login'))
   const membershipResult=await supabase.from('church_memberships').select('church_id,churches(name)').eq('user_id',userId).eq('status','active').limit(1).maybeSingle()
-  if(membershipResult.error){
-    console.error('Privacy membership lookup failed',{code:membershipResult.error.code})
-    return <main className="shell"><section className="card" style={{maxWidth:720,margin:'40px auto',padding:24}}><div className="pill">{t('PRIVACY','PRIVACIDAD')}</div><h1>{t('We could not load your privacy settings.','No pudimos cargar tu configuración de privacidad.')}</h1><p className="muted">{t('Nothing was changed. Please try again.','No se cambió nada. Inténtalo otra vez.')}</p><div className="row"><Link className="btn" href={l('/account/privacy')}>{t('Try again','Intentar otra vez')}</Link><Link className="ghost" href={l('/')}>{t('Home','Inicio')}</Link></div></section></main>
-  }
+  if(membershipResult.error)return recovery(`membership:${bounded(membershipResult.error.code)}`)
   const membership=membershipResult.data
   if(!membership?.church_id)redirect(l('/'))
   const profileResult=await supabase.from('profiles').select('directory_visible,messaging_preference,show_contact_email,show_verified_credentials,show_learning_trophies,contact_email').eq('id',userId).maybeSingle()
-  if(profileResult.error){
-    console.error('Privacy profile lookup failed',{code:profileResult.error.code})
-    return <main className="shell"><section className="card" style={{maxWidth:720,margin:'40px auto',padding:24}}><div className="pill">{t('PRIVACY','PRIVACIDAD')}</div><h1>{t('We could not load your privacy settings.','No pudimos cargar tu configuración de privacidad.')}</h1><p className="muted">{t('Nothing was changed. Please try again.','No se cambió nada. Inténtalo otra vez.')}</p><div className="row"><Link className="btn" href={l('/account/privacy')}>{t('Try again','Intentar otra vez')}</Link><Link className="ghost" href={l('/')}>{t('Home','Inicio')}</Link></div></section></main>
-  }
+  if(profileResult.error)return recovery(`profile:${bounded(profileResult.error.code)}`)
   const profile=profileResult.data
   const church:any=Array.isArray(membership.churches)?membership.churches[0]:membership.churches
   const status=(query.status&&Object.prototype.hasOwnProperty.call(statusCopy,query.status)?query.status:query.error?'generic':null) as PrivacyStatus|null
