@@ -6,13 +6,16 @@ import test from 'node:test'
 const read=(file)=>fs.readFileSync(path.join(process.cwd(),file),'utf8')
 const page=read('src/app/start/page.tsx')
 const actions=read('src/app/start/actions.ts')
+const joinActions=read('src/app/join/[slug]/actions.ts')
 const submit=read('src/app/start/start-submit-button.tsx')
 
 test('Start Here does not echo arbitrary query-string error or message text',()=>{
   assert.doesNotMatch(page,/params\.error\b/)
   assert.doesNotMatch(page,/params\.message\b/)
   assert.match(page,/error_code\?:string/)
+  assert.match(page,/message_code\?:string/)
   assert.match(page,/statusCopy/)
+  assert.match(page,/messageCopy/)
   assert.match(page,/onboarding_save_failed/)
 })
 
@@ -38,10 +41,25 @@ test('onboarding completion uses fixed status codes and does not put provider te
   assert.match(actions,/console\.error\('start onboarding save failed',\{code:boundedCode\(error\.code\)\}\)/)
 })
 
+test('existing-account church join gets a fixed bilingual success confirmation on Start Here',()=>{
+  assert.match(joinActions,/message_code=\$\{row\?\.already_member\?'already_joined':'joined_existing'\}/)
+  assert.match(page,/joined_existing:'You are connected to this church with your existing Kingdom Network account/)
+  assert.match(page,/already_joined:'You are already connected to this church/)
+  assert.match(page,/joined_existing:'Ya estás conectado a esta iglesia con tu cuenta existente de Kingdom Network/)
+  assert.match(page,/already_joined:'Ya estabas conectado a esta iglesia/)
+  assert.match(page,/const statusMessage=\(messageCopy\[lang\]/)
+  assert.match(page,/notice success/)
+  assert.match(page,/aria-live="polite"/)
+})
+
 test('Spanish Start Here presents common church roles in Spanish',()=>{
   assert.match(page,/church_admin:'Administrador de iglesia'/)
   assert.match(page,/member:'Miembro'/)
   assert.match(page,/leader:'Líder'/)
+  assert.match(page,/group_leader:'Líder de Grupo de Amistad'/)
+  assert.match(page,/assistant_leader:'Líder asistente'/)
+  assert.match(page,/ministry_leader:'Líder de ministerio'/)
+  assert.match(page,/finance_admin:'Administrador de finanzas'/)
   assert.match(page,/roleLabel\(membership\.role,lang\)/)
 })
 
