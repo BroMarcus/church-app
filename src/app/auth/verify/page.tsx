@@ -6,7 +6,7 @@ const MAX_AUTH_VALUE_LENGTH=1000
 const allowedTypes=new Set(['email','recovery','invite','magiclink','email_change'])
 
 function safeJoinNext(raw:string|undefined){
-  if(!raw||raw.length>500||raw.includes('\\'))return ''
+  if(!raw||raw.length>500||!raw.startsWith('/')||raw.startsWith('//')||raw.includes('\\'))return ''
   try{
     const canonical=new URL(siteUrl)
     const requested=new URL(raw,canonical)
