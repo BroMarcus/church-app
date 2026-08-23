@@ -105,14 +105,20 @@ export default function UpdatePasswordPage(){
       setConfirm('')
       setReady(false)
       setCompleted(true)
-      const {error:signOutError}=await supabase.auth.signOut()
-      if(signOutError){
-        console.error('post-reset sign out failed',{code:diagnosticCode(signOutError)})
+      try{
+        const {error:signOutError}=await supabase.auth.signOut()
+        if(signOutError){
+          console.error('post-reset sign out failed',{code:diagnosticCode(signOutError)})
+          setSignOutIncomplete(true)
+          setMessage(t.signOutIncomplete)
+          return
+        }
+        setMessage(t.success)
+      }catch(error){
+        console.error('post-reset sign out request failed',{code:diagnosticCode(error)})
         setSignOutIncomplete(true)
         setMessage(t.signOutIncomplete)
-        return
       }
-      setMessage(t.success)
     }catch(error){
       console.error('password update request failed',{code:diagnosticCode(error)})
       setMessage(t.failed)
