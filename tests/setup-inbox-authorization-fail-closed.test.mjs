@@ -14,8 +14,14 @@ test('Setup Inbox actions distinguish auth and membership read failures from ord
   assert.match(actions,/if\(ctx\.readError\)[\s\S]*redirect\(inbox\(lang,'access'\)\)/)
 })
 
+test('Setup Inbox unauthenticated and unauthorized recovery preserves the selected language',()=>{
+  assert.match(actions,/if\(!ctx\.userId\)redirect\(`\/login\?lang=\$\{lang\}&mode=signin`\)/)
+  assert.match(actions,/if\(!ctx\.membership\?\.church_id\|\|!\['pastor','church_admin'\]\.includes\(ctx\.membership\.role\)\)redirect\(lang==='es'\?'\/\?lang=es':'\/'\)/)
+})
+
 test('Setup Inbox authorization diagnostics are bounded',()=>{
   assert.match(actions,/const boundedCode=/)
+  assert.match(actions,/replace\(\/\[\^a-zA-Z0-9_-\]\/g,''\)\.slice\(0,48\)/)
   assert.match(actions,/errorCode:boundedCode\(claimsError\.code\)/)
   assert.match(actions,/errorCode:boundedCode\(membershipError\.code\)/)
   assert.match(page,/const boundedCode=/)
