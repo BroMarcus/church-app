@@ -48,10 +48,10 @@ export default async function LoginPage({searchParams}:{searchParams:Promise<{er
   const {data:publicStatusData,error:publicStatusError}=await supabase.rpc('get_public_signup_status')
   if(publicStatusError)console.error('login public signup status unavailable',{code:boundedCode(publicStatusError.code)})
   const publicStatus:any=Array.isArray(publicStatusData)?publicStatusData[0]:publicStatusData
-  const publicStatusMissing=!publicStatusError&&!publicStatus
-  if(publicStatusMissing)console.error('login public signup status returned no result',{code:'empty_signup_status'})
-  const publicStatusFailed=Boolean(publicStatusError)||publicStatusMissing
-  const publicOpen=!publicStatusFailed&&Boolean(publicStatus?.open)
+  const publicStatusInvalid=!publicStatusError&&(!publicStatus||typeof publicStatus.open!=='boolean')
+  if(publicStatusInvalid)console.error('login public signup status returned no usable decision',{code:'invalid_signup_status'})
+  const publicStatusFailed=Boolean(publicStatusError)||publicStatusInvalid
+  const publicOpen=!publicStatusFailed&&publicStatus.open
   const validInvite=!inviteMalformed&&!inviteCheckFailed&&Boolean(invite?.valid)
   const availabilityFailed=inviteCheckFailed||(!validInvite&&publicStatusFailed)
   const canCreate=!availabilityFailed&&(validInvite||publicOpen)
