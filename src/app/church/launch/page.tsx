@@ -9,21 +9,31 @@ const copy={
   es:{admin:'← Administración',title:'Prepara tu iglesia sin tener que aprender la tecnología.',subtitle:'Para el piloto, solo unas pocas cosas son esenciales. Completa estas primero. El diseño, archivos y configuración más profunda pueden esperar.',next:'HAZ ESTO AHORA',open:'Abrir este paso →',ready:'puntos esenciales listos',of:'de',done:'Listo',needed:'Falta',final:'Revisión final del piloto',optional:'OPCIONAL POR AHORA',optionalTitle:'Hazlo tuyo cuando estés listo.',optionalBody:'Estas cosas mejoran la experiencia, pero no deben impedir que pruebes la plataforma con personas reales.',branding:'Logo, color y mensaje de bienvenida',brandingBody:'Agrega la apariencia de tu iglesia y un mensaje de bienvenida.',uploads:'Sube materiales de la iglesia',uploadsBody:'Agrega manuales, formularios, currículo, políticas, logos y calendarios desde una sola bandeja.',pilot:'PRIMERO EL PILOTO',handles:'Prueba la experiencia real del miembro antes de construir todo.',small:'Empieza con personas reales',smallBody:'Un piloto pequeño es suficiente. Confirma que puedan crear una cuenta, confirmar el correo, iniciar sesión, usar Empieza Aquí y recuperar una contraseña olvidada.',help:'¿Necesitas ayuda?',helpBody:'Kingdom Guide da instrucciones sencillas y te lleva a la pantalla correcta.',guide:'Abrir Kingdom Guide →',when:'CUANDO LOS PUNTOS ESENCIALES ESTÉN LISTOS',run:'Prueba el piloto desde un teléfono.',runBody:'Prueba registro, confirmación por correo, inicio de sesión, recuperación de contraseña, Empieza Aquí, Mi Día, Perfil, Aprendizaje, Grupos, Calendario, Oración/Cuidado Privado y Comentarios antes de expandir.',english:'English',spanish:'Español',church:'Tu Iglesia',accounts:'Protege las cuentas existentes',accountsBody:'Si alguien ya tiene una cuenta de Kingdom Network, pídele que primero inicie sesión y después use el enlace para unirse a la iglesia. No crees una segunda cuenta para la misma persona.',join:'Abrir Centro para Unirse →',password:'Prueba la recuperación de contraseña una vez',passwordBody:'Antes de ampliar el piloto, pide a una persona de confianza que confirme que puede usar Olvidé mi contraseña desde la pantalla de inicio de sesión.',signin:'Abrir inicio de sesión →',pendingInvites:'invitación(es) pendiente(s)',joinedRule:'Esto solo queda listo cuando un miembro real del piloto, que no sea administrador, haya entrado.'}
 } as const
 
+const boundedCode=(value:unknown)=>String(value||'unknown').slice(0,80)
+
 export default async function ChurchLaunchPage({searchParams}:{searchParams:Promise<{lang?:string}>}){
   const params=await searchParams
   const lang=params.lang==='es'?'es':'en'
   const t=copy[lang]
   const l=(path:string)=>lang==='es'?`${path}${path.includes('?')?'&':'?'}lang=es`:path
   const supabase=await createClient()
-  const {data:claims}=await supabase.auth.getClaims()
+  const {data:claims,error:claimsError}=await supabase.auth.getClaims()
+  if(claimsError){
+    console.error('Church Builder auth state unavailable',{code:boundedCode(claimsError.code)})
+    throw new Error('church-launch-load-failed')
+  }
   const userId=claims?.claims?.sub
   if(!userId)redirect(l('/login'))
-  const {data:membership}=await supabase.from('church_memberships').select('church_id,role,churches(name,city,state,timezone,logo_path,brand_color,welcome_message)').eq('user_id',userId).eq('status','active').limit(1).single()
+  const {data:membership,error:membershipError}=await supabase.from('church_memberships').select('church_id,role,churches(name,city,state,timezone,logo_path,brand_color,welcome_message)').eq('user_id',userId).eq('status','active').limit(1).maybeSingle()
+  if(membershipError){
+    console.error('Church Builder membership read failed',{code:boundedCode(membershipError.code)})
+    throw new Error('church-launch-load-failed')
+  }
   if(!membership?.church_id||!['pastor','church_admin'].includes(membership.role))redirect('/')
   const churchId=membership.church_id
   const church:any=Array.isArray(membership.churches)?membership.churches[0]:membership.churches
   const now=new Date().toISOString()
-  const [{count:admins},{count:pilotMembers},{count:publishedCourses},{count:groups},{count:events},{count:openInvites},{count:setupFiles}]=await Promise.all([
+  const readinessReads=await Promise.all([
     supabase.from('church_memberships').select('*',{count:'exact',head:true}).eq('church_id',churchId).eq('status','active').in('role',['pastor','church_admin']),
     supabase.from('church_memberships').select('*',{count:'exact',head:true}).eq('church_id',churchId).eq('status','active').not('role','in','(pastor,church_admin)'),
     supabase.from('courses').select('*',{count:'exact',head:true}).eq('church_id',churchId).eq('published',true),
@@ -32,6 +42,12 @@ export default async function ChurchLaunchPage({searchParams}:{searchParams:Prom
     supabase.from('church_invites').select('*',{count:'exact',head:true}).eq('church_id',churchId).is('redeemed_at',null).is('revoked_at',null).gt('expires_at',now),
     supabase.from('church_setup_uploads').select('*',{count:'exact',head:true}).eq('church_id',churchId)
   ])
+  const readinessErrors=readinessReads.map(result=>result.error).filter(Boolean)
+  if(readinessErrors.length){
+    console.error('Church Builder readiness reads failed',{codes:readinessErrors.map(error=>boundedCode(error?.code))})
+    throw new Error('church-launch-load-failed')
+  }
+  const [{count:admins},{count:pilotMembers},{count:publishedCourses},{count:groups},{count:events},{count:openInvites},{count:setupFiles}]=readinessReads
   const identity=Boolean(church?.name&&church?.city&&church?.state&&church?.timezone)
   const adminReady=(admins??0)>=2
   const people=(pilotMembers??0)>0
