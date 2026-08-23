@@ -5,8 +5,8 @@ import { PasswordField } from '@/components/password-field'
 import { createClient } from '@/lib/supabase/client'
 
 const copy={
-  en:{opening:'Opening your secure reset link…',invalid:'This reset link is invalid or expired. Please request one fresh reset email.',choose:'Choose a new password below.',invalidBack:'This reset link is invalid or expired. Go back to Sign in and request one fresh reset email.',short:'Password must be at least 8 characters.',tooLong:'Password must be 128 characters or fewer.',mismatch:'The two passwords do not match.',failed:'We could not update the password. Please request a fresh reset email and try again.',updated:'Password updated. Your old password will no longer work.',success:'Password updated. Continue to sign in with your new password.',title:'Reset your password',newPassword:'New password',again:'Type it again',showPassword:'Show password',hidePassword:'Hide password',updating:'Updating…',update:'Update password',continue:'Continue to sign in',back:'Back to sign in'},
-  es:{opening:'Abriendo tu enlace seguro…',invalid:'Este enlace no es válido o ya venció. Solicita un correo nuevo para cambiar tu contraseña.',choose:'Escribe una contraseña nueva abajo.',invalidBack:'Este enlace no es válido o ya venció. Vuelve a Iniciar sesión y solicita un correo nuevo.',short:'La contraseña debe tener al menos 8 caracteres.',tooLong:'La contraseña debe tener 128 caracteres o menos.',mismatch:'Las dos contraseñas no coinciden.',failed:'No pudimos cambiar la contraseña. Solicita un correo nuevo e inténtalo otra vez.',updated:'Contraseña actualizada. Tu contraseña anterior ya no funcionará.',success:'Contraseña actualizada. Continúa para iniciar sesión con tu nueva contraseña.',title:'Cambiar tu contraseña',newPassword:'Nueva contraseña',again:'Escríbela otra vez',showPassword:'Mostrar contraseña',hidePassword:'Ocultar contraseña',updating:'Actualizando…',update:'Actualizar contraseña',continue:'Continuar a Iniciar sesión',back:'Volver a Iniciar sesión'}
+  en:{opening:'Opening your secure reset link…',invalid:'This reset link is invalid or expired. Please request one fresh reset email.',choose:'Choose a new password below.',invalidBack:'This reset link is invalid or expired. Go back to Sign in and request one fresh reset email.',short:'Password must be at least 8 characters.',tooLong:'Password must be 128 characters or fewer.',mismatch:'The two passwords do not match.',failed:'We could not update the password. Please request a fresh reset email and try again.',updated:'Password updated. Your old password will no longer work.',success:'Password updated. Continue to sign in with your new password.',signOutIncomplete:'Your password was updated, but we could not safely finish signing this browser out. Open Account Security, choose “Sign out everywhere,” then sign in again with your new password.',title:'Reset your password',newPassword:'New password',again:'Type it again',showPassword:'Show password',hidePassword:'Hide password',updating:'Updating…',update:'Update password',continue:'Continue to sign in',accountSecurity:'Open Account Security',back:'Back to sign in'},
+  es:{opening:'Abriendo tu enlace seguro…',invalid:'Este enlace no es válido o ya venció. Solicita un correo nuevo para cambiar tu contraseña.',choose:'Escribe una contraseña nueva abajo.',invalidBack:'Este enlace no es válido o ya venció. Vuelve a Iniciar sesión y solicita un correo nuevo.',short:'La contraseña debe tener al menos 8 caracteres.',tooLong:'La contraseña debe tener 128 caracteres o menos.',mismatch:'Las dos contraseñas no coinciden.',failed:'No pudimos cambiar la contraseña. Solicita un correo nuevo e inténtalo otra vez.',updated:'Contraseña actualizada. Tu contraseña anterior ya no funcionará.',success:'Contraseña actualizada. Continúa para iniciar sesión con tu nueva contraseña.',signOutIncomplete:'Tu contraseña fue actualizada, pero no pudimos cerrar esta sesión del navegador de forma segura. Abre Seguridad de la Cuenta, elige “Cerrar sesión en todas partes” y luego inicia sesión otra vez con tu contraseña nueva.',title:'Cambiar tu contraseña',newPassword:'Nueva contraseña',again:'Escríbela otra vez',showPassword:'Mostrar contraseña',hidePassword:'Ocultar contraseña',updating:'Actualizando…',update:'Actualizar contraseña',continue:'Continuar a Iniciar sesión',accountSecurity:'Abrir Seguridad de la Cuenta',back:'Volver a Iniciar sesión'}
 } as const
 
 function diagnosticCode(error:unknown){
@@ -29,6 +29,7 @@ export default function UpdatePasswordPage(){
   const [joinNext,setJoinNext]=useState('')
   const [ready,setReady]=useState(false)
   const [completed,setCompleted]=useState(false)
+  const [signOutIncomplete,setSignOutIncomplete]=useState(false)
   const [password,setPassword]=useState('')
   const [confirm,setConfirm]=useState('')
   const [message,setMessage]=useState<string>(copy.en.opening)
@@ -70,7 +71,7 @@ export default function UpdatePasswordPage(){
     }
     void check()
     const {data:listener}=supabase.auth.onAuthStateChange((event,session)=>{
-      if(!mounted||completed)return
+      if(!mounted)return
       if((event==='PASSWORD_RECOVERY'||event==='SIGNED_IN')&&session){
         const url=new URL(window.location.href)
         const nextLang=url.searchParams.get('lang')==='es'?'es':'en'
@@ -78,7 +79,7 @@ export default function UpdatePasswordPage(){
       }
     })
     return()=>{mounted=false;listener.subscription.unsubscribe()}
-  },[completed])
+  },[])
 
   async function save(e:React.FormEvent){
     e.preventDefault()
@@ -94,12 +95,17 @@ export default function UpdatePasswordPage(){
         setMessage(t.failed)
         return
       }
-      const {error:signOutError}=await supabase.auth.signOut()
-      if(signOutError)console.error('post-reset sign out failed',{code:diagnosticCode(signOutError)})
       setPassword('')
       setConfirm('')
       setReady(false)
       setCompleted(true)
+      const {error:signOutError}=await supabase.auth.signOut()
+      if(signOutError){
+        console.error('post-reset sign out failed',{code:diagnosticCode(signOutError)})
+        setSignOutIncomplete(true)
+        setMessage(t.signOutIncomplete)
+        return
+      }
       setMessage(t.success)
     }catch(error){
       console.error('password update request failed',{code:diagnosticCode(error)})
@@ -111,5 +117,6 @@ export default function UpdatePasswordPage(){
 
   const nextPart=joinNext?`&next=${encodeURIComponent(joinNext)}`:''
   const signInHref=`/login?lang=${lang}&mode=signin${nextPart}`
-  return <main className="login-wrap"><div className="login card"><div className="pill">KINGDOM NETWORK</div><h1>{t.title}</h1><div className={`notice ${ready||completed?'success':'error'}`} role={completed?'status':'alert'} aria-live="polite">{message}</div>{ready&&!completed&&<form onSubmit={save}><PasswordField name="password" label={t.newPassword} minLength={8} maxLength={128} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><PasswordField name="confirm_password" label={t.again} minLength={8} maxLength={128} autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><button className="btn" type="submit" disabled={busy}>{busy?t.updating:t.update}</button></form>}{completed?<p style={{marginTop:16}}><a className="btn" href={signInHref}>{t.continue}</a></p>:<p className="small muted" style={{marginTop:16}}><a href={signInHref}>{t.back}</a></p>}</div></main>
+  const securityHref=`/account/security${lang==='es'?'?lang=es':''}`
+  return <main className="login-wrap"><div className="login card"><div className="pill">KINGDOM NETWORK</div><h1>{t.title}</h1><div className={`notice ${ready||completed?'success':'error'}`} role={completed&&!signOutIncomplete?'status':'alert'} aria-live="polite">{message}</div>{ready&&!completed&&<form onSubmit={save}><PasswordField name="password" label={t.newPassword} minLength={8} maxLength={128} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><PasswordField name="confirm_password" label={t.again} minLength={8} maxLength={128} autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><button className="btn" type="submit" disabled={busy}>{busy?t.updating:t.update}</button></form>}{completed?<p style={{marginTop:16}}><a className="btn" href={signOutIncomplete?securityHref:signInHref}>{signOutIncomplete?t.accountSecurity:t.continue}</a></p>:<p className="small muted" style={{marginTop:16}}><a href={signInHref}>{t.back}</a></p>}</div></main>
 }
