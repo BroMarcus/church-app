@@ -7,9 +7,27 @@ import { createClient } from '@/lib/supabase/server'
 const cleanTitle=(fileName:string)=>fileName.replace(/\.[^.]+$/,'').replace(/[_-]+/g,' ').replace(/\s+/g,' ').trim()
 const slugify=(v:string)=>v.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,60)
 const langOf=(formData?:FormData)=>String(formData?.get('lang')||'en')==='es'?'es':'en'
-const inbox=(lang:string,error?:'review'|'approve')=>{const p=lang==='es'?'/church/setup-inbox?lang=es':'/church/setup-inbox';if(!error)return p;return `${p}${p.includes('?')?'&':'?'}error=${error}`}
+const inbox=(lang:string,error?:'review'|'approve'|'access')=>{const p=lang==='es'?'/church/setup-inbox?lang=es':'/church/setup-inbox';if(!error)return p;return `${p}${p.includes('?')?'&':'?'}error=${error}`}
+const boundedCode=(value:unknown)=>String(value||'unknown').slice(0,80)
 
-async function actor(){const supabase=await createClient();const {data:claims}=await supabase.auth.getClaims();const userId=claims?.claims?.sub;if(!userId)return {supabase,userId:null,membership:null};const {data:membership}=await supabase.from('church_memberships').select('church_id,role').eq('user_id',userId).eq('status','active').limit(1).single();return {supabase,userId,membership}}
+async function actor(){
+ const supabase=await createClient()
+ const {data:claims,error:claimsError}=await supabase.auth.getClaims()
+ if(claimsError)return {supabase,userId:null,membership:null,readError:'auth',errorCode:boundedCode(claimsError.code)}
+ const userId=claims?.claims?.sub
+ if(!userId)return {supabase,userId:null,membership:null,readError:null,errorCode:null}
+ const {data:membership,error:membershipError}=await supabase.from('church_memberships').select('church_id,role').eq('user_id',userId).eq('status','active').limit(1).maybeSingle()
+ if(membershipError)return {supabase,userId,membership:null,readError:'membership',errorCode:boundedCode(membershipError.code)}
+ return {supabase,userId,membership,readError:null,errorCode:null}
+}
+
+function requireActorRead(ctx:Awaited<ReturnType<typeof actor>>,lang:string,action:string){
+ if(ctx.readError){
+  console.error('Setup Inbox action authorization unavailable',{action,stage:ctx.readError,code:ctx.errorCode})
+  redirect(inbox(lang,'access'))
+ }
+ if(!ctx.userId||!ctx.membership?.church_id||!['pastor','church_admin'].includes(ctx.membership.role))redirect('/')
+}
 
 function buildPlan(row:any){
  const name=cleanTitle(row.file_name||'Uploaded material'),text=`${row.file_name||''} ${row.notes||''}`.toLowerCase(),category=row.category||'unsorted'
@@ -19,28 +37,28 @@ function buildPlan(row:any){
 }
 
 export async function generateSetupPlan(formData:FormData){
- const id=String(formData.get('id')||''),lang=langOf(formData);const {supabase,userId,membership}=await actor();if(!userId||!membership?.church_id||!['pastor','church_admin'].includes(membership.role))redirect('/');const {data:row}=await supabase.from('church_setup_uploads').select('*').eq('id',id).eq('church_id',membership.church_id).single();if(!row||row.status==='ready')redirect(inbox(lang));const plan=buildPlan(row);const {error}=await supabase.from('church_setup_uploads').update({review_plan:plan,review_confidence:plan.confidence,reviewed_at:new Date().toISOString(),status:'reviewing',suggested_destination:plan.destination}).eq('id',id).eq('church_id',membership.church_id).neq('status','ready');if(error){console.error('generateSetupPlan failed',{churchId:membership.church_id,id,code:error.code});redirect(inbox(lang,'review'))}revalidatePath('/church/setup-inbox')
+ const id=String(formData.get('id')||''),lang=langOf(formData);const ctx=await actor();requireActorRead(ctx,lang,'generate-one');const {supabase,userId,membership}=ctx;const {data:row,error:rowError}=await supabase.from('church_setup_uploads').select('*').eq('id',id).eq('church_id',membership!.church_id).maybeSingle();if(rowError){console.error('generateSetupPlan read failed',{churchId:membership!.church_id,id,code:boundedCode(rowError.code)});redirect(inbox(lang,'review'))}if(!row||row.status==='ready')redirect(inbox(lang));const plan=buildPlan(row);const {data:updated,error}=await supabase.from('church_setup_uploads').update({review_plan:plan,review_confidence:plan.confidence,reviewed_at:new Date().toISOString(),status:'reviewing',suggested_destination:plan.destination}).eq('id',id).eq('church_id',membership!.church_id).neq('status','ready').select('id').maybeSingle();if(error||!updated){console.error('generateSetupPlan failed',{churchId:membership!.church_id,id,code:boundedCode(error?.code)});redirect(inbox(lang,'review'))}revalidatePath('/church/setup-inbox')
 }
 
 export async function generateAllSetupPlans(formData:FormData){
- const lang=langOf(formData);const {supabase,userId,membership}=await actor();if(!userId||!membership?.church_id||!['pastor','church_admin'].includes(membership.role))redirect('/');const {data:rows,error:readError}=await supabase.from('church_setup_uploads').select('*').eq('church_id',membership.church_id).eq('status','received');if(readError){console.error('generateAllSetupPlans read failed',{churchId:membership.church_id,code:readError.code});redirect(inbox(lang,'review'))}for(const row of rows??[]){const plan=buildPlan(row);const {error}=await supabase.from('church_setup_uploads').update({review_plan:plan,review_confidence:plan.confidence,reviewed_at:new Date().toISOString(),status:'reviewing',suggested_destination:plan.destination}).eq('id',row.id).eq('church_id',membership.church_id).eq('status','received');if(error){console.error('generateAllSetupPlans update failed',{churchId:membership.church_id,id:row.id,code:error.code});redirect(inbox(lang,'review'))}}revalidatePath('/church/setup-inbox')
+ const lang=langOf(formData);const ctx=await actor();requireActorRead(ctx,lang,'generate-all');const {supabase,membership}=ctx;const {data:rows,error:readError}=await supabase.from('church_setup_uploads').select('*').eq('church_id',membership!.church_id).eq('status','received');if(readError){console.error('generateAllSetupPlans read failed',{churchId:membership!.church_id,code:boundedCode(readError.code)});redirect(inbox(lang,'review'))}for(const row of rows??[]){const plan=buildPlan(row);const {data:updated,error}=await supabase.from('church_setup_uploads').update({review_plan:plan,review_confidence:plan.confidence,reviewed_at:new Date().toISOString(),status:'reviewing',suggested_destination:plan.destination}).eq('id',row.id).eq('church_id',membership!.church_id).eq('status','received').select('id').maybeSingle();if(error||!updated){console.error('generateAllSetupPlans update failed',{churchId:membership!.church_id,id:row.id,code:boundedCode(error?.code)});redirect(inbox(lang,'review'))}}revalidatePath('/church/setup-inbox')
 }
 
 export async function approveSetupPlan(formData:FormData){
- const id=String(formData.get('id')||''),lang=langOf(formData);const {supabase,userId,membership}=await actor();if(!userId||!membership?.church_id||!['pastor','church_admin'].includes(membership.role))redirect('/');const {data:row,error:rowError}=await supabase.from('church_setup_uploads').select('*').eq('id',id).eq('church_id',membership.church_id).single();if(rowError||!row?.review_plan){console.error('approveSetupPlan read failed',{churchId:membership.church_id,id,code:rowError?.code});redirect(inbox(lang,'approve'))}if(row.status==='ready'){revalidatePath('/church/setup-inbox');return}if(row.status!=='reviewing'){console.error('approveSetupPlan invalid state',{churchId:membership.church_id,id,status:row.status});redirect(inbox(lang,'approve'))}
+ const id=String(formData.get('id')||''),lang=langOf(formData);const ctx=await actor();requireActorRead(ctx,lang,'approve');const {supabase,userId,membership}=ctx;const {data:row,error:rowError}=await supabase.from('church_setup_uploads').select('*').eq('id',id).eq('church_id',membership!.church_id).maybeSingle();if(rowError||!row?.review_plan){console.error('approveSetupPlan read failed',{churchId:membership!.church_id,id,code:boundedCode(rowError?.code)});redirect(inbox(lang,'approve'))}if(row.status==='ready'){revalidatePath('/church/setup-inbox');return}if(row.status!=='reviewing'){console.error('approveSetupPlan invalid state',{churchId:membership!.church_id,id,status:row.status});redirect(inbox(lang,'approve'))}
  const plan:any=row.review_plan;let createdId:string|null=row.created_record_id??null,createdType:string|null=row.created_record_type??null
  if(plan.kind==='course_draft'){
   const title=cleanTitle(row.file_name||'New Course'),slug=`${slugify(title)||'course'}-${String(row.id).slice(0,8)}`
-  const {data:existing,error:existingError}=await supabase.from('courses').select('id,published').eq('church_id',membership.church_id).eq('slug',slug).maybeSingle()
-  if(existingError){console.error('approveSetupPlan existing course lookup failed',{churchId:membership.church_id,id,code:existingError.code});redirect(inbox(lang,'approve'))}
+  const {data:existing,error:existingError}=await supabase.from('courses').select('id,published').eq('church_id',membership!.church_id).eq('slug',slug).maybeSingle()
+  if(existingError){console.error('approveSetupPlan existing course lookup failed',{churchId:membership!.church_id,id,code:boundedCode(existingError.code)});redirect(inbox(lang,'approve'))}
   if(existing?.id){
-   if(existing.published){console.error('approveSetupPlan refused published deterministic course',{churchId:membership.church_id,id,courseId:existing.id});redirect(inbox(lang,'approve'))}
+   if(existing.published){console.error('approveSetupPlan refused published deterministic course',{churchId:membership!.church_id,id,courseId:existing.id});redirect(inbox(lang,'approve'))}
    createdId=existing.id;createdType='course'
   }else{
-   const {data:course,error}=await supabase.from('courses').insert({church_id:membership.church_id,title,slug,description:`Draft created from Setup Inbox source: ${row.file_name}. Review and build lessons before publishing.`,category:'discipleship',published:false,created_by:userId}).select('id').single()
-   if(error||!course?.id){console.error('approveSetupPlan course creation failed',{churchId:membership.church_id,id,code:error?.code});redirect(inbox(lang,'approve'))}
+   const {data:course,error}=await supabase.from('courses').insert({church_id:membership!.church_id,title,slug,description:`Draft created from Setup Inbox source: ${row.file_name}. Review and build lessons before publishing.`,category:'discipleship',published:false,created_by:userId}).select('id').single()
+   if(error||!course?.id){console.error('approveSetupPlan course creation failed',{churchId:membership!.church_id,id,code:boundedCode(error?.code)});redirect(inbox(lang,'approve'))}
    createdId=course.id;createdType='course'
   }
  }
- const {data:updated,error:updateError}=await supabase.from('church_setup_uploads').update({status:'ready',approved_at:new Date().toISOString(),created_record_id:createdId,created_record_type:createdType}).eq('id',id).eq('church_id',membership.church_id).eq('status','reviewing').select('id').maybeSingle();if(updateError||!updated){console.error('approveSetupPlan status update failed',{churchId:membership.church_id,id,createdId,code:updateError?.code});redirect(inbox(lang,'approve'))}revalidatePath('/church/setup-inbox');revalidatePath('/learning')
+ const {data:updated,error:updateError}=await supabase.from('church_setup_uploads').update({status:'ready',approved_at:new Date().toISOString(),created_record_id:createdId,created_record_type:createdType}).eq('id',id).eq('church_id',membership!.church_id).eq('status','reviewing').select('id').maybeSingle();if(updateError||!updated){console.error('approveSetupPlan status update failed',{churchId:membership!.church_id,id,createdId,code:boundedCode(updateError?.code)});redirect(inbox(lang,'approve'))}revalidatePath('/church/setup-inbox');revalidatePath('/learning')
 }
