@@ -16,9 +16,9 @@ const authStatus={
   es:{login_failed:'No pudimos iniciar sesión. Revisa tus datos e inténtalo otra vez.',invalid_credentials:'No pudimos iniciar sesión. Revisa el correo y la contraseña. Si no recuerdas la contraseña, usa “Olvidé mi contraseña” abajo.',email_unconfirmed:'Tu correo todavía no está confirmado. Abre el correo de confirmación más reciente antes de iniciar sesión.',missing_name:'Se requieren nombre y apellido para crear tu cuenta.',name_too_long:'Tu nombre y apellido deben tener 80 caracteres o menos cada uno.',missing_email:'Escribe tu correo electrónico.',invalid_email:'Escribe un correo electrónico válido y sin espacios adicionales.',missing_password:'Escribe tu contraseña.',weak_password:'Tu contraseña debe tener por lo menos 8 caracteres.',password_too_long:'Esa contraseña es demasiado larga. Usa una contraseña más corta e inténtalo otra vez.',password_mismatch:'Las dos contraseñas no coinciden. Escríbelas de nuevo.',invite_invalid:'Esta invitación venció, ya fue usada, fue cancelada, no tiene un formato válido o pertenece a otro correo electrónico.',invite_check_unavailable:'No pudimos verificar esta invitación en este momento. No crees otra cuenta. Inténtalo de nuevo en un momento, o inicia sesión si ya tienes una cuenta.',signup_closed:'El registro público del piloto no está disponible temporalmente.',signup_status_unavailable:'No pudimos verificar si el registro público está disponible en este momento. Inténtalo de nuevo en un momento. Los usuarios existentes todavía pueden iniciar sesión.',email_rate_limit:'Se solicitaron demasiados correos en poco tiempo. Espera aproximadamente un minuto y solicita solo un correo nuevo.',email_failed:'No pudimos enviar el correo de la cuenta en este momento. Espera un momento e inténtalo otra vez.',callback_incomplete:'Ese enlace de correo está incompleto. Solicita un correo nuevo y abre el enlace más reciente.',callback_expired:'Ese enlace venció o ya fue usado. Solicita un correo nuevo y abre solamente el más reciente.',account_exists:'Ese correo ya tiene una cuenta. Inicia sesión con tu contraseña existente o usa “Olvidé mi contraseña” si no la recuerdas.',account_created:'Cuenta creada. Enviamos un correo de confirmación. Revisa también Spam/Correo no deseado. Abre el correo más reciente; después te llevaremos directamente a Empieza Aquí.',reset_sent:'Correo para cambiar la contraseña enviado. Revisa Recibidos y Spam/Correo no deseado. Abre solamente el enlace más reciente.',confirmation_sent:'Correo de confirmación enviado otra vez. Abre solamente el correo más reciente y revisa Spam/Correo no deseado si no aparece.'}
 } as const
 
-const boundedCode=(value:unknown)=>String(value||'unknown').slice(0,80)
+const boundedCode=(value:unknown)=>String(value||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48)||'unknown'
 function safeJoinNext(value:string|undefined){
-  if(!value||value.length>500||value.includes('\\'))return ''
+  if(!value||value.length>500||!value.startsWith('/')||value.startsWith('//')||value.includes('\\'))return ''
   try{
     const base='https://kingdom.invalid'
     const parsed=new URL(value,base)
@@ -48,7 +48,9 @@ export default async function LoginPage({searchParams}:{searchParams:Promise<{er
   const {data:publicStatusData,error:publicStatusError}=await supabase.rpc('get_public_signup_status')
   if(publicStatusError)console.error('login public signup status unavailable',{code:boundedCode(publicStatusError.code)})
   const publicStatus:any=Array.isArray(publicStatusData)?publicStatusData[0]:publicStatusData
-  const publicStatusFailed=Boolean(publicStatusError)
+  const publicStatusMissing=!publicStatusError&&!publicStatus
+  if(publicStatusMissing)console.error('login public signup status returned no result',{code:'empty_signup_status'})
+  const publicStatusFailed=Boolean(publicStatusError)||publicStatusMissing
   const publicOpen=!publicStatusFailed&&Boolean(publicStatus?.open)
   const validInvite=!inviteMalformed&&!inviteCheckFailed&&Boolean(invite?.valid)
   const availabilityFailed=inviteCheckFailed||(!validInvite&&publicStatusFailed)
