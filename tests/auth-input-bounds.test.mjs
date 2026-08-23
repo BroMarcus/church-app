@@ -5,6 +5,7 @@ import test from 'node:test'
 
 const page=fs.readFileSync(path.join(process.cwd(),'src/app/login/page.tsx'),'utf8')
 const actions=fs.readFileSync(path.join(process.cwd(),'src/app/login/actions.ts'),'utf8')
+const updatePassword=fs.readFileSync(path.join(process.cwd(),'src/app/auth/update-password/page.tsx'),'utf8')
 
 test('server actions bound account inputs before calling auth providers',()=>{
   assert.match(actions,/const EMAIL_MAX=254/)
@@ -28,6 +29,7 @@ test('email validation is reused by sign in, signup, reset, and confirmation res
 test('oversized join context is discarded before auth recovery redirects',()=>{
   assert.match(actions,/value\.length>JOIN_NEXT_MAX/)
   assert.match(page,/value\.length>500/)
+  assert.match(updatePassword,/value\.length>500/)
 })
 
 test('login page mirrors server limits for low-tech users',()=>{
@@ -35,6 +37,13 @@ test('login page mirrors server limits for low-tech users',()=>{
   assert.ok((page.match(/maxLength=\{254\}/g)||[]).length>=3)
   assert.ok((page.match(/maxLength=\{128\}/g)||[]).length>=2)
   assert.ok(page.includes('maxLength={4096}'))
+})
+
+test('password reset completion enforces the same new-password ceiling',()=>{
+  assert.match(updatePassword,/password\.length>128\|\|confirm\.length>128/)
+  assert.ok((updatePassword.match(/maxLength=\{128\}/g)||[]).length>=2)
+  assert.ok(updatePassword.includes('Password must be 128 characters or fewer.'))
+  assert.ok(updatePassword.includes('La contraseña debe tener 128 caracteres o menos.'))
 })
 
 test('bilingual messages explain bounded-input failures without provider text',()=>{
