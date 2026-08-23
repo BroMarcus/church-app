@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 
 const text=(f:FormData,k:string)=>String(f.get(k)??'').trim()
 const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
-const boundedCode=(value:unknown)=>String(value||'unknown').slice(0,80)
+const boundedCode=(value:unknown)=>String(value||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48)||'unknown'
 const EMAIL_MAX=254
 const NAME_MAX=80
 const PHONE_MAX=40
@@ -55,8 +55,16 @@ export async function joinChurch(formData:FormData){
     fail('signup_status_unavailable')
   }
   const church:any=Array.isArray(statusData)?statusData[0]:statusData
-  if(!church?.church_id)fail('missing_church')
-  if(!church?.open)fail('signup_closed')
+  if(!church){
+    console.error('public church signup status returned no result',{churchSlug:slug,code:'empty_signup_status'})
+    fail('signup_status_unavailable')
+  }
+  if(!church.church_id)fail('missing_church')
+  if(typeof church.open!=='boolean'){
+    console.error('public church signup status returned malformed result',{churchSlug:slug,code:'malformed_signup_status'})
+    fail('signup_status_unavailable')
+  }
+  if(!church.open)fail('signup_closed')
 
   const startPath=`/start?welcome=1${lang==='es'?'&lang=es':''}`
   const callback=`${siteUrl}/auth/callback?lang=${lang}&mode=signup&next=${encodeURIComponent(startPath)}`
