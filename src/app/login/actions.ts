@@ -120,8 +120,8 @@ export async function signup(formData:FormData){
       fail('signup_status_unavailable')
     }
     const row=Array.isArray(status)?status[0]:status
-    if(!row){
-      console.error('public signup status returned no result',{code:'empty_signup_status'})
+    if(!row||typeof row.open!=='boolean'){
+      console.error('public signup status returned no usable decision',{code:'invalid_signup_status'})
       fail('signup_status_unavailable')
     }
     if(!row.open)fail('signup_closed')
