@@ -20,6 +20,31 @@ test('join signup action separates unavailable status, unknown church, and inten
   assert.match(actions,/if\(!church\?\.open\)fail\('signup_closed'\)/)
 })
 
+test('public church join bounds slug and account inputs before RPC or Auth calls',()=>{
+  assert.match(actions,/const EMAIL_MAX=254/)
+  assert.match(actions,/const NAME_MAX=80/)
+  assert.match(actions,/const PHONE_MAX=40/)
+  assert.match(actions,/const NEW_PASSWORD_MAX=128/)
+  assert.match(actions,/const SLUG_MAX=120/)
+  assert.match(actions,/function safeChurchSlug\(value:string\)/)
+  assert.match(actions,/function emailIssue\(email:string\)/)
+  assert.match(actions,/firstName\.length>NAME_MAX\|\|lastName\.length>NAME_MAX/)
+  assert.match(actions,/phone\.length>PHONE_MAX/)
+  assert.match(actions,/password\.length>NEW_PASSWORD_MAX\|\|confirm\.length>NEW_PASSWORD_MAX/)
+  assert.ok((actions.match(/safeChurchSlug\(text\(formData,'church_slug'\)\)/g)||[]).length>=2)
+})
+
+test('public church join page mirrors server bounds and rejects malformed route slugs before RPC',()=>{
+  assert.match(page,/const safeChurchSlug=/)
+  assert.match(page,/if\(!slug\)notFound\(\)/)
+  assert.ok((page.match(/maxLength=\{NAME_MAX\}/g)||[]).length>=2)
+  assert.ok(page.includes('maxLength={PHONE_MAX}'))
+  assert.ok(page.includes('maxLength={EMAIL_MAX}'))
+  assert.ok((page.match(/maxLength=\{PASSWORD_MAX\}/g)||[]).length>=2)
+  assert.ok(page.includes('Enter a valid email address without extra spaces.'))
+  assert.ok(page.includes('Escribe un correo electrónico válido y sin espacios adicionales.'))
+})
+
 test('public join diagnostics are bounded and do not log provider messages',()=>{
   assert.match(page,/boundedCode\(churchStatusError\.code\)/)
   assert.match(page,/boundedCode\(claimsError\.code\)/)
