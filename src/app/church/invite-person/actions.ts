@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 
 const text=(f:FormData,k:string)=>String(f.get(k)??'').trim()
 const allowedInviteRoles=new Set(['member','group_leader','ministry_leader','minister'])
+const inviteIdPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const path=(lang:string,status?:string,created?:string)=>`/church/invite-person?lang=${lang==='es'?'es':'en'}${status?`&status=${encodeURIComponent(status)}`:''}${created?`&created=${encodeURIComponent(created)}`:''}`
 const boundedCode=(value:unknown)=>String(value??'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48)||'unknown'
 const validEmail=(value:string)=>value.length<=254&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
@@ -56,6 +57,12 @@ export async function createKnownPersonInvite(formData:FormData){
     redirect(path(lang,'create_failed'))
   }
   const row:any=Array.isArray(data)?data[0]:data
-  if(!row?.invite_id)redirect(path(lang,'create_failed'))
-  redirect(path(lang,'created',String(row.invite_id).slice(0,80)))
+  const inviteId=String(row?.invite_id??'').trim()
+  // Do not report success or reflect an unexpected RPC value into the URL. A valid
+  // invitation creation must return the UUID shape used by church_invites.
+  if(!inviteIdPattern.test(inviteId)){
+    console.error('createKnownPersonInvite returned invalid invite id',{resultCode:inviteId?'invalid_id':'missing_id'})
+    redirect(path(lang,'create_failed'))
+  }
+  redirect(path(lang,'created',inviteId))
 }
