@@ -2,9 +2,11 @@ import Link from 'next/link'
 import { verifyAuthLink } from './actions'
 
 const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
+const MAX_AUTH_VALUE_LENGTH=1000
+const allowedTypes=new Set(['email','recovery','invite','magiclink','email_change'])
 
 function safeJoinNext(raw:string|undefined){
-  if(!raw||raw.length>500)return ''
+  if(!raw||raw.length>500||raw.includes('\\'))return ''
   try{
     const canonical=new URL(siteUrl)
     const requested=new URL(raw,canonical)
@@ -24,10 +26,12 @@ export default async function VerifyPage({searchParams}:{searchParams:Promise<{t
   const params=await searchParams
   const lang=params.lang==='es'?'es':'en'
   const t=copy[lang]
-  const hasLink=Boolean(params.token_hash&&params.type)
+  const validType=Boolean(params.type&&allowedTypes.has(params.type))
+  const validToken=Boolean(params.token_hash&&params.token_hash.length<=MAX_AUTH_VALUE_LENGTH)
+  const hasLink=validType&&validToken
   const isRecovery=params.type==='recovery'
   const joinNext=safeJoinNext(params.next)
   const backHref=`/login?lang=${lang}&mode=signin${joinNext?`&next=${encodeURIComponent(joinNext)}`:''}`
 
-  return <main className="login-wrap"><div className="login card"><div className="pill">KINGDOM NETWORK</div><h1>{isRecovery?t.reset:t.confirm}</h1><p className="muted">{hasLink?(isRecovery?t.resetBody:t.confirmBody):t.invalid}</p>{hasLink?<form action={verifyAuthLink}><input type="hidden" name="token_hash" value={params.token_hash}/><input type="hidden" name="type" value={params.type}/><input type="hidden" name="next" value={params.next??'/'}/><input type="hidden" name="lang" value={lang}/><button className="btn" type="submit">{isRecovery?t.continueReset:t.confirmEmail}</button></form>:<div className="notice error" role="alert">{t.fresh}</div>}<p className="small muted" style={{marginTop:16}}>{t.security}</p><p className="small muted" style={{marginTop:16}}><Link href={backHref}>{t.back}</Link></p></div></main>
+  return <main className="login-wrap"><div className="login card"><div className="pill">KINGDOM NETWORK</div><h1>{isRecovery?t.reset:t.confirm}</h1><p className="muted">{hasLink?(isRecovery?t.resetBody:t.confirmBody):t.invalid}</p>{hasLink?<form action={verifyAuthLink}><input type="hidden" name="token_hash" value={params.token_hash}/><input type="hidden" name="type" value={params.type}/><input type="hidden" name="next" value={joinNext||params.next||''}/><input type="hidden" name="lang" value={lang}/><button className="btn" type="submit">{isRecovery?t.continueReset:t.confirmEmail}</button></form>:<div className="notice error" role="alert">{t.fresh}</div>}<p className="small muted" style={{marginTop:16}}>{t.security}</p><p className="small muted" style={{marginTop:16}}><Link href={backHref}>{t.back}</Link></p></div></main>
 }
