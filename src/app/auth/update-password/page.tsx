@@ -15,7 +15,7 @@ function diagnosticCode(error:unknown){
 }
 
 function safeJoinNext(value:string|null){
-  if(!value||value.length>500||value.includes('\\'))return ''
+  if(!value||value.length>500||!value.startsWith('/')||value.startsWith('//')||value.includes('\\'))return ''
   try{
     const base='https://kingdom.invalid'
     const parsed=new URL(value,base)
