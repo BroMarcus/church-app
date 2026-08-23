@@ -7,7 +7,9 @@ const page=fs.readFileSync(path.join(process.cwd(),'src/app/login/page.tsx'),'ut
 const actions=fs.readFileSync(path.join(process.cwd(),'src/app/login/actions.ts'),'utf8')
 
 test('login page distinguishes availability failures from real closed or invalid states',()=>{
-  assert.match(page,/const publicStatusFailed=Boolean\(publicStatusError\)/)
+  assert.match(page,/const publicStatusMissing=!publicStatusError&&!publicStatus/)
+  assert.match(page,/empty_signup_status/)
+  assert.match(page,/const publicStatusFailed=Boolean\(publicStatusError\)\|\|publicStatusMissing/)
   assert.match(page,/const availabilityFailed=inviteCheckFailed\|\|\(!validInvite&&publicStatusFailed\)/)
   assert.match(page,/params\.invite&&!validInvite&&!inviteCheckFailed&&!publicStatusFailed/)
   assert.match(page,/!params\.invite&&!publicOpen&&!publicStatusFailed/)
@@ -29,9 +31,10 @@ test('availability recovery guidance is bilingual and discourages duplicate acco
   assert.ok(page.includes('No crees otra cuenta.'))
 })
 
-test('availability diagnostics use bounded error codes instead of provider messages',()=>{
+test('availability diagnostics use bounded sanitized error codes instead of provider messages',()=>{
   assert.match(page,/boundedCode\(error\.code\)/)
   assert.match(page,/boundedCode\(publicStatusError\.code\)/)
+  assert.match(page,/replace\(\/\[\^a-zA-Z0-9_-\]\/g,''\)\.slice\(0,48\)/)
   assert.match(actions,/boundedCode\(inviteError\.code\)/)
   assert.match(actions,/boundedCode\(statusError\.code\)/)
   assert.match(actions,/replace\(\/\[\^a-zA-Z0-9_-\]\/g,''\)\.slice\(0,48\)/)
@@ -47,8 +50,9 @@ test('legacy first-login inference does not treat failed reads as proof of no ac
   assert.match(actions,/profile:profileResult\.error\?boundedCode\(profileResult\.error\.code\):'ok'/)
 })
 
-test('login page canonicalizes join return paths before carrying them through auth recovery',()=>{
+test('login page only carries rooted local church join paths through auth recovery',()=>{
   assert.match(page,/function safeJoinNext\(value:string\|undefined\)/)
+  assert.match(page,/!value\.startsWith\('\/'\)\|\|value\.startsWith\('\/\/'\)/)
   assert.match(page,/const parsed=new URL\(value,base\)/)
   assert.match(page,/parsed\.origin!==base\|\|!parsed\.pathname\.startsWith\('\/join\/'\)/)
   assert.match(page,/const joinNext=safeJoinNext\(params\.next\)/)
