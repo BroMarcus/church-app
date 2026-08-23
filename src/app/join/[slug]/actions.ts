@@ -6,6 +6,24 @@ import { createClient } from '@/lib/supabase/server'
 const text=(f:FormData,k:string)=>String(f.get(k)??'').trim()
 const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
 const boundedCode=(value:unknown)=>String(value||'unknown').slice(0,80)
+const EMAIL_MAX=254
+const NAME_MAX=80
+const PHONE_MAX=40
+const NEW_PASSWORD_MAX=128
+const SLUG_MAX=120
+
+function safeChurchSlug(value:string){
+  const slug=value.trim().toLowerCase()
+  return slug.length<=SLUG_MAX&&/^[a-z0-9][a-z0-9_-]*$/.test(slug)?slug:''
+}
+
+function emailIssue(email:string){
+  if(!email)return 'missing_email'
+  if(email.length>EMAIL_MAX||/\s/.test(email))return 'invalid_email'
+  const at=email.indexOf('@')
+  if(at<=0||at!==email.lastIndexOf('@')||at===email.length-1)return 'invalid_email'
+  return ''
+}
 
 function joinSignupErrorCode(message:string){
   const lower=message.toLowerCase()
@@ -17,14 +35,18 @@ function joinSignupErrorCode(message:string){
 export async function joinChurch(formData:FormData){
   const supabase=await createClient()
   const lang:'en'|'es'=text(formData,'lang')==='es'?'es':'en'
-  const slug=text(formData,'church_slug').toLowerCase()
+  const slug=safeChurchSlug(text(formData,'church_slug'))
+  if(!slug)redirect(`/login?lang=${lang}&mode=signin`)
   const email=text(formData,'email').toLowerCase(),phone=text(formData,'phone'),firstName=text(formData,'first_name'),lastName=text(formData,'last_name')
   const password=String(formData.get('password')??''),confirm=String(formData.get('confirm_password')??'')
   const fail=(code:string)=>redirect(`/join/${encodeURIComponent(slug)}?lang=${lang}&error_code=${encodeURIComponent(code)}`)
-  if(!slug)fail('missing_church')
   if(!firstName||!lastName)fail('missing_name')
-  if(!email)fail('missing_email')
+  if(firstName.length>NAME_MAX||lastName.length>NAME_MAX)fail('name_too_long')
+  const emailError=emailIssue(email)
+  if(emailError)fail(emailError)
+  if(phone.length>PHONE_MAX)fail('phone_too_long')
   if(password.length<8)fail('weak_password')
+  if(password.length>NEW_PASSWORD_MAX||confirm.length>NEW_PASSWORD_MAX)fail('password_too_long')
   if(password!==confirm)fail('password_mismatch')
 
   const {data:statusData,error:statusError}=await supabase.rpc('get_public_signup_status_for_church',{p_church_slug:slug})
@@ -59,9 +81,9 @@ export async function joinChurch(formData:FormData){
 export async function joinExistingChurch(formData:FormData){
   const supabase=await createClient()
   const lang:'en'|'es'=text(formData,'lang')==='es'?'es':'en'
-  const slug=text(formData,'church_slug').toLowerCase()
+  const slug=safeChurchSlug(text(formData,'church_slug'))
+  if(!slug)redirect(`/login?lang=${lang}&mode=signin`)
   const fail=(code:string)=>redirect(`/join/${encodeURIComponent(slug)}?lang=${lang}&error_code=${encodeURIComponent(code)}`)
-  if(!slug)fail('missing_church')
 
   const {data:claims,error:claimsError}=await supabase.auth.getClaims()
   if(claimsError){
