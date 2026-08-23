@@ -117,6 +117,6 @@ export default function UpdatePasswordPage(){
 
   const nextPart=joinNext?`&next=${encodeURIComponent(joinNext)}`:''
   const signInHref=`/login?lang=${lang}&mode=signin${nextPart}`
-  const securityHref=`/account/security${lang==='es'?'?lang=es':''}`
+  const securityHref=`/account/security?lang=${lang}${nextPart}`
   return <main className="login-wrap"><div className="login card"><div className="pill">KINGDOM NETWORK</div><h1>{t.title}</h1><div className={`notice ${ready||completed?'success':'error'}`} role={completed&&!signOutIncomplete?'status':'alert'} aria-live="polite">{message}</div>{ready&&!completed&&<form onSubmit={save}><PasswordField name="password" label={t.newPassword} minLength={8} maxLength={128} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><PasswordField name="confirm_password" label={t.again} minLength={8} maxLength={128} autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><button className="btn" type="submit" disabled={busy}>{busy?t.updating:t.update}</button></form>}{completed?<p style={{marginTop:16}}><a className="btn" href={signOutIncomplete?securityHref:signInHref}>{signOutIncomplete?t.accountSecurity:t.continue}</a></p>:<p className="small muted" style={{marginTop:16}}><a href={signInHref}>{t.back}</a></p>}</div></main>
 }
