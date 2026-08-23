@@ -8,7 +8,7 @@ const cleanTitle=(fileName:string)=>fileName.replace(/\.[^.]+$/,'').replace(/[_-
 const slugify=(v:string)=>v.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,60)
 const langOf=(formData?:FormData)=>String(formData?.get('lang')||'en')==='es'?'es':'en'
 const inbox=(lang:string,error?:'review'|'approve'|'access')=>{const p=lang==='es'?'/church/setup-inbox?lang=es':'/church/setup-inbox';if(!error)return p;return `${p}${p.includes('?')?'&':'?'}error=${error}`}
-const boundedCode=(value:unknown)=>String(value||'unknown').slice(0,80)
+const boundedCode=(value:unknown)=>String(value||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48)||'unknown'
 const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const setupId=(formData:FormData,lang:string,error:'review'|'approve')=>{const value=String(formData.get('id')||'').trim();if(!UUID_RE.test(value))redirect(inbox(lang,error));return value}
 
@@ -28,7 +28,8 @@ function requireActorRead(ctx:Awaited<ReturnType<typeof actor>>,lang:string,acti
   console.error('Setup Inbox action authorization unavailable',{action,stage:ctx.readError,code:ctx.errorCode})
   redirect(inbox(lang,'access'))
  }
- if(!ctx.userId||!ctx.membership?.church_id||!['pastor','church_admin'].includes(ctx.membership.role))redirect('/')
+ if(!ctx.userId)redirect(`/login?lang=${lang}&mode=signin`)
+ if(!ctx.membership?.church_id||!['pastor','church_admin'].includes(ctx.membership.role))redirect(lang==='es'?'/?lang=es':'/')
 }
 
 function buildPlan(row:any){
