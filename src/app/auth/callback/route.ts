@@ -6,7 +6,7 @@ const boundedCode=(value:unknown)=>String(value||'unknown').slice(0,80)
 const MAX_AUTH_VALUE_LENGTH=1000
 
 function safeLocalPath(raw:string|null){
-  if(!raw||raw.length>MAX_AUTH_VALUE_LENGTH||raw.includes('\\'))return ''
+  if(!raw||raw.length>MAX_AUTH_VALUE_LENGTH||!raw.startsWith('/')||raw.startsWith('//')||raw.includes('\\'))return ''
   try{
     const canonical=new URL(siteUrl)
     const requested=new URL(raw,canonical)
