@@ -6,10 +6,12 @@ import test from 'node:test'
 const page=fs.readFileSync(path.join(process.cwd(),'src/app/join/[slug]/page.tsx'),'utf8')
 const actions=fs.readFileSync(path.join(process.cwd(),'src/app/join/[slug]/actions.ts'),'utf8')
 
-test('public church join page does not turn backend availability failures into a missing-link state',()=>{
+test('public church join page does not turn backend availability failures into a missing-link or paused-signup state',()=>{
   assert.match(page,/error:churchStatusError/)
-  assert.match(page,/if\(churchStatusError\)[\s\S]*public church join status unavailable/)
-  assert.match(page,/if\(!church\?\.church_id\)notFound\(\)/)
+  assert.match(page,/if\(churchStatusError\)[\s\S]*public church join status unavailable[\s\S]*UnavailableState/)
+  assert.match(page,/if\(!church\)[\s\S]*empty_signup_status[\s\S]*UnavailableState/)
+  assert.match(page,/if\(!church\.church_id\)notFound\(\)/)
+  assert.match(page,/if\(typeof church\.open!==['"]boolean['"]\)[\s\S]*malformed_signup_status[\s\S]*UnavailableState/)
   assert.ok(page.includes('We could not safely check this church link right now.'))
   assert.ok(page.includes('No pudimos verificar de forma segura este enlace de la iglesia en este momento.'))
 })
@@ -50,6 +52,7 @@ test('public church join page mirrors server bounds and rejects malformed route 
 test('public join diagnostics are bounded and do not log provider messages',()=>{
   assert.match(page,/boundedCode\(churchStatusError\.code\)/)
   assert.match(page,/boundedCode\(claimsError\.code\)/)
+  assert.match(page,/replace\(\/\[\^a-zA-Z0-9_-\]\/g,''\)\.slice\(0,48\)/)
   assert.match(actions,/boundedCode\(statusError\.code\)/)
   assert.match(actions,/boundedCode\(error\.code\)/)
   assert.match(actions,/replace\(\/\[\^a-zA-Z0-9_-\]\/g,''\)\.slice\(0,48\)/)
