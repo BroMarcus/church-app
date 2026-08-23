@@ -91,11 +91,14 @@ test('collapsed app tour stays limited to five core member-safe destinations',()
   assert.match(page,/Puedes volver a Empieza Aquí cuando quieras/)
 })
 
-test('finish onboarding blocks repeat taps and gives bilingual pending guidance',()=>{
+test('finish onboarding blocks repeat taps and announces bilingual pending guidance',()=>{
   assert.match(page,/StartSubmitButton label=\{t\.finish\} pendingLabel=\{t\.saving\}/)
   assert.match(page,/Saving — keep this page open/)
   assert.match(page,/Guardando — mantén esta página abierta/)
   assert.match(submit,/useFormStatus/)
   assert.match(submit,/disabled=\{pending\}/)
+  assert.match(submit,/aria-disabled=\{pending\}/)
+  assert.match(submit,/aria-busy=\{pending\}/)
+  assert.match(submit,/aria-live="polite"/)
   assert.match(submit,/pending\?pendingLabel:label/)
 })
