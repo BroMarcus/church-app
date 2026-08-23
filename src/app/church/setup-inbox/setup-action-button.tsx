@@ -19,9 +19,10 @@ export function SetupActionButton({kind,lang,label}:Props){
     ? (es?'Aprobar este plan':'Approve this plan')
     : (es?'Crear plan recomendado':'Create recommended plan'))
   const Icon=kind==='approve'?CheckCircle2:WandSparkles
+  const text=pending?pendingLabel:normalLabel
 
   return <button className="btn" type="submit" disabled={pending} aria-disabled={pending} aria-busy={pending}>
     <Icon size={14}/>
-    {pending?pendingLabel:normalLabel}
+    <span aria-live="polite">{text}</span>
   </button>
 }
