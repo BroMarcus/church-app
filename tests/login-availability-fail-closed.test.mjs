@@ -13,11 +13,13 @@ test('login page distinguishes availability failures from real closed or invalid
   assert.match(page,/!params\.invite&&!publicOpen&&!publicStatusFailed/)
 })
 
-test('signup action does not mislabel backend read failures as closed signup or invalid invitation',()=>{
+test('signup action does not mislabel backend read failures or indeterminate results as closed signup or invalid invitation',()=>{
   assert.match(actions,/if\(inviteError\)[\s\S]*fail\('invite_check_unavailable'\)/)
-  assert.match(actions,/if\(statusError\)[\s\S]*fail\('signup_status_unavailable'\)/)
+  assert.match(actions,/if\(typeof valid!==['"]boolean['"]\)[\s\S]*empty_invite_validation[\s\S]*fail\('invite_check_unavailable'\)/)
   assert.match(actions,/if\(!valid\)fail\('invite_invalid'\)/)
-  assert.match(actions,/if\(!row\?\.open\)fail\('signup_closed'\)/)
+  assert.match(actions,/if\(statusError\)[\s\S]*fail\('signup_status_unavailable'\)/)
+  assert.match(actions,/if\(!row\)[\s\S]*empty_signup_status[\s\S]*fail\('signup_status_unavailable'\)/)
+  assert.match(actions,/if\(!row\.open\)fail\('signup_closed'\)/)
 })
 
 test('availability recovery guidance is bilingual and discourages duplicate accounts',()=>{
@@ -32,6 +34,7 @@ test('availability diagnostics use bounded error codes instead of provider messa
   assert.match(page,/boundedCode\(publicStatusError\.code\)/)
   assert.match(actions,/boundedCode\(inviteError\.code\)/)
   assert.match(actions,/boundedCode\(statusError\.code\)/)
+  assert.match(actions,/replace\(\/\[\^a-zA-Z0-9_-\]\/g,''\)\.slice\(0,48\)/)
   assert.doesNotMatch(actions,/invite validation unavailable'\s*,\s*\{message:/)
   assert.doesNotMatch(actions,/signup status unavailable'\s*,\s*\{message:/)
 })
