@@ -47,11 +47,8 @@ export async function GET(request:NextRequest){
   const signupFallback=`/start?welcome=1${lang==='es'?'&lang=es':''}`
   const rawNext=url.searchParams.get('next')
   const joinNext=safeJoinDestination(rawNext)
-  const next=mode==='recovery'
-    ?`/auth/update-password?lang=${lang}${joinNext?`&next=${encodeURIComponent(joinNext)}`:''}${inviteId?`&invite=${encodeURIComponent(inviteId)}`:''}`
-    :inviteId
-      ?`/login?lang=${lang}&mode=signin&invite=${encodeURIComponent(inviteId)}&message_code=confirmation_ready_for_invite`
-      :safeSignupDestination(rawNext,signupFallback)
+  const signupNext=safeSignupDestination(rawNext,signupFallback)
+  const recoveryNext=`/auth/update-password?lang=${lang}${joinNext?`&next=${encodeURIComponent(joinNext)}`:''}${inviteId?`&invite=${encodeURIComponent(inviteId)}`:''}`
   const loginError=(errorCode:string)=>NextResponse.redirect(new URL(`/login?lang=${lang}&mode=signin${inviteId?`&invite=${encodeURIComponent(inviteId)}`:''}${joinNext?`&next=${encodeURIComponent(joinNext)}`:''}&error_code=${encodeURIComponent(errorCode)}`,siteUrl))
   const linkUnavailable=()=>NextResponse.redirect(new URL(`/auth/link-unavailable?lang=${lang}${inviteId?`&invite=${encodeURIComponent(inviteId)}`:''}${joinNext?`&next=${encodeURIComponent(joinNext)}`:''}`,siteUrl))
 
@@ -66,10 +63,29 @@ export async function GET(request:NextRequest){
       console.error('auth callback session exchange failed',{mode,code:boundedCode(error.code),status:typeof error.status==='number'?error.status:'unknown',classification:failureCode})
       return failureCode==='callback_expired'?loginError(failureCode):linkUnavailable()
     }
+
+    if(mode==='signup'&&inviteId){
+      const {data:redeemed,error:redeemError}=await supabase.rpc('redeem_invite_for_current_user',{p_invite_id:inviteId})
+      const row=Array.isArray(redeemed)?redeemed[0]:redeemed
+      if(redeemError||!row?.church_id){
+        console.error('confirmed private invitation redemption failed',{code:redeemError?boundedCode(redeemError.code):'empty_redeem_result'})
+        const {error:signOutError}=await supabase.auth.signOut({scope:'local'})
+        if(signOutError){
+          console.error('post-confirmation invite local sign out failed',{code:boundedCode(signOutError.code)})
+          const {error:retrySignOutError}=await supabase.auth.signOut({scope:'local'})
+          if(retrySignOutError){
+            console.error('post-confirmation invite local sign out retry failed',{code:boundedCode(retrySignOutError.code)})
+            return NextResponse.redirect(new URL(`/account/security?lang=${lang}&invite=${encodeURIComponent(inviteId)}&status=signout_failed`,siteUrl))
+          }
+        }
+        return loginError('invite_redeem_failed')
+      }
+      return NextResponse.redirect(new URL(`/start?lang=${lang}&message_code=joined_invite`,siteUrl))
+    }
+
+    return NextResponse.redirect(new URL(mode==='recovery'?recoveryNext:signupNext,siteUrl))
   }catch(error){
     console.error('auth callback session exchange unavailable',{mode,code:boundedCode(error instanceof Error?error.name:'exchange_unavailable')})
     return linkUnavailable()
   }
-
-  return NextResponse.redirect(new URL(next,siteUrl))
 }
