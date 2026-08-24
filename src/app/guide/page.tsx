@@ -35,6 +35,11 @@ const adminQuick={
 
 const lower=(v:any)=>String(v??'').toLowerCase()
 const boundedCode=(value:unknown)=>String(value||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48)||'unknown'
+const diagnosticCode=(error:unknown,fallback:string)=>{
+  if(error&&typeof error==='object'&&'code' in error)return boundedCode((error as {code?:unknown}).code)
+  if(error instanceof Error)return boundedCode(error.name)
+  return boundedCode(fallback)
+}
 const authority=(r:any)=>r.official_source?'official organization':lower(r.source_scope||'local_church')
 const status=(r:any)=>lower(r.archive_status||'current')
 const authorityScore=(v:string)=>v.includes('official')||v.includes('organization')?35:v.includes('district')?28:v.includes('local')||v.includes('church')?20:v.includes('ministry')?12:v.includes('group')?8:5
@@ -56,16 +61,37 @@ const languageScore=(resourceLanguage:unknown,lang:'en'|'es')=>{
 
 export default async function GuidePage({searchParams}:{searchParams:Promise<{q?:string;lang?:string}>}){
   const query=await searchParams
-  const supabase=await createClient(),{data:{user},error:authError}=await supabase.auth.getUser(),userId=user?.id
+  const requestedLang: 'en'|'es'=query.lang==='es'?'es':'en'
+  let supabase
+  try{supabase=await createClient()}
+  catch(error){
+    console.error('Kingdom Guide client unavailable',{code:diagnosticCode(error,'client_unavailable')})
+    const t=copy[requestedLang],withLang=(href:string)=>requestedLang==='es'?`${href}${href.includes('?')?'&':'?'}lang=es`:href
+    return <main className="shell"><section className="card guide-panel" style={{marginTop:24}}><div className="pill">KINGDOM GUIDE</div><h1>{t.accountUnavailable}</h1><p className="muted">{t.accountBody}</p><div className="row"><Link className="btn" href={withLang('/guide')}>{t.retryGuide}</Link><Link className="ghost" href={withLang('/')}>{t.home}</Link><Link className="ghost" href={withLang('/feedback')}>{t.feedbackCta}</Link></div></section></main>
+  }
+  let authResult
+  try{authResult=await supabase.auth.getUser()}
+  catch(error){
+    console.error('Kingdom Guide auth transport unavailable',{code:diagnosticCode(error,'auth_unavailable')})
+    const t=copy[requestedLang],withLang=(href:string)=>requestedLang==='es'?`${href}${href.includes('?')?'&':'?'}lang=es`:href
+    return <main className="shell"><section className="card guide-panel" style={{marginTop:24}}><div className="pill">KINGDOM GUIDE</div><h1>{t.accountUnavailable}</h1><p className="muted">{t.accountBody}</p><div className="row"><Link className="btn" href={withLang('/guide')}>{t.retryGuide}</Link><Link className="ghost" href={withLang('/')}>{t.home}</Link><Link className="ghost" href={withLang('/feedback')}>{t.feedbackCta}</Link></div></section></main>
+  }
+  const {data:{user},error:authError}=authResult,userId=user?.id
   const preferred=user?.user_metadata?.preferred_language==='es'?'es':'en'
-  const lang=query.lang==='es'?'es':query.lang==='en'?'en':preferred,t=copy[lang],q=String(query.q??'').trim().slice(0,160),needle=q.toLowerCase()
+  const lang: 'en'|'es'=query.lang==='es'?'es':query.lang==='en'?'en':preferred,t=copy[lang],q=String(query.q??'').trim().slice(0,160),needle=q.toLowerCase()
   const withLang=(href:string)=>{const join=href.includes('?')?'&':'?';return lang==='es'?`${href}${join}lang=es`:href}
   if(authError){
     console.error('Kingdom Guide auth verification failed',{code:boundedCode(authError.code)})
     return <main className="shell"><section className="card guide-panel" style={{marginTop:24}}><div className="pill">KINGDOM GUIDE</div><h1>{t.accountUnavailable}</h1><p className="muted">{t.accountBody}</p><div className="row"><Link className="btn" href={withLang('/guide')}>{t.retryGuide}</Link><Link className="ghost" href={withLang('/')}>{t.home}</Link><Link className="ghost" href={withLang('/feedback')}>{t.feedbackCta}</Link></div></section></main>
   }
   if(!userId)redirect(`/login?lang=${lang}&mode=signin`)
-  const {data:membership,error:membershipError}=await supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).single()
+  let membershipResult
+  try{membershipResult=await supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).single()}
+  catch(error){
+    console.error('Kingdom Guide membership transport unavailable',{code:diagnosticCode(error,'membership_unavailable')})
+    return <main className="shell"><section className="card guide-panel" style={{marginTop:24}}><div className="pill">KINGDOM GUIDE</div><h1>{t.connectionUnavailable}</h1><p className="muted">{t.connectionBody}</p><div className="row"><Link className="btn" href={withLang('/guide')}>{t.retryGuide}</Link><Link className="ghost" href={withLang('/')}>{t.home}</Link><Link className="ghost" href={withLang('/feedback')}>{t.feedbackCta}</Link></div></section></main>
+  }
+  const {data:membership,error:membershipError}=membershipResult
   if(membershipError&&membershipError.code!=='PGRST116'){
     console.error('Kingdom Guide membership read failed',{code:boundedCode(membershipError.code)})
     return <main className="shell"><section className="card guide-panel" style={{marginTop:24}}><div className="pill">KINGDOM GUIDE</div><h1>{t.connectionUnavailable}</h1><p className="muted">{t.connectionBody}</p><div className="row"><Link className="btn" href={withLang('/guide')}>{t.retryGuide}</Link><Link className="ghost" href={withLang('/')}>{t.home}</Link><Link className="ghost" href={withLang('/feedback')}>{t.feedbackCta}</Link></div></section></main>
@@ -75,9 +101,14 @@ export default async function GuidePage({searchParams}:{searchParams:Promise<{q?
   const helpResults=q?searchHelp(q,lang):commonHelp(lang).slice(0,6)
   let results:any[]=[],resourceSearchFailed=false
   if(q){
-    const {data,error}=await supabase.from('media_assets').select('id,title,description,asset_type,resource_type,language_code,source_year,ministry_area,topic_tags,scripture_refs,archive_status,source_label,source_scope,official_source,approved_for_members,library_kind,organization_status,created_at').eq('church_id',membership.church_id).eq('approved_for_members',true).not('archive_status','in','(draft,retired)').order('created_at',{ascending:false}).limit(400)
-    if(error){resourceSearchFailed=true;console.error('Kingdom Guide resource search failed',{code:boundedCode(error.code)})}
-    if(!resourceSearchFailed)results=(data??[]).map((r:any)=>{const searchable=[r.title,r.description,r.asset_type,r.resource_type,r.language_code,r.source_year,r.ministry_area,r.topic_tags,r.scripture_refs,r.source_label,r.source_scope,r.library_kind,r.organization_status].flatMap(v=>Array.isArray(v)?v:[v]).filter(Boolean).join(' ').toLowerCase();let score=0;if(lower(r.title).includes(needle))score+=55;if(lower(r.description).includes(needle))score+=22;if(searchable.includes(needle))score+=12;score+=authorityScore(authority(r))+statusScore(status(r))+languageScore(r.language_code,lang);return {...r,__score:score,__searchable:searchable,__authority:authority(r),__status:status(r)}}).filter((r:any)=>r.__searchable.includes(needle)||lower(r.title).includes(needle)||lower(r.description).includes(needle)).sort((a:any,b:any)=>b.__score-a.__score||new Date(b.created_at).getTime()-new Date(a.created_at).getTime()).slice(0,24)
+    let resourceResult
+    try{resourceResult=await supabase.from('media_assets').select('id,title,description,asset_type,resource_type,language_code,source_year,ministry_area,topic_tags,scripture_refs,archive_status,source_label,source_scope,official_source,approved_for_members,library_kind,organization_status,created_at').eq('church_id',membership.church_id).eq('approved_for_members',true).not('archive_status','in','(draft,retired)').order('created_at',{ascending:false}).limit(400)}
+    catch(error){resourceSearchFailed=true;console.error('Kingdom Guide resource transport unavailable',{code:diagnosticCode(error,'resource_search_unavailable')})}
+    if(resourceResult){
+      const {data,error}=resourceResult
+      if(error){resourceSearchFailed=true;console.error('Kingdom Guide resource search failed',{code:boundedCode(error.code)})}
+      if(!resourceSearchFailed)results=(data??[]).map((r:any)=>{const searchable=[r.title,r.description,r.asset_type,r.resource_type,r.language_code,r.source_year,r.ministry_area,r.topic_tags,r.scripture_refs,r.source_label,r.source_scope,r.library_kind,r.organization_status].flatMap(v=>Array.isArray(v)?v:[v]).filter(Boolean).join(' ').toLowerCase();let score=0;if(lower(r.title).includes(needle))score+=55;if(lower(r.description).includes(needle))score+=22;if(searchable.includes(needle))score+=12;score+=authorityScore(authority(r))+statusScore(status(r))+languageScore(r.language_code,lang);return {...r,__score:score,__searchable:searchable,__authority:authority(r),__status:status(r)}}).filter((r:any)=>r.__searchable.includes(needle)||lower(r.title).includes(needle)||lower(r.description).includes(needle)).sort((a:any,b:any)=>b.__score-a.__score||new Date(b.created_at).getTime()-new Date(a.created_at).getTime()).slice(0,24)
+    }
   }
 
   return <main className="shell"><header className="topbar"><div><Link href={withLang('/')} className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??t.church} • Kingdom Guide</div></div><div className="row"><Languages size={15}/><Link className="ghost" href={`/guide${q?`?q=${encodeURIComponent(q)}&lang=en`:'?lang=en'}`}>{t.english}</Link><Link className="ghost" href={`/guide${q?`?q=${encodeURIComponent(q)}&lang=es`:'?lang=es'}`}>{t.spanish}</Link><Link className="ghost" href={withLang('/')}>{t.home}</Link></div></header>
