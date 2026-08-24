@@ -19,7 +19,12 @@ const messageCopy={
  en:{joined_existing:'You are connected to this church with your existing Kingdom Network account. Keep using this same account—do not create another one.',already_joined:'You are already connected to this church. Keep using this same Kingdom Network account—no second account is needed.',joined_invite:'Your email is confirmed and this church invitation is connected to your Kingdom Network account. Keep using this same account—no second account is needed.'},
  es:{joined_existing:'Ya estás conectado a esta iglesia con tu cuenta existente de Kingdom Network. Sigue usando esta misma cuenta—no crees otra.',already_joined:'Ya estabas conectado a esta iglesia. Sigue usando esta misma cuenta de Kingdom Network—no necesitas una segunda cuenta.',joined_invite:'Tu correo está confirmado y esta invitación de la iglesia está conectada a tu cuenta de Kingdom Network. Sigue usando esta misma cuenta—no necesitas una segunda cuenta.'}
 } as const
-const boundedCode=(value:unknown)=>String(value||'unknown').slice(0,80)
+const boundedCode=(value:unknown)=>String(value||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,80)||'unknown'
+const diagnosticCode=(error:unknown,fallback:string)=>{
+ if(typeof error==='object'&&error&&'code' in error)return boundedCode((error as {code?:unknown}).code)
+ if(error instanceof Error)return boundedCode(error.name)
+ return boundedCode(fallback)
+}
 const roleLabel=(role:unknown,lang:'en'|'es')=>{
  const value=String(role||'member')
  const labels:Record<'en'|'es',Record<string,string>>={
@@ -28,19 +33,38 @@ const roleLabel=(role:unknown,lang:'en'|'es')=>{
  }
  return labels[lang][value]||value.replaceAll('_',' ')
 }
+function startRecovery(lang:'en'|'es',code:string){
+ const t=copy[lang]
+ console.error('Start Here unavailable',{code:boundedCode(code)})
+ return <main className="shell start-shell"><section className="card start-how" style={{marginTop:24}}><div className="pill">{t.start.toUpperCase()}</div><h1>{t.connectionTitle}</h1><p className="muted">{t.connectionBody}</p><div className="row"><Link className="btn" href={`/start?lang=${lang}`}>{t.retry}</Link><Link className="ghost" href={`/login?lang=${lang}&mode=signin`}>{t.signIn}</Link></div></section></main>
+}
 
 export default async function StartPage({searchParams}:{searchParams:Promise<{lang?:string;error_code?:string;message_code?:string}>}){
- const params=await searchParams,supabase=await createClient()
- const {data:{user},error:authError}=await supabase.auth.getUser()
+ const params=await searchParams
+ const requestedLang:'en'|'es'=params.lang==='es'?'es':'en'
+ let supabase
+ try{supabase=await createClient()}
+ catch(error){return startRecovery(requestedLang,`client_${diagnosticCode(error,'client_unavailable')}`)}
+
+ let authResult
+ try{authResult=await supabase.auth.getUser()}
+ catch(error){return startRecovery(requestedLang,`auth_${diagnosticCode(error,'auth_unavailable')}`)}
+ const {data:{user},error:authError}=authResult
  const preferred=user?.user_metadata?.preferred_language==='es'?'es':'en'
- const lang=params.lang==='es'?'es':params.lang==='en'?'en':preferred,t=copy[lang]
+ const lang:'en'|'es'=params.lang==='es'?'es':params.lang==='en'?'en':preferred,t=copy[lang]
  const withLang=(path:string)=>lang==='es'?`${path}${path.includes('?')?'&':'?'}lang=es`:path
- const recovery=(code:string)=>{console.error('Start Here unavailable',{code});return <main className="shell start-shell"><section className="card start-how" style={{marginTop:24}}><div className="pill">{t.start.toUpperCase()}</div><h1>{t.connectionTitle}</h1><p className="muted">{t.connectionBody}</p><div className="row"><Link className="btn" href={`/start?lang=${lang}`}>{t.retry}</Link><Link className="ghost" href={`/login?lang=${lang}&mode=signin`}>{t.signIn}</Link></div></section></main>}
- if(authError)return recovery(`auth:${boundedCode(authError.code)}`)
+ if(authError)return startRecovery(lang,`auth_${boundedCode(authError.code)}`)
  const userId=user?.id
  if(!userId)redirect(`/login?lang=${lang}&mode=signin`)
- const [profileResult,membershipResult]=await Promise.all([supabase.from('profiles').select('display_name,first_name,last_name').eq('id',userId).maybeSingle(),supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).maybeSingle()])
- if(profileResult.error||membershipResult.error)return recovery(`reads:${profileResult.error?boundedCode(profileResult.error.code):'ok'}:${membershipResult.error?boundedCode(membershipResult.error.code):'ok'}`)
+
+ let profileResult,membershipResult
+ try{
+  ;[profileResult,membershipResult]=await Promise.all([
+   supabase.from('profiles').select('display_name,first_name,last_name').eq('id',userId).maybeSingle(),
+   supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).maybeSingle()
+  ])
+ }catch(error){return startRecovery(lang,`reads_${diagnosticCode(error,'reads_unavailable')}`)}
+ if(profileResult.error||membershipResult.error)return startRecovery(lang,`reads_${profileResult.error?boundedCode(profileResult.error.code):'ok'}_${membershipResult.error?boundedCode(membershipResult.error.code):'ok'}`)
  const profile=profileResult.data,membership=membershipResult.data
  if(!membership?.church_id)redirect(lang==='es'?'/?lang=es':'/')
  const church:any=Array.isArray(membership.churches)?membership.churches[0]:membership.churches
@@ -58,3 +82,4 @@ export default async function StartPage({searchParams}:{searchParams:Promise<{la
  <details className="card start-how"><summary style={{cursor:'pointer',fontWeight:800}}>{t.tour}</summary><p className="muted start-tour-intro">{t.tourBody}</p><div className="start-tour-grid">{tour.map(([Icon,title,body,path])=><Link key={path} className="card start-step start-tour-card" href={withLang(path)}><div className="start-icon"><Icon size={18}/></div><div><strong>{title}</strong><span>{body}</span></div></Link>)}</div></details>
  <section style={{marginTop:24}}><div className="pill start-section-label">{t.helpTitle}</div><div className="start-grid"><Link className="card start-step" href={withLang('/guide')}><div className="start-icon"><Sparkles size={19}/></div><div><strong>{t.guide}</strong><span>{t.guideBody}</span></div></Link><Link className="card start-step" href={withLang('/help')}><div className="start-icon"><HandHeart size={19}/></div><div><strong>{t.care}</strong><span>{t.careBody}</span></div></Link><Link className="card start-step" href={withLang('/feedback')}><div className="start-icon"><MessageSquareWarning size={19}/></div><div><strong>{t.feedback}</strong><span>{t.feedbackBody}</span></div></Link></div></section>
  </main>
+}
