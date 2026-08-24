@@ -44,18 +44,34 @@ function safeSignupDestination(raw:string|null,fallback:string){
   }
 }
 
-function legacyCallbackContext(raw:string|null,fallback:string){
-  if(!raw||raw.length>MAX_AUTH_VALUE_LENGTH)return {inviteId:'',next:''}
+function legacyRedirectContext(raw:string|null,fallback:string){
+  const empty={inviteId:'',signupNext:'',recoveryNext:''}
+  if(!raw||raw.length>MAX_AUTH_VALUE_LENGTH)return empty
   try{
     const canonical=new URL(siteUrl)
-    const callback=new URL(raw,canonical)
-    if(callback.origin!==canonical.origin||callback.pathname!=='/auth/callback'||callback.searchParams.get('mode')==='recovery')return {inviteId:'',next:''}
-    return {
-      inviteId:safeInviteId(callback.searchParams.get('invite')),
-      next:safeSignupDestination(callback.searchParams.get('next'),fallback)
+    const redirectTarget=new URL(raw,canonical)
+    if(redirectTarget.origin!==canonical.origin)return empty
+
+    if(redirectTarget.pathname==='/auth/callback'){
+      const mode=redirectTarget.searchParams.get('mode')
+      const inviteId=safeInviteId(redirectTarget.searchParams.get('invite'))
+      if(mode==='recovery'){
+        return {inviteId,signupNext:'',recoveryNext:safeJoinDestination(redirectTarget.searchParams.get('next'))}
+      }
+      return {inviteId,signupNext:safeSignupDestination(redirectTarget.searchParams.get('next'),fallback),recoveryNext:''}
     }
+
+    if(redirectTarget.pathname==='/auth/update-password'){
+      return {
+        inviteId:safeInviteId(redirectTarget.searchParams.get('invite')),
+        signupNext:'',
+        recoveryNext:safeJoinDestination(redirectTarget.searchParams.get('next'))
+      }
+    }
+
+    return empty
   }catch{
-    return {inviteId:'',next:''}
+    return empty
   }
 }
 
@@ -65,13 +81,16 @@ export async function GET(request:NextRequest){
   const type=searchParams.get('type')
   const lang=searchParams.get('lang')==='es'?'es':'en'
   const rawNext=searchParams.get('next')
-  const joinNext=safeJoinDestination(rawNext)
   const signupFallback=`/start?welcome=1${lang==='es'?'&lang=es':''}`
-  const callbackContext=legacyCallbackContext(rawNext,signupFallback)
-  const inviteId=safeInviteId(searchParams.get('invite'))||callbackContext.inviteId
-  const next=type==='recovery'?joinNext:(callbackContext.next||safeSignupDestination(rawNext,signupFallback))
+  const redirectContext=legacyRedirectContext(rawNext,signupFallback)
+  const directJoinNext=safeJoinDestination(rawNext)
+  const joinNext=directJoinNext||redirectContext.recoveryNext
+  const explicitInviteRaw=searchParams.get('invite')
+  const explicitInviteId=safeInviteId(explicitInviteRaw)
+  const inviteId=explicitInviteId||redirectContext.inviteId
+  const next=type==='recovery'?joinNext:(redirectContext.signupNext||safeSignupDestination(rawNext,signupFallback))
 
-  if(searchParams.get('invite')&&!inviteId){
+  if(explicitInviteRaw&&!explicitInviteId){
     const nextPart=joinNext?`&next=${encodeURIComponent(joinNext)}`:''
     return NextResponse.redirect(new URL(`/login?lang=${lang}&mode=signin${nextPart}&error_code=invite_invalid`,siteUrl))
   }
