@@ -75,19 +75,20 @@ export async function verifyAuthLink(formData:FormData){
   }
 
   const supabase=await createClient()
+  let verificationFailure:{code?:unknown;status?:unknown}|null=null
+  let failureWasThrown=false
   try{
     const {error}=await supabase.auth.verifyOtp({token_hash:tokenHash,type:rawType as EmailOtpType})
-    if(error){
-      const status=numericStatus((error as {status?:unknown}).status)
-      console.error('auth token verification failed',{type:rawType,code:boundedCode(error.code),status:status||'unknown'})
-      if(isCertainInvalidLink(error as {status?:unknown}))redirect(`${loginBase}&error_code=callback_expired`)
-      redirect(verifyRetryUrl(tokenHash,rawType,lang,joinNext))
-    }
+    if(error)verificationFailure=error as {code?:unknown;status?:unknown}
   }catch(error){
-    const candidate=error as {code?:unknown;status?:unknown}
-    const status=numericStatus(candidate?.status)
-    console.error('auth token verification unavailable',{type:rawType,code:boundedCode(candidate?.code),status:status||'unknown'})
-    if(isCertainInvalidLink(candidate))redirect(`${loginBase}&error_code=callback_expired`)
+    verificationFailure=error as {code?:unknown;status?:unknown}
+    failureWasThrown=true
+  }
+
+  if(verificationFailure){
+    const status=numericStatus(verificationFailure.status)
+    console.error(failureWasThrown?'auth token verification unavailable':'auth token verification failed',{type:rawType,code:boundedCode(verificationFailure.code),status:status||'unknown'})
+    if(isCertainInvalidLink(verificationFailure))redirect(`${loginBase}&error_code=callback_expired`)
     redirect(verifyRetryUrl(tokenHash,rawType,lang,joinNext))
   }
 
