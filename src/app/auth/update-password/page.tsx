@@ -14,6 +14,15 @@ function diagnosticCode(error:unknown){
   if(error&&typeof error==='object'&&'code' in error)return String((error as {code?:unknown}).code||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,80)||'unknown'
   return error instanceof Error?error.name.replace(/[^a-zA-Z0-9_-]/g,'').slice(0,80)||'unknown':'unknown'
 }
+function numericStatus(error:unknown){
+  if(!error||typeof error!=='object'||!('status' in error))return 0
+  const status=Number((error as {status?:unknown}).status)
+  return Number.isInteger(status)&&status>=100&&status<=599?status:0
+}
+function isCertainInvalidRecoveryLink(error:unknown){
+  const status=numericStatus(error)
+  return status>=400&&status<500&&status!==429
+}
 function safeJoinNext(value:string|null){
   if(!value||value.length>500||!value.startsWith('/')||value.startsWith('//')||value.includes('\\'))return ''
   try{const base='https://kingdom.invalid',parsed=new URL(value,base);if(parsed.origin!==base||!parsed.pathname.startsWith('/join/'))return '';return `${parsed.pathname}${parsed.search}`}catch{return ''}
@@ -41,12 +50,31 @@ export default function UpdatePasswordPage(){
       const c=copy[nextLang];setMessage(c.opening);setRetryAvailable(false)
       try{
         const code=url.searchParams.get('code')
-        if(code){const {error}=await supabase.auth.exchangeCodeForSession(code);if(error){console.error('password reset session exchange failed',{code:diagnosticCode(error)});if(mounted){setReady(false);setRetryAvailable(true);setMessage(c.sessionUnavailable)}return}url.searchParams.delete('code');window.history.replaceState({},'',`${url.pathname}${url.search}${url.hash}`)}
+        if(code){
+          const {error}=await supabase.auth.exchangeCodeForSession(code)
+          if(error){
+            console.error('password reset session exchange failed',{code:diagnosticCode(error),status:numericStatus(error)||'unknown'})
+            if(mounted){
+              setReady(false)
+              if(isCertainInvalidRecoveryLink(error)){setRetryAvailable(false);setMessage(c.invalidBack)}
+              else{setRetryAvailable(true);setMessage(c.sessionUnavailable)}
+            }
+            return
+          }
+          url.searchParams.delete('code');window.history.replaceState({},'',`${url.pathname}${url.search}${url.hash}`)
+        }
         const {data,error}=await supabase.auth.getSession()
         if(error){console.error('password reset session lookup failed',{code:diagnosticCode(error)});if(mounted){setReady(false);setRetryAvailable(true);setMessage(c.sessionUnavailable)}return}
         if(!mounted)return
         if(data.session){setRetryAvailable(false);setReady(true);setMessage(c.choose)}else{setRetryAvailable(false);setReady(false);setMessage(c.invalidBack)}
-      }catch(error){console.error('password reset initialization failed',{code:diagnosticCode(error)});if(mounted){setReady(false);setRetryAvailable(true);setMessage(c.sessionUnavailable)}}
+      }catch(error){
+        console.error('password reset initialization failed',{code:diagnosticCode(error),status:numericStatus(error)||'unknown'})
+        if(mounted){
+          setReady(false)
+          if(isCertainInvalidRecoveryLink(error)){setRetryAvailable(false);setMessage(c.invalidBack)}
+          else{setRetryAvailable(true);setMessage(c.sessionUnavailable)}
+        }
+      }
     }
     void check()
     const {data:listener}=supabase.auth.onAuthStateChange((event,session)=>{if(!mounted)return;if((event==='PASSWORD_RECOVERY'||event==='SIGNED_IN')&&session){const url=new URL(window.location.href),nextLang=url.searchParams.get('lang')==='es'?'es':'en';setLang(nextLang);setJoinNext(safeJoinNext(url.searchParams.get('next')));setInviteId(safeInviteId(url.searchParams.get('invite')));setRetryAvailable(false);setReady(true);setMessage(copy[nextLang].choose)}})
