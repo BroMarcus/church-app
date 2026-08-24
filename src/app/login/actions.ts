@@ -54,11 +54,11 @@ export async function login(formData:FormData){
   if(password.length>EXISTING_PASSWORD_MAX)redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error','password_too_long')))
   const {data,error}=await supabase.auth.signInWithPassword({email,password})
   if(error){
-    const normalized=error.message.toLowerCase()
+    const authCode=boundedCode(error.code)
     let code='login_failed'
-    if(normalized.includes('invalid login credentials'))code='invalid_credentials'
-    else if(normalized.includes('email not confirmed'))code='email_unconfirmed'
-    else console.error('login failed',{code:boundedCode(error.code)})
+    if(authCode==='invalid_credentials')code='invalid_credentials'
+    else if(authCode==='email_not_confirmed')code='email_unconfirmed'
+    else console.error('login unavailable',{code:authCode,status:typeof error.status==='number'?String(error.status).slice(0,3):'unknown'})
     redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error',code)))
   }
   if(inviteId){
