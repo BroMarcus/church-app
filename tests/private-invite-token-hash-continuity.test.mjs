@@ -48,6 +48,15 @@ test('successful token-hash email verification redeems private invite only after
   assert.match(verifyActions,/redirect\(`\/start\?lang=\$\{lang\}&message_code=joined_invite`\)/)
 })
 
+test('failed token-hash invite redemption verifies local session absence before reporting cleanup success',()=>{
+  assert.match(verifyActions,/supabase\.auth\.getSession\(\)/)
+  assert.match(verifyActions,/post-token-hash invite local sign out verification failed/)
+  assert.match(verifyActions,/post-token-hash invite local sign out verification unavailable/)
+  assert.match(verifyActions,/post-token-hash invite local session still present after sign out/)
+  assert.match(verifyActions,/if\(!verification\.data\.session\)cleanupSucceeded=true/)
+  assert.match(verifyActions,/if\(!cleanupSucceeded\)redirect\(`\/account\/security\?lang=\$\{lang\}&invite=\$\{encodeURIComponent\(inviteId\)\}&status=signout_failed`\)/)
+})
+
 test('temporary verification retry and recovery preserve only validated invitation context',()=>{
   assert.match(verifyActions,/verifyRetryUrl\(tokenHash,rawType,lang,joinNext,inviteId\)/)
   assert.match(verifyActions,/if\(inviteId\)query\.set\('invite',inviteId\)/)
