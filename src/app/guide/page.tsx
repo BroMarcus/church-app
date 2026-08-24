@@ -64,7 +64,7 @@ export default async function GuidePage({searchParams}:{searchParams:Promise<{q?
     console.error('Kingdom Guide auth verification failed',{code:boundedCode(authError.code)})
     return <main className="shell"><section className="card guide-panel" style={{marginTop:24}}><div className="pill">KINGDOM GUIDE</div><h1>{t.accountUnavailable}</h1><p className="muted">{t.accountBody}</p><div className="row"><Link className="btn" href={withLang('/guide')}>{t.retryGuide}</Link><Link className="ghost" href={withLang('/')}>{t.home}</Link><Link className="ghost" href={withLang('/feedback')}>{t.feedbackCta}</Link></div></section></main>
   }
-  if(!userId)redirect(`/login?lang=${lang}`)
+  if(!userId)redirect(`/login?lang=${lang}&mode=signin`)
   const {data:membership,error:membershipError}=await supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).single()
   if(membershipError&&membershipError.code!=='PGRST116'){
     console.error('Kingdom Guide membership read failed',{code:boundedCode(membershipError.code)})
