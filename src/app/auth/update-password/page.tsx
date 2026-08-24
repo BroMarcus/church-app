@@ -27,6 +27,10 @@ function safeJoinNext(value:string|null){
   if(!value||value.length>500||!value.startsWith('/')||value.startsWith('//')||value.includes('\\'))return ''
   try{const base='https://kingdom.invalid',parsed=new URL(value,base);if(parsed.origin!==base||!parsed.pathname.startsWith('/join/'))return '';return `${parsed.pathname}${parsed.search}`}catch{return ''}
 }
+function getBrowserSupabase(context:string){
+  try{return createClient()}
+  catch(error){console.error(`${context} client unavailable`,{code:diagnosticCode(error)});return null}
+}
 async function finishPostResetSignOut(supabase:ReturnType<typeof createClient>){
   for(let attempt=1;attempt<=2;attempt+=1){
     try{
@@ -64,11 +68,13 @@ export default function UpdatePasswordPage(){
   const t=copy[lang]
 
   useEffect(()=>{
-    const supabase=createClient();let mounted=true
+    let mounted=true
+    const url=new URL(window.location.href),nextLang=url.searchParams.get('lang')==='es'?'es':'en',next=safeJoinNext(url.searchParams.get('next')),invite=safeInviteId(url.searchParams.get('invite'))
+    setLang(nextLang);setJoinNext(next);setInviteId(invite)
+    const c=copy[nextLang];setMessage(c.opening);setRetryAvailable(false)
+    const supabase=getBrowserSupabase('password reset initialization')
+    if(!supabase){setReady(false);setRetryAvailable(true);setMessage(c.sessionUnavailable);return()=>{mounted=false}}
     const check=async()=>{
-      const url=new URL(window.location.href),nextLang=url.searchParams.get('lang')==='es'?'es':'en',next=safeJoinNext(url.searchParams.get('next')),invite=safeInviteId(url.searchParams.get('invite'))
-      setLang(nextLang);setJoinNext(next);setInviteId(invite)
-      const c=copy[nextLang];setMessage(c.opening);setRetryAvailable(false)
       try{
         const code=url.searchParams.get('code')
         if(code){
@@ -98,13 +104,15 @@ export default function UpdatePasswordPage(){
       }
     }
     void check()
-    const {data:listener}=supabase.auth.onAuthStateChange((event,session)=>{if(!mounted)return;if((event==='PASSWORD_RECOVERY'||event==='SIGNED_IN')&&session){const url=new URL(window.location.href),nextLang=url.searchParams.get('lang')==='es'?'es':'en';setLang(nextLang);setJoinNext(safeJoinNext(url.searchParams.get('next')));setInviteId(safeInviteId(url.searchParams.get('invite')));setRetryAvailable(false);setReady(true);setMessage(copy[nextLang].choose)}})
+    const {data:listener}=supabase.auth.onAuthStateChange((event,session)=>{if(!mounted)return;if((event==='PASSWORD_RECOVERY'||event==='SIGNED_IN')&&session){const nextUrl=new URL(window.location.href),listenerLang=nextUrl.searchParams.get('lang')==='es'?'es':'en';setLang(listenerLang);setJoinNext(safeJoinNext(nextUrl.searchParams.get('next')));setInviteId(safeInviteId(nextUrl.searchParams.get('invite')));setRetryAvailable(false);setReady(true);setMessage(copy[listenerLang].choose)}})
     return()=>{mounted=false;listener.subscription.unsubscribe()}
   },[])
 
   async function save(e:React.FormEvent){
     e.preventDefault();if(password.length<8){setMessage(t.short);return}if(password.length>128||confirm.length>128){setMessage(t.tooLong);return}if(password!==confirm){setMessage(t.mismatch);return}
-    setBusy(true);const supabase=createClient()
+    setBusy(true)
+    const supabase=getBrowserSupabase('password update')
+    if(!supabase){setMessage(t.failed);setBusy(false);return}
     try{
       const {error}=await supabase.auth.updateUser({password})
       if(error){console.error('password update failed',{code:diagnosticCode(error)});setMessage(t.failed);return}
