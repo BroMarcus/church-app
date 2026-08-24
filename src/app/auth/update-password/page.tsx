@@ -28,22 +28,23 @@ function safeJoinNext(value:string|null){
   try{const base='https://kingdom.invalid',parsed=new URL(value,base);if(parsed.origin!==base||!parsed.pathname.startsWith('/join/'))return '';return `${parsed.pathname}${parsed.search}`}catch{return ''}
 }
 async function finishPostResetSignOut(supabase:ReturnType<typeof createClient>){
-  try{
-    const {error}=await supabase.auth.signOut()
-    if(error){console.error('post-reset sign out failed',{code:diagnosticCode(error)});return false}
-  }catch(error){console.error('post-reset sign out request failed',{code:diagnosticCode(error)});return false}
-
   for(let attempt=1;attempt<=2;attempt+=1){
     try{
+      const {error}=await supabase.auth.signOut({scope:'local'})
+      if(error){
+        console.error('post-reset local sign out failed',{attempt,code:diagnosticCode(error)})
+        continue
+      }
       const verification=await supabase.auth.getSession()
-      if(verification.error){console.error('post-reset sign out verification failed',{attempt,code:diagnosticCode(verification.error)});return false}
+      if(verification.error){
+        console.error('post-reset sign out verification failed',{attempt,code:diagnosticCode(verification.error)})
+        continue
+      }
       if(!verification.data.session)return true
       console.error('post-reset session still present',{attempt,code:'session_still_present'})
-      if(attempt===1){
-        const {error:localError}=await supabase.auth.signOut({scope:'local'})
-        if(localError){console.error('post-reset local cleanup failed',{code:diagnosticCode(localError)});return false}
-      }
-    }catch(error){console.error('post-reset sign out verification unavailable',{attempt,code:diagnosticCode(error)});return false}
+    }catch(error){
+      console.error('post-reset local sign out unavailable',{attempt,code:diagnosticCode(error)})
+    }
   }
   return false
 }
