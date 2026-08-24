@@ -56,8 +56,22 @@ async function cleanupLocalSession(supabase:SupabaseServerClient,context:string)
   for(let attempt=1;attempt<=2;attempt+=1){
     try{
       const {error}=await supabase.auth.signOut({scope:'local'})
-      if(!error)return true
-      console.error(`${context} local sign out failed`,{attempt,code:boundedCode(error.code)})
+      if(error){
+        console.error(`${context} local sign out failed`,{attempt,code:boundedCode(error.code)})
+        continue
+      }
+      let verification
+      try{verification=await supabase.auth.getSession()}
+      catch(error){
+        console.error(`${context} local sign out verification unavailable`,{attempt,code:diagnosticCode(error,'session_check_unavailable')})
+        continue
+      }
+      if(verification.error){
+        console.error(`${context} local sign out verification failed`,{attempt,code:boundedCode(verification.error.code)})
+        continue
+      }
+      if(!verification.data.session)return true
+      console.error(`${context} local session still present after sign out`,{attempt,code:'session_still_present'})
     }catch(error){
       console.error(`${context} local sign out unavailable`,{attempt,code:diagnosticCode(error,'signout_unavailable')})
     }
