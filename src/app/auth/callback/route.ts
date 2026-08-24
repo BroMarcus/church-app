@@ -55,37 +55,49 @@ export async function GET(request:NextRequest){
   if(url.searchParams.get('invite')&&!inviteId)return loginError('invite_invalid')
   if(!code||code.length>MAX_AUTH_VALUE_LENGTH)return loginError('callback_incomplete')
 
+  let supabase:Awaited<ReturnType<typeof createClient>>
   try{
-    const supabase=await createClient()
+    supabase=await createClient()
     const {error}=await supabase.auth.exchangeCodeForSession(code)
     if(error){
       const failureCode=exchangeFailureCode(error)
       console.error('auth callback session exchange failed',{mode,code:boundedCode(error.code),status:typeof error.status==='number'?error.status:'unknown',classification:failureCode})
       return failureCode==='callback_expired'?loginError(failureCode):linkUnavailable()
     }
-
-    if(mode==='signup'&&inviteId){
-      const {data:redeemed,error:redeemError}=await supabase.rpc('redeem_invite_for_current_user',{p_invite_id:inviteId})
-      const row=Array.isArray(redeemed)?redeemed[0]:redeemed
-      if(redeemError||!row?.church_id){
-        console.error('confirmed private invitation redemption failed',{code:redeemError?boundedCode(redeemError.code):'empty_redeem_result'})
-        const {error:signOutError}=await supabase.auth.signOut({scope:'local'})
-        if(signOutError){
-          console.error('post-confirmation invite local sign out failed',{code:boundedCode(signOutError.code)})
-          const {error:retrySignOutError}=await supabase.auth.signOut({scope:'local'})
-          if(retrySignOutError){
-            console.error('post-confirmation invite local sign out retry failed',{code:boundedCode(retrySignOutError.code)})
-            return NextResponse.redirect(new URL(`/account/security?lang=${lang}&invite=${encodeURIComponent(inviteId)}&status=signout_failed`,siteUrl))
-          }
-        }
-        return loginError('invite_redeem_failed')
-      }
-      return NextResponse.redirect(new URL(`/start?lang=${lang}&message_code=joined_invite`,siteUrl))
-    }
-
-    return NextResponse.redirect(new URL(mode==='recovery'?recoveryNext:signupNext,siteUrl))
   }catch(error){
     console.error('auth callback session exchange unavailable',{mode,code:boundedCode(error instanceof Error?error.name:'exchange_unavailable')})
     return linkUnavailable()
   }
+
+  if(mode==='signup'&&inviteId){
+    let redeemFailed=false
+    try{
+      const {data:redeemed,error:redeemError}=await supabase.rpc('redeem_invite_for_current_user',{p_invite_id:inviteId})
+      const row=Array.isArray(redeemed)?redeemed[0]:redeemed
+      if(redeemError||!row?.church_id){
+        redeemFailed=true
+        console.error('confirmed private invitation redemption failed',{code:redeemError?boundedCode(redeemError.code):'empty_redeem_result'})
+      }
+    }catch(error){
+      redeemFailed=true
+      console.error('confirmed private invitation redemption unavailable',{code:boundedCode(error instanceof Error?error.name:'invite_redeem_unavailable')})
+    }
+    if(redeemFailed){
+      let cleanupSucceeded=false
+      for(let attempt=1;attempt<=2&&!cleanupSucceeded;attempt+=1){
+        try{
+          const {error:signOutError}=await supabase.auth.signOut({scope:'local'})
+          if(!signOutError)cleanupSucceeded=true
+          else console.error('post-confirmation invite local sign out failed',{attempt,code:boundedCode(signOutError.code)})
+        }catch(error){
+          console.error('post-confirmation invite local sign out unavailable',{attempt,code:boundedCode(error instanceof Error?error.name:'signout_unavailable')})
+        }
+      }
+      if(!cleanupSucceeded)return NextResponse.redirect(new URL(`/account/security?lang=${lang}&invite=${encodeURIComponent(inviteId)}&status=signout_failed`,siteUrl))
+      return loginError('invite_redeem_failed')
+    }
+    return NextResponse.redirect(new URL(`/start?lang=${lang}&message_code=joined_invite`,siteUrl))
+  }
+
+  return NextResponse.redirect(new URL(mode==='recovery'?recoveryNext:signupNext,siteUrl))
 }
