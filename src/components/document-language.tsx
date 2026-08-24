@@ -7,8 +7,8 @@ export function DocumentLanguage(){
   const searchParams=useSearchParams()
 
   useEffect(()=>{
-    const nextLang=searchParams.get('lang')==='es'?'es':'en'
-    document.documentElement.lang=nextLang
+    const selected=searchParams.get('lang')
+    if(selected==='en'||selected==='es')document.documentElement.lang=selected
   },[searchParams])
 
   return null
