@@ -123,6 +123,10 @@ export async function login(formData:FormData){
     else console.error('login unavailable',{code:authCode,status:typeof error.status==='number'?String(error.status).slice(0,3):'unknown'})
     redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error',code)))
   }
+  if(!data?.session||!data.user?.id){
+    console.error('login returned incomplete auth state',{code:'auth_state_missing'})
+    redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error','login_failed')))
+  }
   if(inviteId){
     const redeemed=await redeemInvite(supabase,inviteId,'existing-account private')
     if(!redeemed){
@@ -133,7 +137,7 @@ export async function login(formData:FormData){
     redirect(`/start?lang=${lang}&message_code=joined_existing`)
   }
   if(next)redirect(next)
-  const userId=data.user?.id
+  const userId=data.user.id
   if(userId){
     const onboardingState=data.user?.user_metadata?.onboarding_completed
     if(onboardingState===false)redirect(`/start?welcome=1${lang==='es'?'&lang=es':''}`)
@@ -236,7 +240,11 @@ export async function signup(formData:FormData){
   }
   const {data,error}=signupResult
   if(error){console.error('signup failed',{code:boundedCode(error.code)});redirect(loginUrl(lang,invitePart+'&mode=signup'+statusPart('error',authEmailErrorCode(error))))}
-  if(data.user&&Array.isArray(data.user.identities)&&data.user.identities.length===0){redirect(loginUrl(lang,invitePart+'&mode=signin'+statusPart('message','account_exists')))}
+  if(!data?.user){
+    console.error('signup returned incomplete auth state',{code:'auth_state_missing'})
+    fail('email_failed')
+  }
+  if(Array.isArray(data.user.identities)&&data.user.identities.length===0){redirect(loginUrl(lang,invitePart+'&mode=signin'+statusPart('message','account_exists')))}
   if(data.session&&inviteId){
     const redeemed=await redeemInvite(supabase,inviteId,'new-account private')
     if(!redeemed){
