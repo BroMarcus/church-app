@@ -75,10 +75,19 @@ test('combined release snapshot requires end-to-end private-invite recovery proo
 });
 
 test('combined release snapshot records exact-head CI and read-only runtime audit boundaries', () => {
-  assert.match(snapshot, /Kingdom Network Build #1196: \*\*SUCCESS\*\*/);
+  assert.match(snapshot, /Kingdom Network Build #1301: \*\*SUCCESS\*\*/);
   assert.match(snapshot, /latest 24-hour window: \*\*no runtime errors found\*\*/i);
   assert.match(snapshot, /does \*\*not\*\* replace exact-build phone acceptance/i);
   assert.match(snapshot, /Any new commit on PR #55 creates a new exact head and requires a fresh Kingdom Network Build/i);
+});
+
+test('combined release snapshot requires complete auth success state before consequential continuation', () => {
+  assert.match(snapshot, /password sign-in requires a real authenticated user and session/i);
+  assert.match(snapshot, /signup requires an Auth user before showing `account created`/i);
+  assert.match(snapshot, /modern PKCE callback requires both user and session/i);
+  assert.match(snapshot, /token-hash verification path requires both user and session/i);
+  assert.match(snapshot, /password update requires Auth to return the updated user/i);
+  assert.match(snapshot, /Auth success paths must not continue unless the required user\/session state is actually present/i);
 });
 
 test('critical integration files contain no unresolved merge-conflict markers', () => {
