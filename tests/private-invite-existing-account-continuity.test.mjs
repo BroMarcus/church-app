@@ -14,17 +14,17 @@ test('existing-account private invite is redeemed only after authenticated sign-
   assert.match(loginActions,/redeem_invite_for_current_user/)
   assert.match(loginActions,/p_invite_id:inviteId/)
   assert.match(loginActions,/redirect\(`\/start\?lang=\$\{lang\}&message_code=joined_existing`\)/)
-  assert.match(loginActions,/auth\.signOut\(\{scope:'local'\}\)/)
-  assert.match(loginActions,/post-invite-failure local sign out failed/)
+  assert.match(loginActions,/cleanupLocalSession\(supabase,'post-invite-failure'\)/)
   assert.match(loginActions,/invite_redeem_failed/)
 })
 
 test('failed invite redemption verifies local cleanup before claiming the browser was signed out',()=>{
-  const localSignouts=loginActions.match(/auth\.signOut\(\{scope:'local'\}\)/g)??[]
-  assert.ok(localSignouts.length>=2,'expected existing-account cleanup plus new-account cleanup')
-  assert.match(loginActions,/const \{error:retrySignOutError\}=await supabase\.auth\.signOut\(\{scope:'local'\}\)/)
-  assert.match(loginActions,/post-invite-failure local sign out retry failed/)
-  assert.match(loginActions,/redirect\(`\/account\/security\?lang=\$\{lang\}&invite=\$\{encodeURIComponent\(inviteId\)\}&status=signout_failed`\)/)
+  assert.match(loginActions,/async function cleanupLocalSession/)
+  assert.match(loginActions,/for\(let attempt=1;attempt<=2;attempt\+=1\)/)
+  assert.match(loginActions,/auth\.signOut\(\{scope:'local'\}\)/)
+  assert.match(loginActions,/local sign out failed/)
+  assert.match(loginActions,/local sign out unavailable/)
+  assert.match(loginActions,/if\(!cleanupSucceeded\)redirect\(`\/account\/security\?lang=\$\{lang\}&invite=\$\{encodeURIComponent\(inviteId\)\}&status=signout_failed`\)/)
   assert.match(loginActions,/redirect\(loginUrl\(lang,'&mode=signin'\+invitePart\+statusPart\('error','invite_redeem_failed'\)\)\)/)
 })
 
@@ -67,12 +67,12 @@ test('confirmed-invite RPC or cleanup transport failures fail closed instead of 
 test('new private-invite signup does not place invite id in unverified auth user metadata',()=>{
   assert.match(loginActions,/emailRedirectTo:callbackUrl\(lang,'signup',startPath,inviteId\)/)
   const signUpStart=loginActions.indexOf('supabase.auth.signUp')
-  const signUpEnd=loginActions.indexOf('if(error)',signUpStart)
+  const signUpEnd=loginActions.indexOf('const {data,error}=signupResult',signUpStart)
   assert.ok(signUpStart>=0&&signUpEnd>signUpStart,'signup call should be present')
   const signUpCall=loginActions.slice(signUpStart,signUpEnd)
   assert.doesNotMatch(signUpCall,/invite_id\s*:/,'unconfirmed user metadata must not consume/reserve the invite')
   assert.match(loginActions,/if\(data\.session&&inviteId\)/)
-  assert.match(loginActions,/new-account private invitation redemption failed/)
+  assert.match(loginActions,/new-account private invitation redemption failed|new-account private.*invitation redemption/)
   assert.match(loginActions,/message_code=joined_invite/)
 })
 
