@@ -27,6 +27,26 @@ function safeJoinNext(value:string|null){
   if(!value||value.length>500||!value.startsWith('/')||value.startsWith('//')||value.includes('\\'))return ''
   try{const base='https://kingdom.invalid',parsed=new URL(value,base);if(parsed.origin!==base||!parsed.pathname.startsWith('/join/'))return '';return `${parsed.pathname}${parsed.search}`}catch{return ''}
 }
+async function finishPostResetSignOut(supabase:ReturnType<typeof createClient>){
+  try{
+    const {error}=await supabase.auth.signOut()
+    if(error){console.error('post-reset sign out failed',{code:diagnosticCode(error)});return false}
+  }catch(error){console.error('post-reset sign out request failed',{code:diagnosticCode(error)});return false}
+
+  for(let attempt=1;attempt<=2;attempt+=1){
+    try{
+      const verification=await supabase.auth.getSession()
+      if(verification.error){console.error('post-reset sign out verification failed',{attempt,code:diagnosticCode(verification.error)});return false}
+      if(!verification.data.session)return true
+      console.error('post-reset session still present',{attempt,code:'session_still_present'})
+      if(attempt===1){
+        const {error:localError}=await supabase.auth.signOut({scope:'local'})
+        if(localError){console.error('post-reset local cleanup failed',{code:diagnosticCode(localError)});return false}
+      }
+    }catch(error){console.error('post-reset sign out verification unavailable',{attempt,code:diagnosticCode(error)});return false}
+  }
+  return false
+}
 
 export default function UpdatePasswordPage(){
   const [lang,setLang]=useState<'en'|'es'>('en')
@@ -88,7 +108,9 @@ export default function UpdatePasswordPage(){
       const {error}=await supabase.auth.updateUser({password})
       if(error){console.error('password update failed',{code:diagnosticCode(error)});setMessage(t.failed);return}
       setPassword('');setConfirm('');setReady(false);setCompleted(true)
-      try{const {error:signOutError}=await supabase.auth.signOut();if(signOutError){console.error('post-reset sign out failed',{code:diagnosticCode(signOutError)});setSignOutIncomplete(true);setMessage(t.signOutIncomplete);return}setMessage(t.success)}catch(error){console.error('post-reset sign out request failed',{code:diagnosticCode(error)});setSignOutIncomplete(true);setMessage(t.signOutIncomplete)}
+      const signedOut=await finishPostResetSignOut(supabase)
+      if(!signedOut){setSignOutIncomplete(true);setMessage(t.signOutIncomplete);return}
+      setMessage(t.success)
     }catch(error){console.error('password update request failed',{code:diagnosticCode(error)});setMessage(t.failed)}finally{setBusy(false)}
   }
 
