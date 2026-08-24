@@ -94,7 +94,7 @@ export async function login(formData:FormData){
   const supabase=await getSupabase('login')
   if(!supabase)redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error','login_failed')))
 
-  let signInResult:Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>|null=null
+  let signInResult
   try{signInResult=await supabase.auth.signInWithPassword({email,password})}
   catch(authError){
     console.error('login transport unavailable',{code:diagnosticCode(authError,'signin_unavailable')})
@@ -124,7 +124,7 @@ export async function login(formData:FormData){
     const onboardingState=data.user?.user_metadata?.onboarding_completed
     if(onboardingState===false)redirect(`/start?welcome=1${lang==='es'?'&lang=es':''}`)
     if(onboardingState===undefined){
-      let historyResults:null|Awaited<ReturnType<typeof Promise.all>>=null
+      let historyResults
       try{
         historyResults=await Promise.all([
           supabase.from('profiles').select('first_name,last_name,display_name,bio').eq('id',userId).maybeSingle(),
@@ -174,7 +174,7 @@ export async function signup(formData:FormData){
 
   let publicSignup=false
   if(inviteId){
-    let inviteResult:Awaited<ReturnType<typeof supabase.rpc>>|null=null
+    let inviteResult
     try{inviteResult=await supabase.rpc('validate_invite_email',{p_invite_id:inviteId,p_email:email})}
     catch(inviteError){
       console.error('signup invite validation transport unavailable',{code:diagnosticCode(inviteError,'invite_check_unavailable')})
@@ -191,7 +191,7 @@ export async function signup(formData:FormData){
     }
     if(!valid)fail('invite_invalid')
   }else{
-    let statusResult:Awaited<ReturnType<typeof supabase.rpc>>|null=null
+    let statusResult
     try{statusResult=await supabase.rpc('get_public_signup_status')}
     catch(statusError){
       console.error('public signup status transport unavailable',{code:diagnosticCode(statusError,'signup_status_unavailable')})
@@ -213,7 +213,7 @@ export async function signup(formData:FormData){
 
   const displayName=`${firstName} ${lastName}`.trim()
   const startPath=`/start?welcome=1${lang==='es'?'&lang=es':''}`
-  let signupResult:Awaited<ReturnType<typeof supabase.auth.signUp>>|null=null
+  let signupResult
   try{
     signupResult=await supabase.auth.signUp({email,password,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath,inviteId),data:{first_name:firstName,last_name:lastName,display_name:displayName,public_signup:publicSignup,onboarding_completed:false,preferred_language:lang}}})
   }catch(signupError){
@@ -247,7 +247,7 @@ export async function requestPasswordReset(formData:FormData){
   if(emailError)redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error',emailError)))
   const supabase=await getSupabase('password reset request')
   if(!supabase)redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error','email_failed')))
-  let resetResult:Awaited<ReturnType<typeof supabase.auth.resetPasswordForEmail>>|null=null
+  let resetResult
   try{resetResult=await supabase.auth.resetPasswordForEmail(email,{redirectTo:recoveryUrl(lang,next,inviteId)})}
   catch(error){
     console.error('requestPasswordReset transport unavailable',{code:diagnosticCode(error,'reset_request_unavailable')})
@@ -272,7 +272,7 @@ export async function resendConfirmation(formData:FormData){
   const supabase=await getSupabase('confirmation resend')
   if(!supabase)redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error','email_failed')))
   const startPath=next||`/start?welcome=1${lang==='es'?'&lang=es':''}`
-  let resendResult:Awaited<ReturnType<typeof supabase.auth.resend>>|null=null
+  let resendResult
   try{resendResult=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath,inviteId)}})}
   catch(error){
     console.error('resendConfirmation transport unavailable',{code:diagnosticCode(error,'confirmation_resend_unavailable')})
