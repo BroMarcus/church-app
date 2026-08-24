@@ -5,6 +5,7 @@ const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel
 const boundedCode=(value:unknown)=>String(value||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,80)||'unknown'
 const MAX_AUTH_VALUE_LENGTH=1000
 const INVITE_ID_PATTERN=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const TERMINAL_AUTH_LINK_CODES=new Set(['otp_expired','flow_state_expired','flow_state_not_found','invite_not_found'])
 function safeInviteId(raw:string|null){return raw&&raw.length<=128&&INVITE_ID_PATTERN.test(raw)?raw:''}
 
 function safeLocalPath(raw:string|null){
@@ -30,11 +31,11 @@ function safeSignupDestination(raw:string|null,fallback:string){
   }catch{return fallback}
 }
 function exchangeFailureCode(error:unknown){
-  const status=typeof error==='object'&&error&&'status' in error?Number((error as {status?:unknown}).status):NaN
-  // Invalid/expired/used auth codes are ordinary client-side link failures. Rate limits,
-  // upstream/server failures, and thrown transport errors are uncertain and must not be
-  // mislabeled as an expired newest email link.
-  return Number.isFinite(status)&&status>=400&&status<500&&status!==429?'callback_expired':'login_failed'
+  const code=typeof error==='object'&&error&&'code' in error?boundedCode((error as {code?:unknown}).code):'unknown'
+  // Supabase may use the same HTTP status (notably 403) for both expired OTPs and
+  // unrelated Auth conditions. Only explicit terminal link codes are safe to call
+  // expired/used; rate limits, service/config failures, and unknown errors stay retryable.
+  return TERMINAL_AUTH_LINK_CODES.has(code)?'callback_expired':'login_failed'
 }
 
 export async function GET(request:NextRequest){
