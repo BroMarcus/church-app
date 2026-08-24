@@ -35,7 +35,7 @@ function exchangeFailureCode(error:unknown){
   // Supabase may use the same HTTP status (notably 403) for both expired OTPs and
   // unrelated Auth conditions. Only explicit terminal link codes are safe to call
   // expired/used; rate limits, service/config failures, and unknown errors stay retryable.
-  return TERMINAL_AUTH_LINK_CODES.has(code)?'callback_expired':'login_failed'
+  return TERMINAL_AUTH_LINK_CODES.has(code)?'callback_expired':'callback_unavailable'
 }
 
 export async function GET(request:NextRequest){
@@ -53,6 +53,7 @@ export async function GET(request:NextRequest){
       ?`/login?lang=${lang}&mode=signin&invite=${encodeURIComponent(inviteId)}&message_code=confirmation_ready_for_invite`
       :safeSignupDestination(rawNext,signupFallback)
   const loginError=(errorCode:string)=>NextResponse.redirect(new URL(`/login?lang=${lang}&mode=signin${inviteId?`&invite=${encodeURIComponent(inviteId)}`:''}${joinNext?`&next=${encodeURIComponent(joinNext)}`:''}&error_code=${encodeURIComponent(errorCode)}`,siteUrl))
+  const linkUnavailable=()=>NextResponse.redirect(new URL(`/auth/link-unavailable?lang=${lang}${inviteId?`&invite=${encodeURIComponent(inviteId)}`:''}${joinNext?`&next=${encodeURIComponent(joinNext)}`:''}`,siteUrl))
 
   if(url.searchParams.get('invite')&&!inviteId)return loginError('invite_invalid')
   if(!code||code.length>MAX_AUTH_VALUE_LENGTH)return loginError('callback_incomplete')
@@ -63,11 +64,11 @@ export async function GET(request:NextRequest){
     if(error){
       const failureCode=exchangeFailureCode(error)
       console.error('auth callback session exchange failed',{mode,code:boundedCode(error.code),status:typeof error.status==='number'?error.status:'unknown',classification:failureCode})
-      return loginError(failureCode)
+      return failureCode==='callback_expired'?loginError(failureCode):linkUnavailable()
     }
   }catch(error){
     console.error('auth callback session exchange unavailable',{mode,code:boundedCode(error instanceof Error?error.name:'exchange_unavailable')})
-    return loginError('login_failed')
+    return linkUnavailable()
   }
 
   return NextResponse.redirect(new URL(next,siteUrl))
