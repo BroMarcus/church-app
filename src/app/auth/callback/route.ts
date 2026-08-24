@@ -29,6 +29,13 @@ function safeSignupDestination(raw:string|null,fallback:string){
     return parsed.pathname==='/start'||parsed.pathname.startsWith('/join/')?local:fallback
   }catch{return fallback}
 }
+function exchangeFailureCode(error:unknown){
+  const status=typeof error==='object'&&error&&'status' in error?Number((error as {status?:unknown}).status):NaN
+  // Invalid/expired/used auth codes are ordinary client-side link failures. Rate limits,
+  // upstream/server failures, and thrown transport errors are uncertain and must not be
+  // mislabeled as an expired newest email link.
+  return Number.isFinite(status)&&status>=400&&status<500&&status!==429?'callback_expired':'login_failed'
+}
 
 export async function GET(request:NextRequest){
   const url=new URL(request.url)
@@ -48,8 +55,19 @@ export async function GET(request:NextRequest){
 
   if(url.searchParams.get('invite')&&!inviteId)return loginError('invite_invalid')
   if(!code||code.length>MAX_AUTH_VALUE_LENGTH)return loginError('callback_incomplete')
-  const supabase=await createClient()
-  const {error}=await supabase.auth.exchangeCodeForSession(code)
-  if(error){console.error('auth callback session exchange failed',{mode,code:boundedCode(error.code)});return loginError('callback_expired')}
+
+  try{
+    const supabase=await createClient()
+    const {error}=await supabase.auth.exchangeCodeForSession(code)
+    if(error){
+      const failureCode=exchangeFailureCode(error)
+      console.error('auth callback session exchange failed',{mode,code:boundedCode(error.code),status:typeof error.status==='number'?error.status:'unknown',classification:failureCode})
+      return loginError(failureCode)
+    }
+  }catch(error){
+    console.error('auth callback session exchange unavailable',{mode,code:boundedCode(error instanceof Error?error.name:'exchange_unavailable')})
+    return loginError('login_failed')
+  }
+
   return NextResponse.redirect(new URL(next,siteUrl))
 }
