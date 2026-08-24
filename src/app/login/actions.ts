@@ -71,7 +71,14 @@ export async function login(formData:FormData){
     if(redeemError||!row?.church_id){
       console.error('existing-account private invitation redemption failed',{code:redeemError?boundedCode(redeemError.code):'empty_redeem_result'})
       const {error:signOutError}=await supabase.auth.signOut({scope:'local'})
-      if(signOutError)console.error('post-invite-failure sign out failed',{code:boundedCode(signOutError.code)})
+      if(signOutError){
+        console.error('post-invite-failure local sign out failed',{code:boundedCode(signOutError.code)})
+        const {error:retrySignOutError}=await supabase.auth.signOut({scope:'local'})
+        if(retrySignOutError){
+          console.error('post-invite-failure local sign out retry failed',{code:boundedCode(retrySignOutError.code)})
+          redirect(`/account/security?lang=${lang}&invite=${encodeURIComponent(inviteId)}&status=signout_failed`)
+        }
+      }
       redirect(loginUrl(lang,'&mode=signin'+invitePart+statusPart('error','invite_redeem_failed')))
     }
     redirect(`/start?lang=${lang}&message_code=joined_existing`)
