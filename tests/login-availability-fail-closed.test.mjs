@@ -7,12 +7,16 @@ const page=fs.readFileSync(path.join(process.cwd(),'src/app/login/page.tsx'),'ut
 const actions=fs.readFileSync(path.join(process.cwd(),'src/app/login/actions.ts'),'utf8')
 
 test('login page distinguishes availability failures from real closed or invalid states',()=>{
+  assert.match(page,/const inviteDecisionInvalid=Boolean\(inviteParam\)&&!inviteCheckFailed&&\(!invite\|\|typeof invite\.valid!==['"]boolean['"]\)/)
+  assert.match(page,/invalid_invite_preview/)
   assert.match(page,/const publicStatusInvalid=!publicStatusError&&\(!publicStatus\|\|typeof publicStatus\.open!==['"]boolean['"]\)/)
   assert.match(page,/invalid_signup_status/)
   assert.match(page,/const publicStatusFailed=Boolean\(publicStatusError\)\|\|publicStatusInvalid/)
-  assert.match(page,/const availabilityFailed=inviteCheckFailed\|\|\(!validInvite&&publicStatusFailed\)/)
-  assert.match(page,/params\.invite&&!validInvite&&!inviteCheckFailed&&!publicStatusFailed/)
+  assert.match(page,/const validInvite=!inviteMalformed&&!inviteCheckFailed&&!inviteDecisionInvalid&&invite\?\.valid===true/)
+  assert.match(page,/const availabilityFailed=inviteCheckFailed\|\|inviteDecisionInvalid\|\|\(!validInvite&&publicStatusFailed\)/)
+  assert.match(page,/params\.invite&&!validInvite&&!inviteCheckFailed&&!inviteDecisionInvalid&&!publicStatusFailed/)
   assert.match(page,/!params\.invite&&!publicOpen&&!publicStatusFailed/)
+  assert.doesNotMatch(page,/Boolean\(invite\?\.valid\)/)
 })
 
 test('signup action does not mislabel backend read failures or indeterminate results as closed signup or invalid invitation',()=>{
