@@ -27,30 +27,34 @@ All ten core PRs were open, draft, and reported mergeable at this snapshot. Each
 
 - Draft PR: #55 `Combined V1 pilot candidate — auth, onboarding, Guide, Builder, readiness`
 - Branch: `automation/combined-v1-pilot-candidate`
-- Latest fully verified combined head before the current callback-certainty extension: `940f07e9100d6d112cdf61a6b8dd4ba4e0e3835b`
-- Kingdom Network Build #1198: **SUCCESS** — dependency install, security/regression suite, lint, and full Next.js production build all passed on that exact head.
-- Current extension head: callback-certainty hardening is newer than the verified checkpoint and requires its own exact-head Kingdom Network Build before READY status is restored.
-- PR #55 remains draft and mergeable; production deployment remains on HOLD.
+- Latest fully verified combined implementation head before this release-record refresh: `66b5d593b28d3d1101756ba5697fb00d99881181`
+- Kingdom Network Build #1301: **SUCCESS** — dependency install, security/regression suite, lint, and full Next.js production build all passed on that exact implementation head.
+- PR #55 remained draft + mergeable and 237 commits ahead / 0 behind `main` at that checkpoint.
+- The release-record refresh itself is metadata/test-only and still requires its own exact-head Kingdom Network Build before READY status is restored.
+- Production deployment remains on HOLD.
 
-### Auth callback certainty extension
+### Auth success-state certainty extension
 
-The combined candidate now distinguishes a genuine invalid/expired/used confirmation or recovery code from an uncertain Auth transport/server failure:
+The combined candidate now refuses to treat an Auth response as successful merely because no explicit provider error was returned:
 
-- ordinary non-rate-limited 4xx exchange failures may return the fixed `callback_expired` recovery state;
-- HTTP 429, 5xx, missing/unknown status, and thrown transport/session-exchange exceptions fail closed into generic sign-in retry rather than falsely claiming the newest email link expired;
-- safe private-invite and `/join/*` context remains attached to the recovery redirect;
+- password sign-in requires a real authenticated user and session before invitation redemption, church-return routing, onboarding inference, or Home;
+- signup requires an Auth user before showing `account created`; confirmation-required signup may still legitimately have no session;
+- the modern PKCE callback requires both user and session before treating confirmation/recovery as verified;
+- the token-hash verification path requires both user and session before password recovery or private-invitation redemption;
+- password update requires Auth to return the updated user before Kingdom Network shows completion or begins post-reset sign-out cleanup;
+- incomplete Auth success payloads fail closed into the existing bilingual retry paths and do not get mislabeled as expired links;
+- safe private-invite and `/join/*` context remains attached to retry/recovery paths;
 - diagnostics remain bounded and do not expose raw provider exception text;
-- focused regression coverage protects this distinction.
+- focused regression coverage protects the full sign-in → signup → callback → token-hash verify → password-update certainty chain.
 
-This prevents a low-tech user from being told to request yet another confirmation/reset email solely because the Auth provider or network was temporarily unavailable.
+This closes a false-success class that could otherwise send a low-tech user into the wrong next step even though Auth had not produced a complete verified state.
 
 ### Read-only runtime audit
 
 A Vercel runtime-error audit was performed without changing production data or configuration:
 
 - latest 24-hour window: **no runtime errors found**;
-- prior 7-day history contained older `/login` provider/database error messages plus an Auth refresh/sign-out race from earlier deployments;
-- the combined candidate's touched auth paths now use bounded diagnostic codes rather than exposing raw provider/database text, but this does **not** replace exact-build phone acceptance because PR #55 is not independently deployed.
+- this does **not** replace exact-build phone acceptance because PR #55 is not independently deployed.
 
 ## Separately coordinated queues
 
@@ -89,6 +93,7 @@ The combined candidate must still satisfy the full manifest. At minimum:
 - existing-account joining does not require or encourage duplicate accounts;
 - password recovery preserves a valid intended church join destination;
 - confirmation/recovery callback failures must not label an uncertain 429/5xx/transport failure as an expired newest link;
+- Auth success paths must not continue unless the required user/session state is actually present;
 - **private invitation → existing account** is tested as one continuous path: direct sign-in applies the invitation to the same account, forgot-password recovery preserves the invitation through reset/sign-in, and unconfirmed-email resend/confirmation returns the same account to finish invitation redemption;
 - private-invite failure must fail closed without a half-finished membership and must not sign the member out of unrelated devices;
 - replaced/revoked/used invitation recovery clearly directs the tester to the newest valid invitation without exposing tokens or raw technical errors;
