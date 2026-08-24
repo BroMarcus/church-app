@@ -13,6 +13,7 @@ test('existing-account private invite is redeemed only after authenticated sign-
   assert.match(loginActions,/redeem_invite_for_current_user/)
   assert.match(loginActions,/p_invite_id:inviteId/)
   assert.match(loginActions,/redirect\(`\/start\?lang=\$\{lang\}&message_code=joined_existing`\)/)
+  assert.match(loginActions,/auth\.signOut\(\{scope:'local'\}\)/)
   assert.match(loginActions,/post-invite-failure sign out failed/)
   assert.match(loginActions,/invite_redeem_failed/)
 })
@@ -43,4 +44,4 @@ test('private invitation ids are UUID bounded before RPC or redirect use',()=>{
   assert.match(loginActions,/safeInviteId\(rawInviteId\)/)
   assert.match(callback,/INVITE_ID_PATTERN/)
   assert.match(resetPage,/INVITE_ID_PATTERN/)
-} )
+})
