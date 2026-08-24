@@ -157,11 +157,28 @@ export async function signup(formData:FormData){
 
   const displayName=`${firstName} ${lastName}`.trim()
   const startPath=`/start?welcome=1${lang==='es'?'&lang=es':''}`
-  const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath),data:{first_name:firstName,last_name:lastName,display_name:displayName,invite_id:inviteId||null,public_signup:publicSignup,onboarding_completed:false,preferred_language:lang}}})
+  // Private invitations stay unconsumed until there is a verified authenticated
+  // session. The invite travels in the confirmation callback instead of raw user
+  // metadata, so an unconfirmed signup cannot reserve/consume a church invitation.
+  const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath,inviteId),data:{first_name:firstName,last_name:lastName,display_name:displayName,public_signup:publicSignup,onboarding_completed:false,preferred_language:lang}}})
   if(error){console.error('signup failed',{code:boundedCode(error.code)});redirect(loginUrl(lang,invitePart+'&mode=signup'+statusPart('error',authEmailErrorCode(error))))}
   if(data.user&&Array.isArray(data.user.identities)&&data.user.identities.length===0){redirect(loginUrl(lang,invitePart+'&mode=signin'+statusPart('message','account_exists')))}
+  if(data.session&&inviteId){
+    const {data:redeemed,error:redeemError}=await supabase.rpc('redeem_invite_for_current_user',{p_invite_id:inviteId})
+    const row=Array.isArray(redeemed)?redeemed[0]:redeemed
+    if(redeemError||!row?.church_id){
+      console.error('new-account private invitation redemption failed',{code:redeemError?boundedCode(redeemError.code):'empty_redeem_result'})
+      const {error:signOutError}=await supabase.auth.signOut({scope:'local'})
+      if(signOutError){
+        console.error('post-signup-invite local sign out failed',{code:boundedCode(signOutError.code)})
+        redirect(`/account/security?lang=${lang}&invite=${encodeURIComponent(inviteId)}&status=signout_failed`)
+      }
+      redirect(loginUrl(lang,'&mode=signin'+invitePart+statusPart('error','invite_redeem_failed')))
+    }
+    redirect(`/start?lang=${lang}&message_code=joined_invite`)
+  }
   if(data.session)redirect(startPath)
-  redirect(loginUrl(lang,'&mode=signin'+statusPart('message','account_created')))
+  redirect(loginUrl(lang,'&mode=signin'+invitePart+statusPart('message','account_created')))
 }
 
 export async function requestPasswordReset(formData:FormData){
