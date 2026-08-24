@@ -6,6 +6,11 @@ import { createClient } from '@/lib/supabase/server'
 const text=(f:FormData,k:string)=>String(f.get(k)??'').trim()
 const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
 const boundedCode=(value:unknown)=>String(value||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48)||'unknown'
+const diagnosticCode=(error:unknown,fallback:string)=>{
+  if(error&&typeof error==='object'&&'code' in error)return boundedCode((error as {code?:unknown}).code)
+  if(error instanceof Error)return boundedCode(error.name)
+  return boundedCode(fallback)
+}
 const EMAIL_MAX=254
 const NAME_MAX=80
 const PHONE_MAX=40
@@ -25,15 +30,15 @@ function emailIssue(email:string){
   return ''
 }
 
-function joinSignupErrorCode(message:string){
-  const lower=message.toLowerCase()
-  if(lower.includes('rate limit')||lower.includes('security purposes')||lower.includes('over_email_send_rate_limit'))return 'email_rate_limit'
-  if(lower.includes('password'))return 'password_rejected'
+function joinSignupErrorCode(error:{code?:unknown;status?:unknown}){
+  const code=boundedCode(error?.code)
+  if(code==='over_email_send_rate_limit'||code==='over_request_rate_limit'||error?.status===429)return 'email_rate_limit'
+  if(code==='weak_password')return 'password_rejected'
+  if(code==='email_address_invalid')return 'invalid_email'
   return 'signup_failed'
 }
 
 export async function joinChurch(formData:FormData){
-  const supabase=await createClient()
   const lang:'en'|'es'=text(formData,'lang')==='es'?'es':'en'
   const slug=safeChurchSlug(text(formData,'church_slug'))
   if(!slug)redirect(`/login?lang=${lang}&mode=signin`)
@@ -49,7 +54,20 @@ export async function joinChurch(formData:FormData){
   if(password.length>NEW_PASSWORD_MAX||confirm.length>NEW_PASSWORD_MAX)fail('password_too_long')
   if(password!==confirm)fail('password_mismatch')
 
-  const {data:statusData,error:statusError}=await supabase.rpc('get_public_signup_status_for_church',{p_church_slug:slug})
+  let supabase:Awaited<ReturnType<typeof createClient>>
+  try{supabase=await createClient()}
+  catch(error){
+    console.error('public church signup client unavailable',{code:diagnosticCode(error,'client_unavailable')})
+    fail('signup_status_unavailable')
+  }
+
+  let statusResult
+  try{statusResult=await supabase.rpc('get_public_signup_status_for_church',{p_church_slug:slug})}
+  catch(error){
+    console.error('public church signup status transport unavailable',{code:diagnosticCode(error,'signup_status_unavailable')})
+    fail('signup_status_unavailable')
+  }
+  const {data:statusData,error:statusError}=statusResult
   if(statusError){
     console.error('public church signup status unavailable',{code:boundedCode(statusError.code)})
     fail('signup_status_unavailable')
@@ -70,13 +88,20 @@ export async function joinChurch(formData:FormData){
   const callback=`${siteUrl}/auth/callback?lang=${lang}&mode=signup&next=${encodeURIComponent(startPath)}`
   const emailConsent=text(formData,'email_consent')==='on',smsConsent=text(formData,'sms_consent')==='on'
   const displayName=`${firstName} ${lastName}`.trim()
-  const {data,error}=await supabase.auth.signUp({
-    email,password,
-    options:{emailRedirectTo:callback,data:{first_name:firstName,last_name:lastName,display_name:displayName,phone:phone||null,public_signup:true,public_signup_church_id:church.church_id,onboarding_completed:false,preferred_language:lang,join_source:'church_link',email_consent:emailConsent,sms_consent:smsConsent}}
-  })
+  let signupResult
+  try{
+    signupResult=await supabase.auth.signUp({
+      email,password,
+      options:{emailRedirectTo:callback,data:{first_name:firstName,last_name:lastName,display_name:displayName,phone:phone||null,public_signup:true,public_signup_church_id:church.church_id,onboarding_completed:false,preferred_language:lang,join_source:'church_link',email_consent:emailConsent,sms_consent:smsConsent}}
+    })
+  }catch(error){
+    console.error('public church signup transport unavailable',{churchSlug:slug,code:diagnosticCode(error,'signup_unavailable')})
+    fail('signup_failed')
+  }
+  const {data,error}=signupResult
   if(error){
     console.error('public church signup failed',{churchSlug:slug,code:boundedCode(error.code)})
-    fail(joinSignupErrorCode(error.message))
+    fail(joinSignupErrorCode(error))
   }
   if(data.user&&Array.isArray(data.user.identities)&&data.user.identities.length===0){
     const next=`/join/${encodeURIComponent(slug)}?lang=${lang}`
@@ -87,13 +112,25 @@ export async function joinChurch(formData:FormData){
 }
 
 export async function joinExistingChurch(formData:FormData){
-  const supabase=await createClient()
   const lang:'en'|'es'=text(formData,'lang')==='es'?'es':'en'
   const slug=safeChurchSlug(text(formData,'church_slug'))
   if(!slug)redirect(`/login?lang=${lang}&mode=signin`)
   const fail=(code:string)=>redirect(`/join/${encodeURIComponent(slug)}?lang=${lang}&error_code=${encodeURIComponent(code)}`)
 
-  const {data:claims,error:claimsError}=await supabase.auth.getClaims()
+  let supabase:Awaited<ReturnType<typeof createClient>>
+  try{supabase=await createClient()}
+  catch(error){
+    console.error('existing-account church join client unavailable',{code:diagnosticCode(error,'client_unavailable')})
+    fail('join_failed')
+  }
+
+  let claimsResult
+  try{claimsResult=await supabase.auth.getClaims()}
+  catch(error){
+    console.error('existing-account church join auth transport unavailable',{code:diagnosticCode(error,'auth_unavailable')})
+    fail('join_failed')
+  }
+  const {data:claims,error:claimsError}=claimsResult
   if(claimsError){
     console.error('existing-account church join auth unavailable',{code:boundedCode(claimsError.code)})
     fail('join_failed')
@@ -103,15 +140,22 @@ export async function joinExistingChurch(formData:FormData){
     redirect(`/login?lang=${lang}&mode=signin&next=${encodeURIComponent(next)}`)
   }
 
-  const {data,error}=await supabase.rpc('join_public_church_existing_account',{
-    p_church_slug:slug,
-    p_phone:null,
-    p_email_consent:false,
-    p_sms_consent:false,
-    p_language:lang
-  })
+  let joinResult
+  try{
+    joinResult=await supabase.rpc('join_public_church_existing_account',{
+      p_church_slug:slug,
+      p_phone:null,
+      p_email_consent:false,
+      p_sms_consent:false,
+      p_language:lang
+    })
+  }catch(error){
+    console.error('existing-account church join transport unavailable',{churchSlug:slug,code:diagnosticCode(error,'join_unavailable')})
+    fail('join_failed')
+  }
+  const {data,error}=joinResult
   if(error){
-    const msg=error.message.toLowerCase()
+    const msg=String(error.message||'').toLowerCase()
     if(msg.includes('capacity'))fail('capacity_full')
     if(msg.includes('previous church access'))fail('inactive_access')
     console.error('existing-account church join failed',{churchSlug:slug,code:boundedCode(error.code)})
@@ -119,7 +163,7 @@ export async function joinExistingChurch(formData:FormData){
   }
   const row:any=Array.isArray(data)?data[0]:data
   if(!row){
-    console.error('existing-account church join returned no result',{churchSlug:slug})
+    console.error('existing-account church join returned no result',{churchSlug:slug,code:'empty_join_result'})
     fail('join_failed')
   }
   redirect(`/start?lang=${lang}&message_code=${row?.already_member?'already_joined':'joined_existing'}`)
