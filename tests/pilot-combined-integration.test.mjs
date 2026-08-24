@@ -65,6 +65,22 @@ test('combined integration manifest requires exact combined-head validation and 
   assert.match(manifest, /Result opens as an \*\*unpublished\*\* draft in Course Builder/i);
 });
 
+test('combined release snapshot requires end-to-end private-invite recovery proof', () => {
+  assert.match(snapshot, /\*\*private invitation → existing account\*\* is tested as one continuous path/i);
+  assert.match(snapshot, /direct sign-in applies the invitation to the same account/i);
+  assert.match(snapshot, /forgot-password recovery preserves the invitation through reset\/sign-in/i);
+  assert.match(snapshot, /unconfirmed-email resend\/confirmation returns the same account to finish invitation redemption/i);
+  assert.match(snapshot, /must not sign the member out of unrelated devices/i);
+  assert.match(snapshot, /real-phone English \+ Spanish proof against one exact deployed PR #55 build/i);
+});
+
+test('combined release snapshot records exact-head CI and read-only runtime audit boundaries', () => {
+  assert.match(snapshot, /Kingdom Network Build #1196: \*\*SUCCESS\*\*/);
+  assert.match(snapshot, /latest 24-hour window: \*\*no runtime errors found\*\*/i);
+  assert.match(snapshot, /does \*\*not\*\* replace exact-build phone acceptance/i);
+  assert.match(snapshot, /Any new commit on PR #55 creates a new exact head and requires a fresh Kingdom Network Build/i);
+});
+
 test('critical integration files contain no unresolved merge-conflict markers', () => {
   const roots = ['src', 'tests', '.github'];
   const marker = /^(<<<<<<<|=======|>>>>>>>)(?: |$)/m;
