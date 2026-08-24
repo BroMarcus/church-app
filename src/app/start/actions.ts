@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 
-const boundedCode=(value:unknown)=>String(value||'unknown').slice(0,80)
+const boundedCode=(value:unknown)=>String(value||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48)||'unknown'
 
 export async function completeOnboarding(formData:FormData){
   const supabase=await createClient()
