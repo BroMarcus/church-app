@@ -5,11 +5,12 @@ import test from 'node:test'
 const action=readFileSync(new URL('../src/app/auth/verify/actions.ts',import.meta.url),'utf8')
 const page=readFileSync(new URL('../src/app/auth/verify/page.tsx',import.meta.url),'utf8')
 
-test('legacy token verification distinguishes certain expired links from temporary outages',()=>{
-  assert.match(action,/status>=400&&status<500&&status!==429/)
+test('legacy token verification only treats explicit terminal auth-link codes as expired',()=>{
+  assert.match(action,/TERMINAL_AUTH_LINK_CODES=new Set\(\['otp_expired','flow_state_expired','flow_state_not_found','invite_not_found'\]\)/)
+  assert.match(action,/return TERMINAL_AUTH_LINK_CODES\.has\(boundedCode\(error\?\.code\)\)/)
+  assert.doesNotMatch(action,/status>=400&&status<500&&status!==429/)
   assert.match(action,/verifyRetryUrl\(tokenHash,rawType,lang,joinNext\)/)
   assert.match(action,/auth token verification unavailable/)
-  assert.doesNotMatch(action,/if\(error\)[\s\S]{0,220}callback_expired[\s\S]{0,80}\}/)
 })
 
 test('uncertain verification preserves the same newest token and safe join context for manual retry',()=>{
