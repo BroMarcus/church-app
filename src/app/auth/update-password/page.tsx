@@ -114,8 +114,9 @@ export default function UpdatePasswordPage(){
     const supabase=getBrowserSupabase('password update')
     if(!supabase){setMessage(t.failed);setBusy(false);return}
     try{
-      const {error}=await supabase.auth.updateUser({password})
+      const {data,error}=await supabase.auth.updateUser({password})
       if(error){console.error('password update failed',{code:diagnosticCode(error)});setMessage(t.failed);return}
+      if(!data?.user){console.error('password update returned incomplete auth state',{code:'auth_state_missing'});setMessage(t.failed);return}
       setPassword('');setConfirm('');setReady(false);setCompleted(true)
       const signedOut=await finishPostResetSignOut(supabase)
       if(!signedOut){setSignOutIncomplete(true);setMessage(t.signOutIncomplete);return}
