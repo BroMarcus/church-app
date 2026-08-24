@@ -94,13 +94,13 @@ export async function login(formData:FormData){
   const supabase=await getSupabase('login')
   if(!supabase)redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error','login_failed')))
 
-  let data
-  let error
-  try{({data,error}=await supabase.auth.signInWithPassword({email,password}))}
+  let signInResult:Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>|null=null
+  try{signInResult=await supabase.auth.signInWithPassword({email,password})}
   catch(authError){
     console.error('login transport unavailable',{code:diagnosticCode(authError,'signin_unavailable')})
     redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error','login_failed')))
   }
+  const {data,error}=signInResult
   if(error){
     const authCode=boundedCode(error.code)
     let code='login_failed'
@@ -119,17 +119,23 @@ export async function login(formData:FormData){
     redirect(`/start?lang=${lang}&message_code=joined_existing`)
   }
   if(next)redirect(next)
-  const userId=data?.user?.id
+  const userId=data.user?.id
   if(userId){
     const onboardingState=data.user?.user_metadata?.onboarding_completed
     if(onboardingState===false)redirect(`/start?welcome=1${lang==='es'?'&lang=es':''}`)
     if(onboardingState===undefined){
+      let historyResults:null|Awaited<ReturnType<typeof Promise.all>>=null
       try{
-        const [profileResult,groupsResult,enrollmentsResult]=await Promise.all([
+        historyResults=await Promise.all([
           supabase.from('profiles').select('first_name,last_name,display_name,bio').eq('id',userId).maybeSingle(),
           supabase.from('group_memberships').select('*',{count:'exact',head:true}).eq('user_id',userId),
           supabase.from('course_enrollments').select('*',{count:'exact',head:true}).eq('user_id',userId)
         ])
+      }catch(inferenceError){
+        console.error('legacy onboarding inference transport unavailable',{code:diagnosticCode(inferenceError,'inference_unavailable')})
+      }
+      if(historyResults){
+        const [profileResult,groupsResult,enrollmentsResult]=historyResults
         const inferenceError=profileResult.error||groupsResult.error||enrollmentsResult.error
         if(inferenceError){
           console.error('legacy onboarding inference unavailable',{
@@ -143,8 +149,6 @@ export async function login(formData:FormData){
           const hasActivity=(groupsResult.count??0)>0||(enrollmentsResult.count??0)>0||Boolean(profile?.bio)
           if(hasBasicProfile&&!hasActivity)redirect(`/start?welcome=1${lang==='es'?'&lang=es':''}`)
         }
-      }catch(inferenceError){
-        console.error('legacy onboarding inference transport unavailable',{code:diagnosticCode(inferenceError,'inference_unavailable')})
       }
     }
   }
@@ -170,54 +174,56 @@ export async function signup(formData:FormData){
 
   let publicSignup=false
   if(inviteId){
-    try{
-      const {data:valid,error:inviteError}=await supabase.rpc('validate_invite_email',{p_invite_id:inviteId,p_email:email})
-      if(inviteError){
-        console.error('signup invite validation unavailable',{code:boundedCode(inviteError.code)})
-        fail('invite_check_unavailable')
-      }
-      if(typeof valid!=='boolean'){
-        console.error('signup invite validation returned no decision',{code:'empty_invite_validation'})
-        fail('invite_check_unavailable')
-      }
-      if(!valid)fail('invite_invalid')
-    }catch(inviteError){
+    let inviteResult:Awaited<ReturnType<typeof supabase.rpc>>|null=null
+    try{inviteResult=await supabase.rpc('validate_invite_email',{p_invite_id:inviteId,p_email:email})}
+    catch(inviteError){
       console.error('signup invite validation transport unavailable',{code:diagnosticCode(inviteError,'invite_check_unavailable')})
       fail('invite_check_unavailable')
     }
+    const {data:valid,error:inviteError}=inviteResult
+    if(inviteError){
+      console.error('signup invite validation unavailable',{code:boundedCode(inviteError.code)})
+      fail('invite_check_unavailable')
+    }
+    if(typeof valid!=='boolean'){
+      console.error('signup invite validation returned no decision',{code:'empty_invite_validation'})
+      fail('invite_check_unavailable')
+    }
+    if(!valid)fail('invite_invalid')
   }else{
-    try{
-      const {data:status,error:statusError}=await supabase.rpc('get_public_signup_status')
-      if(statusError){
-        console.error('public signup status unavailable',{code:boundedCode(statusError.code)})
-        fail('signup_status_unavailable')
-      }
-      const row=Array.isArray(status)?status[0]:status
-      if(!row||typeof row.open!=='boolean'){
-        console.error('public signup status returned no usable decision',{code:'invalid_signup_status'})
-        fail('signup_status_unavailable')
-      }
-      if(!row.open)fail('signup_closed')
-      publicSignup=true
-    }catch(statusError){
+    let statusResult:Awaited<ReturnType<typeof supabase.rpc>>|null=null
+    try{statusResult=await supabase.rpc('get_public_signup_status')}
+    catch(statusError){
       console.error('public signup status transport unavailable',{code:diagnosticCode(statusError,'signup_status_unavailable')})
       fail('signup_status_unavailable')
     }
+    const {data:status,error:statusError}=statusResult
+    if(statusError){
+      console.error('public signup status unavailable',{code:boundedCode(statusError.code)})
+      fail('signup_status_unavailable')
+    }
+    const row=Array.isArray(status)?status[0]:status
+    if(!row||typeof row.open!=='boolean'){
+      console.error('public signup status returned no usable decision',{code:'invalid_signup_status'})
+      fail('signup_status_unavailable')
+    }
+    if(!row.open)fail('signup_closed')
+    publicSignup=true
   }
 
   const displayName=`${firstName} ${lastName}`.trim()
   const startPath=`/start?welcome=1${lang==='es'?'&lang=es':''}`
-  let data
-  let error
+  let signupResult:Awaited<ReturnType<typeof supabase.auth.signUp>>|null=null
   try{
-    ({data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath,inviteId),data:{first_name:firstName,last_name:lastName,display_name:displayName,public_signup:publicSignup,onboarding_completed:false,preferred_language:lang}}}))
+    signupResult=await supabase.auth.signUp({email,password,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath,inviteId),data:{first_name:firstName,last_name:lastName,display_name:displayName,public_signup:publicSignup,onboarding_completed:false,preferred_language:lang}}})
   }catch(signupError){
     console.error('signup transport unavailable',{code:diagnosticCode(signupError,'signup_unavailable')})
     fail('email_failed')
   }
+  const {data,error}=signupResult
   if(error){console.error('signup failed',{code:boundedCode(error.code)});redirect(loginUrl(lang,invitePart+'&mode=signup'+statusPart('error',authEmailErrorCode(error))))}
-  if(data?.user&&Array.isArray(data.user.identities)&&data.user.identities.length===0){redirect(loginUrl(lang,invitePart+'&mode=signin'+statusPart('message','account_exists')))}
-  if(data?.session&&inviteId){
+  if(data.user&&Array.isArray(data.user.identities)&&data.user.identities.length===0){redirect(loginUrl(lang,invitePart+'&mode=signin'+statusPart('message','account_exists')))}
+  if(data.session&&inviteId){
     const redeemed=await redeemInvite(supabase,inviteId,'new-account private')
     if(!redeemed){
       const cleanupSucceeded=await cleanupLocalSession(supabase,'post-signup-invite')
@@ -226,7 +232,7 @@ export async function signup(formData:FormData){
     }
     redirect(`/start?lang=${lang}&message_code=joined_invite`)
   }
-  if(data?.session)redirect(startPath)
+  if(data.session)redirect(startPath)
   redirect(loginUrl(lang,'&mode=signin'+invitePart+statusPart('message','account_created')))
 }
 
@@ -241,12 +247,15 @@ export async function requestPasswordReset(formData:FormData){
   if(emailError)redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error',emailError)))
   const supabase=await getSupabase('password reset request')
   if(!supabase)redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error','email_failed')))
-  try{
-    const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:recoveryUrl(lang,next,inviteId)})
-    if(error){console.error('requestPasswordReset failed',{code:boundedCode(error.code)});redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error',authEmailErrorCode(error))))}
-  }catch(error){
+  let resetResult:Awaited<ReturnType<typeof supabase.auth.resetPasswordForEmail>>|null=null
+  try{resetResult=await supabase.auth.resetPasswordForEmail(email,{redirectTo:recoveryUrl(lang,next,inviteId)})}
+  catch(error){
     console.error('requestPasswordReset transport unavailable',{code:diagnosticCode(error,'reset_request_unavailable')})
     redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error','email_failed')))
+  }
+  if(resetResult.error){
+    console.error('requestPasswordReset failed',{code:boundedCode(resetResult.error.code)})
+    redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error',authEmailErrorCode(resetResult.error))))
   }
   redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('message','reset_sent')))
 }
@@ -263,12 +272,15 @@ export async function resendConfirmation(formData:FormData){
   const supabase=await getSupabase('confirmation resend')
   if(!supabase)redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error','email_failed')))
   const startPath=next||`/start?welcome=1${lang==='es'?'&lang=es':''}`
-  try{
-    const {error}=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath,inviteId)}})
-    if(error){console.error('resendConfirmation failed',{code:boundedCode(error.code)});redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error',authEmailErrorCode(error))))}
-  }catch(error){
+  let resendResult:Awaited<ReturnType<typeof supabase.auth.resend>>|null=null
+  try{resendResult=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath,inviteId)}})}
+  catch(error){
     console.error('resendConfirmation transport unavailable',{code:diagnosticCode(error,'confirmation_resend_unavailable')})
     redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error','email_failed')))
+  }
+  if(resendResult.error){
+    console.error('resendConfirmation failed',{code:boundedCode(resendResult.error.code)})
+    redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error',authEmailErrorCode(resendResult.error))))
   }
   redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('message','confirmation_sent')))
 }
