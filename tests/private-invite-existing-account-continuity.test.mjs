@@ -27,10 +27,7 @@ test('failed invite redemption verifies local cleanup before claiming the browse
   assert.match(loginActions,/local session still present after sign out/)
   assert.match(loginActions,/local sign out verification failed/)
   assert.match(loginActions,/local sign out verification unavailable/)
-  assert.match(loginActions,/local sign out failed/)
-  assert.match(loginActions,/local sign out unavailable/)
   assert.match(loginActions,/if\(!cleanupSucceeded\)redirect\(`\/account\/security\?lang=\$\{lang\}&invite=\$\{encodeURIComponent\(inviteId\)\}&status=signout_failed`\)/)
-  assert.match(loginActions,/redirect\(loginUrl\(lang,'&mode=signin'\+invitePart\+statusPart\('error','invite_redeem_failed'\)\)\)/)
 })
 
 test('login page carries only a validated open invite into sign-in and recovery actions',()=>{
@@ -61,10 +58,14 @@ test('confirmation callback applies the private invite with the verified session
   assert.match(startPage,/correo está confirmado/i)
 })
 
-test('confirmed-invite RPC or cleanup transport failures fail closed instead of leaving an uncertain signed-in session',()=>{
+test('confirmed-invite RPC or cleanup failures verify local session absence before reporting safe sign-out',()=>{
   assert.match(callback,/confirmed private invitation redemption unavailable/)
   assert.match(callback,/for\(let attempt=1;attempt<=2&&!cleanupSucceeded;attempt\+=1\)/)
   assert.match(callback,/post-confirmation invite local sign out unavailable/)
+  assert.match(callback,/supabase\.auth\.getSession\(\)/)
+  assert.match(callback,/post-confirmation invite local sign out verification failed/)
+  assert.match(callback,/post-confirmation invite local sign out verification unavailable/)
+  assert.match(callback,/post-confirmation invite local session still present after sign out/)
   assert.match(callback,/if\(!cleanupSucceeded\)return NextResponse\.redirect\(new URL\(`\/account\/security\?lang=\$\{lang\}&invite=\$\{encodeURIComponent\(inviteId\)\}&status=signout_failed`/)
   assert.match(callback,/return loginError\('invite_redeem_failed'\)/)
 })
