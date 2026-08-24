@@ -35,9 +35,13 @@ function emailIssue(email:string){
   if(at<=0||at!==email.lastIndexOf('@')||at===email.length-1)return 'invalid_email'
   return ''
 }
-function authEmailErrorCode(message:string){
-  const normalized=message.toLowerCase()
-  return normalized.includes('rate limit')||normalized.includes('over_email_send_rate_limit')||normalized.includes('security purposes')?'email_rate_limit':'email_failed'
+function authEmailErrorCode(error:{code?:unknown;status?:unknown}){
+  const code=boundedCode(error?.code)
+  if(code==='over_email_send_rate_limit'||code==='over_request_rate_limit'||error?.status===429)return 'email_rate_limit'
+  if(code==='email_exists'||code==='user_already_exists')return 'account_exists'
+  if(code==='weak_password')return 'weak_password'
+  if(code==='email_address_invalid')return 'invalid_email'
+  return 'email_failed'
 }
 
 export async function login(formData:FormData){
@@ -147,7 +151,7 @@ export async function signup(formData:FormData){
   const displayName=`${firstName} ${lastName}`.trim()
   const startPath=`/start?welcome=1${lang==='es'?'&lang=es':''}`
   const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath),data:{first_name:firstName,last_name:lastName,display_name:displayName,invite_id:inviteId||null,public_signup:publicSignup,onboarding_completed:false,preferred_language:lang}}})
-  if(error){console.error('signup failed',{code:boundedCode(error.code)});redirect(loginUrl(lang,invitePart+'&mode=signup'+statusPart('error',authEmailErrorCode(error.message))))}
+  if(error){console.error('signup failed',{code:boundedCode(error.code)});redirect(loginUrl(lang,invitePart+'&mode=signup'+statusPart('error',authEmailErrorCode(error))))}
   if(data.user&&Array.isArray(data.user.identities)&&data.user.identities.length===0){redirect(loginUrl(lang,invitePart+'&mode=signin'+statusPart('message','account_exists')))}
   if(data.session)redirect(startPath)
   redirect(loginUrl(lang,'&mode=signin'+statusPart('message','account_created')))
@@ -164,7 +168,7 @@ export async function requestPasswordReset(formData:FormData){
   const emailError=emailIssue(email)
   if(emailError)redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error',emailError)))
   const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:recoveryUrl(lang,next,inviteId)})
-  if(error){console.error('requestPasswordReset failed',{code:boundedCode(error.code)});redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error',authEmailErrorCode(error.message))))}
+  if(error){console.error('requestPasswordReset failed',{code:boundedCode(error.code)});redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error',authEmailErrorCode(error))))}
   redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('message','reset_sent')))
 }
 
@@ -180,6 +184,6 @@ export async function resendConfirmation(formData:FormData){
   if(emailError)redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error',emailError)))
   const startPath=next||`/start?welcome=1${lang==='es'?'&lang=es':''}`
   const {error}=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath,inviteId)}})
-  if(error){console.error('resendConfirmation failed',{code:boundedCode(error.code)});redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error',authEmailErrorCode(error.message))))}
+  if(error){console.error('resendConfirmation failed',{code:boundedCode(error.code)});redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error',authEmailErrorCode(error))))}
   redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('message','confirmation_sent')))
 }
