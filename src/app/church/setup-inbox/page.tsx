@@ -24,7 +24,7 @@ const boundedCode=(value:unknown)=>String(value||'unknown').slice(0,80)
 
 export default async function SetupInbox({searchParams}:{searchParams:Promise<{lang?:string;error?:string}>}){
  const q=await searchParams,lang=q.lang==='es'?'es':'en',es=lang==='es',l=(p:string)=>es?`${p}${p.includes('?')?'&':'?'}lang=es`:p
- const supabase=await createClient();const {data:claims,error:claimsError}=await supabase.auth.getClaims();if(claimsError){console.error('SetupInbox claims read failed',{code:boundedCode(claimsError.code)});throw new Error('setup-inbox-load-failed')}const userId=claims?.claims?.sub;if(!userId)redirect(l('/login'))
+ const supabase=await createClient();const {data:claims,error:claimsError}=await supabase.auth.getClaims();if(claimsError){console.error('SetupInbox claims read failed',{code:boundedCode(claimsError.code)});throw new Error('setup-inbox-load-failed')}const userId=claims?.claims?.sub;if(!userId)redirect(l('/login?mode=signin'))
  const {data:m,error:membershipError}=await supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).single();if(membershipError){console.error('SetupInbox membership read failed',{userId,code:boundedCode(membershipError.code)});throw new Error('setup-inbox-load-failed')}if(!m?.church_id||!['pastor','church_admin'].includes(m.role))redirect(l('/'))
  const {data:rows,error:rowsError}=await supabase.from('church_setup_uploads').select('*').eq('church_id',m.church_id).order('created_at',{ascending:false});if(rowsError){console.error('SetupInbox records read failed',{churchId:m.church_id,code:boundedCode(rowsError.code)});throw new Error('setup-inbox-load-failed')}
  const church:any=Array.isArray(m.churches)?m.churches[0]:m.churches
