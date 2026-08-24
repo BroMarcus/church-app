@@ -57,6 +57,8 @@ test('signup action does not mislabel backend read failures or indeterminate res
   assert.match(actions,/if\(statusError\)[\s\S]*fail\('signup_status_unavailable'\)/)
   assert.match(actions,/if\(!row\|\|typeof row\.open!==['"]boolean['"]\)[\s\S]*invalid_signup_status[\s\S]*fail\('signup_status_unavailable'\)/)
   assert.match(actions,/if\(!row\.open\)fail\('signup_closed'\)/)
+  assert.match(actions,/signup invite validation transport unavailable/)
+  assert.match(actions,/public signup status transport unavailable/)
 })
 
 test('availability recovery guidance is bilingual and discourages duplicate accounts',()=>{
@@ -77,8 +79,10 @@ test('availability diagnostics use bounded sanitized error codes instead of prov
   assert.doesNotMatch(actions,/signup status unavailable'\s*,\s*\{message:/)
 })
 
-test('legacy first-login inference does not treat failed reads as proof of no activity',()=>{
-  assert.match(actions,/const \[profileResult,groupsResult,enrollmentsResult\]=await Promise\.all/)
+test('legacy first-login inference does not treat failed or thrown reads as proof of no activity',()=>{
+  assert.match(actions,/historyResults=await Promise\.all/)
+  assert.match(actions,/legacy onboarding inference transport unavailable/)
+  assert.match(actions,/if\(historyResults\)\{[\s\S]*const \[profileResult,groupsResult,enrollmentsResult\]=historyResults/)
   assert.match(actions,/const inferenceError=profileResult\.error\|\|groupsResult\.error\|\|enrollmentsResult\.error/)
   assert.match(actions,/if\(inferenceError\)[\s\S]*legacy onboarding inference unavailable/)
   assert.match(actions,/\}else\{[\s\S]*const hasActivity=\(groupsResult\.count\?\?0\)>0\|\|\(enrollmentsResult\.count\?\?0\)>0/)
