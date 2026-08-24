@@ -27,10 +27,22 @@ All ten core PRs were open, draft, and reported mergeable at this snapshot. Each
 
 - Draft PR: #55 `Combined V1 pilot candidate — auth, onboarding, Guide, Builder, readiness`
 - Branch: `automation/combined-v1-pilot-candidate`
-- Exact verified head before this snapshot-only gate update: `dc88da8c46cf3177c6a9061169b519959584d656`
-- Kingdom Network Build #1196: **SUCCESS** — dependency install, security/regression suite, lint, and full Next.js production build all passed on that exact head.
-- Compare to current `main` at verification: **132 ahead / 0 behind**; merge base `abc1b2e85eda18ec24fcd1222423f12c17c6b655`.
-- PR #55 remained draft and mergeable; production deployment remained on HOLD.
+- Latest fully verified combined head before the current callback-certainty extension: `940f07e9100d6d112cdf61a6b8dd4ba4e0e3835b`
+- Kingdom Network Build #1198: **SUCCESS** — dependency install, security/regression suite, lint, and full Next.js production build all passed on that exact head.
+- Current extension head: callback-certainty hardening is newer than the verified checkpoint and requires its own exact-head Kingdom Network Build before READY status is restored.
+- PR #55 remains draft and mergeable; production deployment remains on HOLD.
+
+### Auth callback certainty extension
+
+The combined candidate now distinguishes a genuine invalid/expired/used confirmation or recovery code from an uncertain Auth transport/server failure:
+
+- ordinary non-rate-limited 4xx exchange failures may return the fixed `callback_expired` recovery state;
+- HTTP 429, 5xx, missing/unknown status, and thrown transport/session-exchange exceptions fail closed into generic sign-in retry rather than falsely claiming the newest email link expired;
+- safe private-invite and `/join/*` context remains attached to the recovery redirect;
+- diagnostics remain bounded and do not expose raw provider exception text;
+- focused regression coverage protects this distinction.
+
+This prevents a low-tech user from being told to request yet another confirmation/reset email solely because the Auth provider or network was temporarily unavailable.
 
 ### Read-only runtime audit
 
@@ -76,6 +88,7 @@ The combined candidate must still satisfy the full manifest. At minimum:
 - English and Spanish real-phone acceptance is performed against the exact deployed combined build;
 - existing-account joining does not require or encourage duplicate accounts;
 - password recovery preserves a valid intended church join destination;
+- confirmation/recovery callback failures must not label an uncertain 429/5xx/transport failure as an expired newest link;
 - **private invitation → existing account** is tested as one continuous path: direct sign-in applies the invitation to the same account, forgot-password recovery preserves the invitation through reset/sign-in, and unconfirmed-email resend/confirmation returns the same account to finish invitation redemption;
 - private-invite failure must fail closed without a half-finished membership and must not sign the member out of unrelated devices;
 - replaced/revoked/used invitation recovery clearly directs the tester to the newest valid invitation without exposing tokens or raw technical errors;
