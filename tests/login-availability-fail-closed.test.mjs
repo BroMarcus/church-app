@@ -29,6 +29,16 @@ test('known unusable invitations never claim signup is open when public signup i
   assert.match(page,/\{canCreate&&<Link className=\{mode==='signup'\?'btn':'ghost'\} href=\{query\('signup'\)\}>\{t\.create\}<\/Link>\}/)
 })
 
+test('sign in branches on stable Auth codes and keeps uncertain failures neutral',()=>{
+  assert.match(actions,/const authCode=boundedCode\(error\.code\)/)
+  assert.match(actions,/if\(authCode==='invalid_credentials'\)code='invalid_credentials'/)
+  assert.match(actions,/else if\(authCode==='email_not_confirmed'\)code='email_unconfirmed'/)
+  assert.match(actions,/else console\.error\('login unavailable',\{code:authCode,status:/)
+  assert.doesNotMatch(actions,/error\.message\.toLowerCase\(\)/)
+  assert.ok(page.includes('We could not safely complete sign in right now. Your account may be fine.'))
+  assert.ok(page.includes('No pudimos completar el inicio de sesión de forma segura en este momento. Tu cuenta puede estar bien.'))
+})
+
 test('signup action does not mislabel backend read failures or indeterminate results as closed signup or invalid invitation',()=>{
   assert.match(actions,/if\(inviteError\)[\s\S]*fail\('invite_check_unavailable'\)/)
   assert.match(actions,/if\(typeof valid!==['"]boolean['"]\)[\s\S]*empty_invite_validation[\s\S]*fail\('invite_check_unavailable'\)/)
