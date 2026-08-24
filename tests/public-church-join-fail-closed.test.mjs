@@ -24,6 +24,23 @@ test('join signup action separates unavailable or malformed status from unknown 
   assert.match(actions,/if\(!church\.open\)fail\('signup_closed'\)/)
 })
 
+test('public church join server action fails closed when client, status, or signup transport throws',()=>{
+  assert.match(actions,/try\{supabase=await createClient\(\)\}[\s\S]*public church signup client unavailable[\s\S]*fail\('signup_status_unavailable'\)/)
+  assert.match(actions,/try\{statusResult=await supabase\.rpc\('get_public_signup_status_for_church'/)
+  assert.match(actions,/public church signup status transport unavailable[\s\S]*fail\('signup_status_unavailable'\)/)
+  assert.match(actions,/try\{[\s\S]*signupResult=await supabase\.auth\.signUp/)
+  assert.match(actions,/public church signup transport unavailable[\s\S]*fail\('signup_failed'\)/)
+})
+
+test('public church signup classifies stable auth codes instead of provider message text',()=>{
+  assert.match(actions,/function joinSignupErrorCode\(error:\{code\?:unknown;status\?:unknown\}\)/)
+  assert.match(actions,/over_email_send_rate_limit/)
+  assert.match(actions,/over_request_rate_limit/)
+  assert.match(actions,/weak_password/)
+  assert.match(actions,/email_address_invalid/)
+  assert.doesNotMatch(actions,/joinSignupErrorCode\(message:string\)/)
+})
+
 test('public church join bounds slug and account inputs before RPC or Auth calls',()=>{
   assert.match(actions,/const EMAIL_MAX=254/)
   assert.match(actions,/const NAME_MAX=80/)
@@ -60,10 +77,13 @@ test('public join diagnostics are bounded and do not log provider messages',()=>
   assert.doesNotMatch(page,/console\.error\([^\n]+message:/)
 })
 
-test('existing-account join fails closed on auth uncertainty or empty rpc result',()=>{
+test('existing-account join fails closed on client, auth, rpc uncertainty, or empty result',()=>{
+  assert.match(actions,/existing-account church join client unavailable[\s\S]*fail\('join_failed'\)/)
+  assert.match(actions,/existing-account church join auth transport unavailable[\s\S]*fail\('join_failed'\)/)
   assert.match(actions,/data:claims,error:claimsError/)
   assert.match(actions,/if\(claimsError\)[\s\S]*fail\('join_failed'\)/)
-  assert.match(actions,/if\(!row\)[\s\S]*fail\('join_failed'\)/)
+  assert.match(actions,/existing-account church join transport unavailable[\s\S]*fail\('join_failed'\)/)
+  assert.match(actions,/if\(!row\)[\s\S]*empty_join_result[\s\S]*fail\('join_failed'\)/)
 })
 
 test('existing-account join uses the pending submit button to block repeat taps',()=>{
