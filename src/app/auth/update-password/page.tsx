@@ -9,6 +9,7 @@ const copy={
   es:{opening:'Abriendo tu enlace seguro…',invalid:'Este enlace no es válido o ya venció. Solicita un correo nuevo para cambiar tu contraseña.',choose:'Escribe una contraseña nueva abajo.',invalidBack:'Este enlace no es válido o ya venció. Vuelve a Iniciar sesión y solicita un correo nuevo.',sessionUnavailable:'No pudimos verificar de forma segura tu sesión para cambiar la contraseña. Mantén esta página abierta e inténtalo una vez más. Si todavía no funciona, vuelve a Iniciar sesión y solicita un correo nuevo.',short:'La contraseña debe tener al menos 8 caracteres.',tooLong:'La contraseña debe tener 128 caracteres o menos.',mismatch:'Las dos contraseñas no coinciden.',failed:'No pudimos cambiar la contraseña en este momento. Mantén esta página abierta e inténtalo una vez más. Si después vence el enlace, solicita un correo nuevo.',updated:'Contraseña actualizada. Tu contraseña anterior ya no funcionará.',success:'Contraseña actualizada. Continúa para iniciar sesión con tu nueva contraseña.',signOutIncomplete:'Tu contraseña fue actualizada, pero no pudimos cerrar esta sesión del navegador de forma segura. Abre Seguridad de la Cuenta, elige “Cerrar sesión en todas partes” y luego inicia sesión otra vez con tu contraseña nueva.',title:'Cambiar tu contraseña',newPassword:'Nueva contraseña',again:'Escríbela otra vez',showPassword:'Mostrar contraseña',hidePassword:'Ocultar contraseña',updating:'Actualizando…',update:'Actualizar contraseña',retry:'Intentar otra vez',continue:'Continuar a Iniciar sesión',accountSecurity:'Abrir Seguridad de la Cuenta',back:'Volver a Iniciar sesión'}
 } as const
 const INVITE_ID_PATTERN=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const TERMINAL_AUTH_LINK_CODES=new Set(['otp_expired','flow_state_expired','flow_state_not_found','invite_not_found'])
 function safeInviteId(value:string|null){return value&&value.length<=128&&INVITE_ID_PATTERN.test(value)?value:''}
 function diagnosticCode(error:unknown){
   if(error&&typeof error==='object'&&'code' in error)return String((error as {code?:unknown}).code||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,80)||'unknown'
@@ -20,8 +21,7 @@ function numericStatus(error:unknown){
   return Number.isInteger(status)&&status>=100&&status<=599?status:0
 }
 function isCertainInvalidRecoveryLink(error:unknown){
-  const status=numericStatus(error)
-  return status>=400&&status<500&&status!==429
+  return TERMINAL_AUTH_LINK_CODES.has(diagnosticCode(error))
 }
 function safeJoinNext(value:string|null){
   if(!value||value.length>500||!value.startsWith('/')||value.startsWith('//')||value.includes('\\'))return ''
