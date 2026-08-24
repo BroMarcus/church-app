@@ -10,6 +10,13 @@ test('Fresh Church Setup requires an approved filename extension even when brows
   assert.doesNotMatch(source, /\(!file\.type&&!allowedExtensions\.has\(extension\)\)/);
 });
 
+test('Fresh Church Setup keeps browser client and path initialization inside safe upload recovery', () => {
+  assert.match(source, /setSaving\(true\);setStatus\(null\)\s*\n\s*try\{\s*\n\s*const supabase=createClient\(\);const path=`\$\{churchId\}\/\$\{crypto\.randomUUID\(\)\}\/\$\{clean\(file\.name\)\}`/);
+  assert.doesNotMatch(source, /setSaving\(true\);setStatus\(null\)\s*\n\s*const supabase=createClient\(\)/);
+  assert.match(source, /SetupUploader unexpected failure'\,\{churchId,code:boundedCode\(error\)\}/);
+  assert.match(source, /finally\{setSaving\(false\)\}/);
+});
+
 test('Fresh Church Setup keeps upload diagnostics bounded instead of logging raw exceptions', () => {
   assert.match(source, /const boundedCode=/);
   assert.match(source, /SetupUploader unexpected failure'\,\{churchId,code:boundedCode\(error\)\}/);
