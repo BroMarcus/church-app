@@ -28,6 +28,17 @@ test('server auth diagnostics use sanitized bounded provider codes',()=>{
   assert.match(verifyActions,/token verification failed',\{type:rawType,code:boundedCode\(error\.code\)\}/)
 })
 
+test('signup and account-email recovery classify failures by stable auth code, not provider message text',()=>{
+  assert.match(loginActions,/function authEmailErrorCode\(error:\{code\?:unknown;status\?:unknown\}\)/)
+  assert.match(loginActions,/code==='over_email_send_rate_limit'\|\|code==='over_request_rate_limit'/)
+  assert.match(loginActions,/code==='email_exists'\|\|code==='user_already_exists'/)
+  assert.match(loginActions,/code==='weak_password'/)
+  assert.match(loginActions,/code==='email_address_invalid'/)
+  assert.doesNotMatch(loginActions,/authEmailErrorCode\(error\.message\)/)
+  assert.doesNotMatch(loginActions,/normalized\.includes\('rate limit'\)/)
+  assert.match(loginActions,/authEmailErrorCode\(error\)/)
+})
+
 test('client password reset diagnostics stay bounded without exposing exception text',()=>{
   assert.match(updatePassword,/function diagnosticCode\(error:unknown\)/)
   assert.match(updatePassword,/password reset initialization failed',\{code:diagnosticCode\(error\)\}/)
