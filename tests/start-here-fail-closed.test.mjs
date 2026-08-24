@@ -38,7 +38,19 @@ test('onboarding completion uses fixed status codes and does not put provider te
   assert.match(actions,/error_code=onboarding_save_failed/)
   assert.match(actions,/error_code=connection_unavailable/)
   assert.doesNotMatch(actions,/encodeURIComponent\(message\)/)
-  assert.match(actions,/console\.error\('start onboarding save failed',\{code:boundedCode\(error\.code\)\}\)/)
+  assert.match(actions,/console\.error\('start onboarding save failed',\{code:boundedCode\(updateResult\.error\.code\)\}\)/)
+})
+
+test('onboarding completion fails closed on thrown client, auth, and save transport failures',()=>{
+  assert.match(actions,/try\{supabase=await createClient\(\)\}[\s\S]*start onboarding client unavailable[\s\S]*error_code=connection_unavailable/)
+  assert.match(actions,/try\{authResult=await supabase\.auth\.getUser\(\)\}[\s\S]*start onboarding auth transport unavailable[\s\S]*error_code=connection_unavailable/)
+  assert.match(actions,/try\{updateResult=await supabase\.auth\.updateUser/[\s\S]*start onboarding save transport unavailable[\s\S]*error_code=onboarding_save_failed/)
+  assert.match(actions,/function diagnosticCode|const diagnosticCode/)
+  assert.doesNotMatch(actions,/console\.error\([^\n]*,error\)/)
+})
+
+test('signed-out Start Here completion explicitly returns a low-tech user to Sign In',()=>{
+  assert.match(actions,/if\(!user\)redirect\(`\/login\?lang=\$\{lang\}&mode=signin`\)/)
 })
 
 test('existing-account church join gets a fixed bilingual success confirmation on Start Here',()=>{
