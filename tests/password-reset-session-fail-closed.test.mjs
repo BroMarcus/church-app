@@ -23,8 +23,18 @@ test('reset code exchange only treats explicit terminal auth-link codes as inval
 test('reset initialization failures offer an explicit retry without discarding safe church context',()=>{
   assert.match(page,/setRetryAvailable\(true\)/)
   assert.match(page,/onClick=\{\(\)=>window\.location\.reload\(\)\}/)
-  assert.match(page,/const next=safeJoinNext\(url\.searchParams\.get\('next'\)\)/)
+  assert.match(page,/next=safeJoinNext\(url\.searchParams\.get\('next'\)\)/)
   assert.match(page,/const nextPart=joinNext\?`&next=\$\{encodeURIComponent\(joinNext\)\}`:''/)
+})
+
+test('browser client initialization failure stays inside bilingual safe recovery',()=>{
+  assert.match(page,/function getBrowserSupabase\(context:string\)\{[\s\S]*try\{return createClient\(\)\}[\s\S]*client unavailable[\s\S]*return null/)
+  assert.match(page,/const supabase=getBrowserSupabase\('password reset initialization'\)/)
+  assert.match(page,/if\(!supabase\)\{setReady\(false\);setRetryAvailable\(true\);setMessage\(c\.sessionUnavailable\)/)
+  assert.match(page,/const supabase=getBrowserSupabase\('password update'\)/)
+  assert.match(page,/if\(!supabase\)\{setMessage\(t\.failed\);setBusy\(false\);return\}/)
+  assert.doesNotMatch(page,/const supabase=createClient\(\);let mounted=true/)
+  assert.doesNotMatch(page,/setBusy\(true\);const supabase=createClient\(\)/)
 })
 
 test('password update retry guidance avoids forcing extra reset emails after a temporary failure',()=>{
