@@ -21,17 +21,25 @@ test('Start Here does not echo arbitrary query-string error or message text',()=
 
 test('Start Here distinguishes temporary auth and data-read failures from real empty membership state',()=>{
   assert.match(page,/error:authError/)
-  assert.match(page,/if\(authError\)return recovery/)
+  assert.match(page,/if\(authError\)return startRecovery/)
   assert.match(page,/profileResult\.error\|\|membershipResult\.error/)
   assert.match(page,/if\(!membership\?\.church_id\)redirect/)
+})
+
+test('Start Here page fails closed on thrown client, auth, and member-data transport failures',()=>{
+  assert.match(page,/try\{supabase=await createClient\(\)\}[\s\S]*catch\(error\)\{return startRecovery\(requestedLang,`client_\$\{diagnosticCode/)
+  assert.match(page,/try\{authResult=await supabase\.auth\.getUser\(\)\}[\s\S]*catch\(error\)\{return startRecovery\(requestedLang,`auth_\$\{diagnosticCode/)
+  assert.match(page,/\[profileResult,membershipResult\]=await Promise\.all\([\s\S]*catch\(error\)\{return startRecovery\(lang,`reads_\$\{diagnosticCode/)
+  assert.match(page,/function startRecovery/)
 })
 
 test('Start Here failure recovery is bilingual and keeps diagnostics bounded',()=>{
   assert.match(page,/We could not safely load Start Here/)
   assert.match(page,/No pudimos cargar Empieza Aquí de forma segura/)
-  assert.match(page,/const boundedCode=\(value:unknown\)=>String\(value\|\|'unknown'\)\.slice\(0,80\)/)
+  assert.match(page,/const boundedCode=\(value:unknown\)=>String\(value\|\|'unknown'\)\.replace\(\/\[\^a-zA-Z0-9_-\]\+\/g,''\)\.slice\(0,80\)\|\|'unknown'/)
   assert.match(page,/Try Start Here again/)
   assert.match(page,/Intentar Empieza Aquí otra vez/)
+  assert.match(page,/console\.error\('Start Here unavailable',\{code:boundedCode\(code\)\}\)/)
 })
 
 test('onboarding completion uses fixed status codes and does not put provider text in the URL',()=>{
