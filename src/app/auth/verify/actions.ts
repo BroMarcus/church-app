@@ -92,9 +92,11 @@ export async function verifyAuthLink(formData:FormData){
 
   let verificationFailure:{code?:unknown;status?:unknown}|null=null
   let failureWasThrown=false
+  let verifiedAuthState:{session?:unknown;user?:unknown}|null=null
   try{
-    const {error}=await supabase.auth.verifyOtp({token_hash:tokenHash,type:rawType as EmailOtpType})
+    const {data,error}=await supabase.auth.verifyOtp({token_hash:tokenHash,type:rawType as EmailOtpType})
     if(error)verificationFailure=error as {code?:unknown;status?:unknown}
+    else verifiedAuthState=data
   }catch(error){
     verificationFailure=error as {code?:unknown;status?:unknown}
     failureWasThrown=true
@@ -104,6 +106,11 @@ export async function verifyAuthLink(formData:FormData){
     const status=numericStatus(verificationFailure.status)
     console.error(failureWasThrown?'auth token verification unavailable':'auth token verification failed',{type:rawType,code:boundedCode(verificationFailure.code),status:status||'unknown'})
     if(isCertainInvalidLink(verificationFailure))redirect(`${loginBase}&error_code=callback_expired`)
+    redirect(verifyRetryUrl(tokenHash,rawType,lang,joinNext,inviteId))
+  }
+
+  if(!verifiedAuthState?.session||!verifiedAuthState.user){
+    console.error('auth token verification returned incomplete auth state',{type:rawType,code:'auth_state_missing'})
     redirect(verifyRetryUrl(tokenHash,rawType,lang,joinNext,inviteId))
   }
 
