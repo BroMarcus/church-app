@@ -7,7 +7,7 @@ import { PendingSubmit } from './pending-submit'
 import { PendingAction } from './pending-action'
 
 const copy={
-  en:{home:'Welcome to Kingdom Network.',homeBody:'One place to grow, connect, serve and walk with God.',first:'First name',last:'Last name',email:'Email',createPassword:'Create password',password:'Password',again:'Type password again',showPassword:'Show password',hidePassword:'Hide password',signIn:'Sign in',accept:'Create my account',publicHelp:'Anyone interested in the pilot can create an account. No invitation is needed.',closed:'Public signup is temporarily unavailable. Existing users can still sign in.',availabilityUnavailable:'We could not safely check account creation or invitation status right now. Nothing is wrong with your account. Try again in a moment, or sign in if you already have an account.',trouble:'Can’t get in?',resetHelp:'Use one option below, then open only the newest email we send.',accountEmail:'Your account email',forgot:'I forgot my password',resend:'I never confirmed my email',invalidOpen:'That old invitation is no longer available, but public signup is open below.',invalidClosed:'That invitation is no longer available, and public signup is closed right now. If you already have an account, sign in with that same account. If you are new, ask a church leader for the newest invitation.',invalidSignin:'That invitation is no longer available. Sign in with your same account. If you still need to join that church, ask a church leader for the newest invitation after you sign in.',english:'English',spanish:'Español',resetTip:'Use this if you already confirmed your account but forgot your password.',confirmTip:'Use this if you created an account but never confirmed your email.',emailTip:'Check Inbox and Spam/Junk. After requesting an email, the button will wait one minute so you do not accidentally trigger the email cooldown.',step1:'Create your account',step2:'Confirm the email we send',step3:'Come back and sign in',create:'Create account',signinTitle:'Sign in',newHere:'New here?',returning:'Already have an account?',existingAccount:'If you have used Kingdom Network before, do not create another account. Sign in with the account you already have.',joinReturning:'You already have an account. Sign in here and we will return you to the church join page so you can finish joining without making a duplicate account.',inviteReturning:'This invitation can be connected to the Kingdom Network account you already have. Sign in with that same account. We will apply this invitation after sign-in—do not create a second account.',creating:'Creating account…',signing:'Signing in…',sending:'Sending…',wait:'Wait {seconds}s before requesting another email',returnJoin:'← Return to the church join page'},
+  en:{home:'Welcome to Kingdom Network.',homeBody:'One place to grow, connect, serve and walk with God.',first:'First name',last:'Last name',email:'Email',createPassword:'Create password',password:'Password',again:'Type password again',showPassword:'Show password',hidePassword:'Hide password',signIn:'Sign in',accept:'Create my account',publicHelp:'Anyone interested in the pilot can create an account. No invitation is needed.',closed:'Public signup is temporarily unavailable. Existing users can still sign in.',availabilityUnavailable:'We could not safely check account creation or invitation status right now. Nothing is wrong with your account. Try again in a moment, or sign in if you already have an account.',trouble:'Can’t get in?',resetHelp:'Use one option below, then open only the newest email we send.',accountEmail:'Your account email',forgot:'I forgot my password',resend:'I never confirmed my email',invalidOpen:'That old invitation is no longer available, but public signup is open below.',invalidClosed:'That invitation is no longer available, and public signup is closed right now. If you already have an account, sign in with that same account. If you are new, ask a church leader for the newest invitation.',invalidSignin:'That invitation is no longer available. Sign in with your same account. If you still need to join that church, ask a church leader for the newest invitation after you sign in.',english:'English',spanish:'Español',resetTip:'Use this if you already confirmed your account but forgot your password.',confirmTip:'Use this if you created an account but never confirmed my email.',emailTip:'Check Inbox and Spam/Junk. After requesting an email, the button will wait one minute so you do not accidentally trigger the email cooldown.',step1:'Create your account',step2:'Confirm the email we send',step3:'Come back and sign in',create:'Create account',signinTitle:'Sign in',newHere:'New here?',returning:'Already have an account?',existingAccount:'If you have used Kingdom Network before, do not create another account. Sign in with the account you already have.',joinReturning:'You already have an account. Sign in here and we will return you to the church join page so you can finish joining without making a duplicate account.',inviteReturning:'This invitation can be connected to the Kingdom Network account you already have. Sign in with that same account. We will apply this invitation after sign-in—do not create a second account.',creating:'Creating account…',signing:'Signing in…',sending:'Sending…',wait:'Wait {seconds}s before requesting another email',returnJoin:'← Return to the church join page'},
   es:{home:'Bienvenido a Kingdom Network.',homeBody:'Un lugar para crecer, conectarte, servir y caminar con Dios.',first:'Nombre',last:'Apellido',email:'Correo electrónico',createPassword:'Crear contraseña',password:'Contraseña',again:'Escribe la contraseña otra vez',showPassword:'Mostrar contraseña',hidePassword:'Ocultar contraseña',signIn:'Iniciar sesión',accept:'Crear mi cuenta',publicHelp:'Cualquier persona interesada en el piloto puede crear una cuenta. No necesitas invitación.',closed:'El registro público no está disponible temporalmente. Los usuarios existentes todavía pueden iniciar sesión.',availabilityUnavailable:'No pudimos verificar de forma segura el registro o la invitación en este momento. Tu cuenta no está dañada. Inténtalo de nuevo en un momento, o inicia sesión si ya tienes una cuenta.',trouble:'¿No puedes entrar?',resetHelp:'Usa una opción abajo y abre solamente el correo más reciente que enviemos.',accountEmail:'Correo de tu cuenta',forgot:'Olvidé mi contraseña',resend:'Nunca confirmé mi correo',invalidOpen:'Esa invitación anterior ya no está disponible, pero el registro público está abierto abajo.',invalidClosed:'Esa invitación ya no está disponible y el registro público está cerrado en este momento. Si ya tienes una cuenta, inicia sesión con esa misma cuenta. Si eres nuevo, pide a un líder de la iglesia la invitación más reciente.',invalidSignin:'Esa invitación ya no está disponible. Inicia sesión con tu misma cuenta. Si todavía necesitas unirte a esa iglesia, pide a un líder la invitación más reciente después de iniciar sesión.',english:'English',spanish:'Español',resetTip:'Usa esto si ya confirmaste tu cuenta pero olvidaste tu contraseña.',confirmTip:'Usa esto si creaste una cuenta pero nunca confirmaste tu correo.',emailTip:'Revisa Recibidos y Spam/Correo no deseado. Después de pedir un correo, el botón esperará un minuto para evitar activar el límite de envío.',step1:'Crea tu cuenta',step2:'Confirma el correo que enviamos',step3:'Regresa e inicia sesión',create:'Crear cuenta',signinTitle:'Iniciar sesión',newHere:'¿Eres nuevo?',returning:'¿Ya tienes una cuenta?',existingAccount:'Si ya has usado Kingdom Network, no crees otra cuenta. Inicia sesión con la cuenta que ya tienes.',joinReturning:'Ya tienes una cuenta. Inicia sesión aquí y te regresaremos a la página de la iglesia para terminar de unirte sin crear una cuenta duplicada.',inviteReturning:'Esta invitación se puede conectar a la cuenta de Kingdom Network que ya tienes. Inicia sesión con esa misma cuenta. Aplicaremos la invitación después de iniciar sesión—no crees una segunda cuenta.',creating:'Creando cuenta…',signing:'Iniciando sesión…',sending:'Enviando…',wait:'Espera {seconds}s antes de pedir otro correo',returnJoin:'← Regresar a la página para unirte a la iglesia'}
 } as const
 
@@ -17,6 +17,11 @@ const authStatus={
 } as const
 
 const boundedCode=(value:unknown)=>String(value||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48)||'unknown'
+const diagnosticCode=(error:unknown,fallback:string)=>{
+  if(error&&typeof error==='object'&&'code' in error)return boundedCode((error as {code?:unknown}).code)
+  if(error instanceof Error)return boundedCode(error.name)
+  return boundedCode(fallback)
+}
 const INVITE_ID_PATTERN=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 function safeJoinNext(value:string|undefined){if(!value||value.length>500||!value.startsWith('/')||value.startsWith('//')||value.includes('\\'))return '';try{const base='https://kingdom.invalid',parsed=new URL(value,base);if(parsed.origin!==base||!parsed.pathname.startsWith('/join/'))return '';return `${parsed.pathname}${parsed.search}${parsed.hash}`}catch{return ''}}
 
@@ -29,19 +34,33 @@ export default async function LoginPage({searchParams}:{searchParams:Promise<{er
   const inviteParam=params.invite&&params.invite.length<=128&&INVITE_ID_PATTERN.test(params.invite)?params.invite:''
   const inviteMalformed=Boolean(params.invite&&!inviteParam)
   let invite:any=null,inviteCheckFailed=false
-  if(inviteParam){const {data,error}=await supabase.rpc('get_invite_preview',{p_invite_id:inviteParam});if(error){inviteCheckFailed=true;console.error('login invite preview unavailable',{code:boundedCode(error.code)})}else invite=Array.isArray(data)?data[0]:data}
+  if(inviteParam){
+    try{
+      const {data,error}=await supabase.rpc('get_invite_preview',{p_invite_id:inviteParam})
+      if(error){inviteCheckFailed=true;console.error('login invite preview unavailable',{code:boundedCode(error.code)})}
+      else invite=Array.isArray(data)?data[0]:data
+    }catch(error){
+      inviteCheckFailed=true
+      console.error('login invite preview transport unavailable',{code:diagnosticCode(error,'invite_preview_unavailable')})
+    }
+  }
   const inviteDecisionInvalid=Boolean(inviteParam)&&!inviteCheckFailed&&(!invite||typeof invite.valid!=='boolean')
   if(inviteDecisionInvalid)console.error('login invite preview returned no usable decision',{code:'invalid_invite_preview'})
   let publicStatus:any=null,publicStatusError:any=null,publicStatusInvalid=false,publicStatusFailed=false,publicOpen=false
   if(!explicitSignin){
-    const result=await supabase.rpc('get_public_signup_status')
-    publicStatusError=result.error
-    if(publicStatusError)console.error('login public signup status unavailable',{code:boundedCode(publicStatusError.code)})
-    publicStatus=Array.isArray(result.data)?result.data[0]:result.data
-    publicStatusInvalid=!publicStatusError&&(!publicStatus||typeof publicStatus.open!=='boolean')
-    if(publicStatusInvalid)console.error('login public signup status returned no usable decision',{code:'invalid_signup_status'})
-    publicStatusFailed=Boolean(publicStatusError)||publicStatusInvalid
-    publicOpen=!publicStatusFailed&&publicStatus.open
+    try{
+      const result=await supabase.rpc('get_public_signup_status')
+      publicStatusError=result.error
+      if(publicStatusError)console.error('login public signup status unavailable',{code:boundedCode(publicStatusError.code)})
+      publicStatus=Array.isArray(result.data)?result.data[0]:result.data
+      publicStatusInvalid=!publicStatusError&&(!publicStatus||typeof publicStatus.open!=='boolean')
+      if(publicStatusInvalid)console.error('login public signup status returned no usable decision',{code:'invalid_signup_status'})
+      publicStatusFailed=Boolean(publicStatusError)||publicStatusInvalid
+      publicOpen=!publicStatusFailed&&publicStatus.open
+    }catch(error){
+      publicStatusFailed=true
+      console.error('login public signup status transport unavailable',{code:diagnosticCode(error,'signup_status_unavailable')})
+    }
   }
   const validInvite=!inviteMalformed&&!inviteCheckFailed&&!inviteDecisionInvalid&&invite?.valid===true
   const availabilityFailed=inviteCheckFailed||inviteDecisionInvalid||(!explicitSignin&&!validInvite&&publicStatusFailed)
