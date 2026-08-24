@@ -1,6 +1,6 @@
 # Kingdom Network Pilot Combined Release Snapshot
 
-Snapshot date: 2026-08-22
+Snapshot date: 2026-08-24
 
 This file pins the exact draft PR heads that the combined-integration manifest was reviewed against. It is intentionally separate from the long-form integration policy so later PR drift is obvious and reviewable.
 
@@ -23,6 +23,23 @@ Production deployment remains **HOLD**. These SHAs are integration inputs, not p
 
 All ten core PRs were open, draft, and reported mergeable at this snapshot. Each listed authority batch had a successful Kingdom Network Build on the head recorded above; PR #31's previously stale description was separately verified against Build #825, which completed successfully on its exact recorded head.
 
+## Current combined V1 candidate checkpoint
+
+- Draft PR: #55 `Combined V1 pilot candidate — auth, onboarding, Guide, Builder, readiness`
+- Branch: `automation/combined-v1-pilot-candidate`
+- Exact verified head before this snapshot-only gate update: `dc88da8c46cf3177c6a9061169b519959584d656`
+- Kingdom Network Build #1196: **SUCCESS** — dependency install, security/regression suite, lint, and full Next.js production build all passed on that exact head.
+- Compare to current `main` at verification: **132 ahead / 0 behind**; merge base `abc1b2e85eda18ec24fcd1222423f12c17c6b655`.
+- PR #55 remained draft and mergeable; production deployment remained on HOLD.
+
+### Read-only runtime audit
+
+A Vercel runtime-error audit was performed without changing production data or configuration:
+
+- latest 24-hour window: **no runtime errors found**;
+- prior 7-day history contained older `/login` provider/database error messages plus an Auth refresh/sign-out race from earlier deployments;
+- the combined candidate's touched auth paths now use bounded diagnostic codes rather than exposing raw provider/database text, but this does **not** replace exact-build phone acceptance because PR #55 is not independently deployed.
+
 ## Separately coordinated queues
 
 These are deliberately not absorbed blindly into the core pilot reconciliation:
@@ -38,13 +55,14 @@ Finance / Reporting / Multi-Church Licensing remains separately claimed. No comb
 
 ## Drift rule
 
-Before building the combined candidate:
+Before building or approving the combined candidate:
 
 1. Re-fetch every intended PR head.
 2. If any SHA differs from this snapshot, stop treating this snapshot as current for that PR.
 3. Review the new diff and CI result before updating the pinned SHA.
 4. Re-run the combined integration regression after any snapshot change.
 5. Never substitute a branch name alone for an exact commit SHA in pilot acceptance evidence.
+6. Any new commit on PR #55 creates a new exact head and requires a fresh Kingdom Network Build before READY status is restored.
 
 ## Combined-candidate gate
 
@@ -58,6 +76,13 @@ The combined candidate must still satisfy the full manifest. At minimum:
 - English and Spanish real-phone acceptance is performed against the exact deployed combined build;
 - existing-account joining does not require or encourage duplicate accounts;
 - password recovery preserves a valid intended church join destination;
+- **private invitation → existing account** is tested as one continuous path: direct sign-in applies the invitation to the same account, forgot-password recovery preserves the invitation through reset/sign-in, and unconfirmed-email resend/confirmation returns the same account to finish invitation redemption;
+- private-invite failure must fail closed without a half-finished membership and must not sign the member out of unrelated devices;
+- replaced/revoked/used invitation recovery clearly directs the tester to the newest valid invitation without exposing tokens or raw technical errors;
 - Fresh Church Setup produces an unpublished retry-safe draft rather than publishing automatically;
 - consequential actions remain protected from slow-phone double submission;
 - no release-stop condition from `PILOT_COMBINED_INTEGRATION_MANIFEST.md` remains open.
+
+## Human acceptance note
+
+Automated CI and a clean runtime-audit window are necessary but not sufficient. The release remains blocked on real-phone English + Spanish proof against one exact deployed PR #55 build, including the combined private-invitation recovery chain above. Do not record PASS from separate individually tested pieces if the end-to-end invitation continuity was not actually exercised.
