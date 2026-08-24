@@ -21,14 +21,16 @@ test('auth and recovery diagnostics do not log raw provider messages',()=>{
 test('server auth diagnostics use sanitized bounded provider codes',()=>{
   assert.match(loginActions,/const boundedCode=\(value:unknown\)=>String\(value\|\|'unknown'\)\.replace\(\/\[\^a-zA-Z0-9_-\]\/g,''\)\.slice\(0,48\)\|\|'unknown'/)
   assert.match(loginActions,/signup failed',\{code:boundedCode\(error\.code\)\}/)
-  assert.match(loginActions,/requestPasswordReset failed',\{code:boundedCode\(error\.code\)\}/)
-  assert.match(loginActions,/resendConfirmation failed',\{code:boundedCode\(error\.code\)\}/)
+  assert.match(loginActions,/requestPasswordReset failed',\{code:boundedCode\(resetResult\.error\.code\)\}/)
+  assert.match(loginActions,/resendConfirmation failed',\{code:boundedCode\(resendResult\.error\.code\)\}/)
   assert.match(loginActions,/login unavailable',\{code:authCode,status:/)
-  assert.match(callbackRoute,/session exchange failed',\{mode,code:boundedCode\(error\.code\)\}/)
-  assert.match(verifyActions,/token verification failed',\{type:rawType,code:boundedCode\(error\.code\)\}/)
+  assert.match(loginActions,/diagnosticCode\(authError,'signin_unavailable'\)/)
+  assert.match(loginActions,/diagnosticCode\(signupError,'signup_unavailable'\)/)
+  assert.match(callbackRoute,/session exchange failed',\{mode,code:boundedCode\(error\.code\)/)
+  assert.match(verifyActions,/token verification failed',\{type:rawType,code:boundedCode\(error\.code\)/)
 })
 
-test('signup and account-email recovery classify failures by stable auth code, not provider message text',()=>{
+test('signup and account-email recovery classify returned failures by stable auth code, not provider message text',()=>{
   assert.match(loginActions,/function authEmailErrorCode\(error:\{code\?:unknown;status\?:unknown\}\)/)
   assert.match(loginActions,/code==='over_email_send_rate_limit'\|\|code==='over_request_rate_limit'/)
   assert.match(loginActions,/code==='email_exists'\|\|code==='user_already_exists'/)
@@ -37,6 +39,16 @@ test('signup and account-email recovery classify failures by stable auth code, n
   assert.doesNotMatch(loginActions,/authEmailErrorCode\(error\.message\)/)
   assert.doesNotMatch(loginActions,/normalized\.includes\('rate limit'\)/)
   assert.match(loginActions,/authEmailErrorCode\(error\)/)
+  assert.match(loginActions,/authEmailErrorCode\(resetResult\.error\)/)
+  assert.match(loginActions,/authEmailErrorCode\(resendResult\.error\)/)
+})
+
+test('thrown auth transport failures use bounded names/codes instead of exception text',()=>{
+  assert.match(loginActions,/const diagnosticCode=\(error:unknown,fallback:string\)=>/)
+  assert.match(loginActions,/client unavailable',\{code:diagnosticCode\(error,'client_unavailable'\)\}/)
+  assert.match(loginActions,/requestPasswordReset transport unavailable',\{code:diagnosticCode\(error,'reset_request_unavailable'\)\}/)
+  assert.match(loginActions,/resendConfirmation transport unavailable',\{code:diagnosticCode\(error,'confirmation_resend_unavailable'\)\}/)
+  assert.doesNotMatch(loginActions,/console\.error\([^\n]*error\.message/)
 })
 
 test('client password reset diagnostics stay bounded without exposing exception text',()=>{
