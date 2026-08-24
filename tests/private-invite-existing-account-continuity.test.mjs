@@ -8,6 +8,7 @@ const loginActions=read('src/app/login/actions.ts')
 const loginPage=read('src/app/login/page.tsx')
 const callback=read('src/app/auth/callback/route.ts')
 const resetPage=read('src/app/auth/update-password/page.tsx')
+const startPage=read('src/app/start/page.tsx')
 
 test('existing-account private invite is redeemed only after authenticated sign-in',()=>{
   assert.match(loginActions,/redeem_invite_for_current_user/)
@@ -20,7 +21,7 @@ test('existing-account private invite is redeemed only after authenticated sign-
 
 test('failed invite redemption verifies local cleanup before claiming the browser was signed out',()=>{
   const localSignouts=loginActions.match(/auth\.signOut\(\{scope:'local'\}\)/g)??[]
-  assert.ok(localSignouts.length>=2,'expected one local cleanup attempt plus one safe retry')
+  assert.ok(localSignouts.length>=2,'expected existing-account cleanup plus new-account cleanup')
   assert.match(loginActions,/const \{error:retrySignOutError\}=await supabase\.auth\.signOut\(\{scope:'local'\}\)/)
   assert.match(loginActions,/post-invite-failure local sign out retry failed/)
   assert.match(loginActions,/redirect\(`\/account\/security\?lang=\$\{lang\}&invite=\$\{encodeURIComponent\(inviteId\)\}&status=signout_failed`\)/)
@@ -41,11 +42,30 @@ test('forgot password preserves the same private invitation until the next sign-
   assert.match(resetPage,/const signInHref=`\/login\?lang=\$\{lang\}&mode=signin\$\{invitePart\}\$\{nextPart\}`/)
 })
 
-test('resend-confirmation callback returns an invited existing account to sign-in with the same invite',()=>{
+test('confirmation callback applies the private invite with the verified session and goes directly to Start Here',()=>{
   assert.match(loginActions,/callbackUrl\(lang,'signup',startPath,inviteId\)/)
-  assert.match(callback,/confirmation_ready_for_invite/)
-  assert.match(callback,/safeInviteId\(url\.searchParams\.get\('invite'\)\)/)
-  assert.match(loginPage,/confirmation_ready_for_invite/)
+  const exchangeIndex=callback.indexOf('exchangeCodeForSession')
+  const redeemIndex=callback.indexOf("redeem_invite_for_current_user")
+  assert.ok(exchangeIndex>=0,'callback must verify the email/session first')
+  assert.ok(redeemIndex>exchangeIndex,'callback must redeem only after session verification')
+  assert.match(callback,/mode==='signup'&&inviteId/)
+  assert.match(callback,/p_invite_id:inviteId/)
+  assert.match(callback,/message_code=joined_invite/)
+  assert.doesNotMatch(callback,/confirmation_ready_for_invite/)
+  assert.match(startPage,/joined_invite/)
+  assert.match(startPage,/correo está confirmado/i)
+})
+
+test('new private-invite signup does not place invite id in unverified auth user metadata',()=>{
+  assert.match(loginActions,/emailRedirectTo:callbackUrl\(lang,'signup',startPath,inviteId\)/)
+  const signUpStart=loginActions.indexOf('supabase.auth.signUp')
+  const signUpEnd=loginActions.indexOf('if(error)',signUpStart)
+  assert.ok(signUpStart>=0&&signUpEnd>signUpStart,'signup call should be present')
+  const signUpCall=loginActions.slice(signUpStart,signUpEnd)
+  assert.doesNotMatch(signUpCall,/invite_id\s*:/,'unconfirmed user metadata must not consume/reserve the invite')
+  assert.match(loginActions,/if\(data\.session&&inviteId\)/)
+  assert.match(loginActions,/new-account private invitation redemption failed/)
+  assert.match(loginActions,/message_code=joined_invite/)
 })
 
 test('private invitation ids are UUID bounded before RPC or redirect use',()=>{
