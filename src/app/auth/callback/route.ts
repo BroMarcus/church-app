@@ -58,11 +58,15 @@ export async function GET(request:NextRequest){
   let supabase:Awaited<ReturnType<typeof createClient>>
   try{
     supabase=await createClient()
-    const {error}=await supabase.auth.exchangeCodeForSession(code)
+    const {data,error}=await supabase.auth.exchangeCodeForSession(code)
     if(error){
       const failureCode=exchangeFailureCode(error)
       console.error('auth callback session exchange failed',{mode,code:boundedCode(error.code),status:typeof error.status==='number'?error.status:'unknown',classification:failureCode})
       return failureCode==='callback_expired'?loginError(failureCode):linkUnavailable()
+    }
+    if(!data?.session||!data.user){
+      console.error('auth callback session exchange returned incomplete auth state',{mode,code:'auth_state_missing'})
+      return linkUnavailable()
     }
   }catch(error){
     console.error('auth callback session exchange unavailable',{mode,code:boundedCode(error instanceof Error?error.name:'exchange_unavailable')})
