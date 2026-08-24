@@ -16,8 +16,8 @@ const statusCopy={
  es:{onboarding_save_failed:'No pudimos guardar ese paso. No se borró ni cambió nada. Inténtalo otra vez.',connection_unavailable:'No pudimos verificar tu cuenta de forma segura en este momento. No se cambió nada. Inténtalo otra vez.'}
 } as const
 const messageCopy={
- en:{joined_existing:'You are connected to this church with your existing Kingdom Network account. Keep using this same account—do not create another one.',already_joined:'You are already connected to this church. Keep using this same Kingdom Network account—no second account is needed.'},
- es:{joined_existing:'Ya estás conectado a esta iglesia con tu cuenta existente de Kingdom Network. Sigue usando esta misma cuenta—no crees otra.',already_joined:'Ya estabas conectado a esta iglesia. Sigue usando esta misma cuenta de Kingdom Network—no necesitas una segunda cuenta.'}
+ en:{joined_existing:'You are connected to this church with your existing Kingdom Network account. Keep using this same account—do not create another one.',already_joined:'You are already connected to this church. Keep using this same Kingdom Network account—no second account is needed.',joined_invite:'Your email is confirmed and this church invitation is connected to your Kingdom Network account. Keep using this same account—no second account is needed.'},
+ es:{joined_existing:'Ya estás conectado a esta iglesia con tu cuenta existente de Kingdom Network. Sigue usando esta misma cuenta—no crees otra.',already_joined:'Ya estabas conectado a esta iglesia. Sigue usando esta misma cuenta de Kingdom Network—no necesitas una segunda cuenta.',joined_invite:'Tu correo está confirmado y esta invitación de la iglesia está conectada a tu cuenta de Kingdom Network. Sigue usando esta misma cuenta—no necesitas una segunda cuenta.'}
 } as const
 const boundedCode=(value:unknown)=>String(value||'unknown').slice(0,80)
 const roleLabel=(role:unknown,lang:'en'|'es')=>{
