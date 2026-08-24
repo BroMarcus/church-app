@@ -6,12 +6,27 @@ const confirmRoute=readFileSync(new URL('../src/app/auth/confirm/route.ts',impor
 const verifyPage=readFileSync(new URL('../src/app/auth/verify/page.tsx',import.meta.url),'utf8')
 const verifyActions=readFileSync(new URL('../src/app/auth/verify/actions.ts',import.meta.url),'utf8')
 
-test('token-hash confirmation extracts only a safe private invite from the same-origin signup callback',()=>{
+test('token-hash confirmation extracts only safe private-invite context from same-origin auth redirects',()=>{
   assert.match(confirmRoute,/INVITE_ID_PATTERN/)
-  assert.match(confirmRoute,/callback\.origin!==canonical\.origin\|\|callback\.pathname!=='\/auth\/callback'/)
-  assert.match(confirmRoute,/callback\.searchParams\.get\('mode'\)==='recovery'/)
-  assert.match(confirmRoute,/inviteId:safeInviteId\(callback\.searchParams\.get\('invite'\)\)/)
+  assert.match(confirmRoute,/redirectTarget\.origin!==canonical\.origin/)
+  assert.match(confirmRoute,/redirectTarget\.pathname==='\/auth\/callback'/)
+  assert.match(confirmRoute,/redirectTarget\.pathname==='\/auth\/update-password'/)
+  assert.match(confirmRoute,/inviteId:safeInviteId\(redirectTarget\.searchParams\.get\('invite'\)\)/)
+  assert.match(confirmRoute,/recoveryNext:safeJoinDestination\(redirectTarget\.searchParams\.get\('next'\)\)/)
   assert.match(confirmRoute,/if\(inviteId\)verifyUrl\.searchParams\.set\('invite',inviteId\)/)
+})
+
+test('legacy recovery accepts same-origin update-password context but not arbitrary redirect destinations',()=>{
+  assert.match(confirmRoute,/const joinNext=directJoinNext\|\|redirectContext\.recoveryNext/)
+  assert.match(confirmRoute,/const next=type==='recovery'\?joinNext:/)
+  assert.match(confirmRoute,/if\(redirectTarget\.origin!==canonical\.origin\)return empty/)
+  assert.match(confirmRoute,/return empty\n  \}catch/)
+})
+
+test('explicit malformed invite cannot be masked by a valid nested callback invite',()=>{
+  assert.match(confirmRoute,/const explicitInviteRaw=searchParams\.get\('invite'\)/)
+  assert.match(confirmRoute,/const explicitInviteId=safeInviteId\(explicitInviteRaw\)/)
+  assert.match(confirmRoute,/if\(explicitInviteRaw&&!explicitInviteId\)/)
 })
 
 test('verification screen preserves bounded invite context and explains same-account behavior bilingually',()=>{
