@@ -5,7 +5,7 @@ import { type EmailOtpType } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 
 const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
-const boundedCode=(value:unknown)=>String(value||'unknown').slice(0,80)
+const boundedCode=(value:unknown)=>String(value||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48)||'unknown'
 const MAX_AUTH_VALUE_LENGTH=1000
 const allowedTypes:EmailOtpType[]=['email','recovery','invite','magiclink','email_change']
 
@@ -44,6 +44,22 @@ function safeSignupDestination(raw:string,fallback:string){
   }
 }
 
+function numericStatus(value:unknown){
+  const status=Number(value)
+  return Number.isInteger(status)&&status>=100&&status<=599?status:0
+}
+
+function isCertainInvalidLink(error:{status?:unknown}|null|undefined){
+  const status=numericStatus(error?.status)
+  return status>=400&&status<500&&status!==429
+}
+
+function verifyRetryUrl(tokenHash:string,rawType:string,lang:'en'|'es',joinNext:string){
+  const query=new URLSearchParams({token_hash:tokenHash,type:rawType,lang,error_code:'verify_unavailable'})
+  if(joinNext)query.set('next',joinNext)
+  return `/auth/verify?${query.toString()}`
+}
+
 export async function verifyAuthLink(formData:FormData){
   const tokenHash=String(formData.get('token_hash')??'')
   const rawType=String(formData.get('type')??'')
@@ -59,10 +75,20 @@ export async function verifyAuthLink(formData:FormData){
   }
 
   const supabase=await createClient()
-  const {error}=await supabase.auth.verifyOtp({token_hash:tokenHash,type:rawType as EmailOtpType})
-  if(error){
-    console.error('auth token verification failed',{type:rawType,code:boundedCode(error.code)})
-    redirect(`${loginBase}&error_code=callback_expired`)
+  try{
+    const {error}=await supabase.auth.verifyOtp({token_hash:tokenHash,type:rawType as EmailOtpType})
+    if(error){
+      const status=numericStatus((error as {status?:unknown}).status)
+      console.error('auth token verification failed',{type:rawType,code:boundedCode(error.code),status:status||'unknown'})
+      if(isCertainInvalidLink(error as {status?:unknown}))redirect(`${loginBase}&error_code=callback_expired`)
+      redirect(verifyRetryUrl(tokenHash,rawType,lang,joinNext))
+    }
+  }catch(error){
+    const candidate=error as {code?:unknown;status?:unknown}
+    const status=numericStatus(candidate?.status)
+    console.error('auth token verification unavailable',{type:rawType,code:boundedCode(candidate?.code),status:status||'unknown'})
+    if(isCertainInvalidLink(candidate))redirect(`${loginBase}&error_code=callback_expired`)
+    redirect(verifyRetryUrl(tokenHash,rawType,lang,joinNext))
   }
 
   if(rawType==='recovery'){
