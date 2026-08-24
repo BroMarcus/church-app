@@ -5,6 +5,7 @@ import test from 'node:test'
 const callback=readFileSync(new URL('../src/app/auth/callback/route.ts',import.meta.url),'utf8')
 const verify=readFileSync(new URL('../src/app/auth/verify/actions.ts',import.meta.url),'utf8')
 const loginActions=readFileSync(new URL('../src/app/login/actions.ts',import.meta.url),'utf8')
+const resetPage=readFileSync(new URL('../src/app/auth/update-password/page.tsx',import.meta.url),'utf8')
 
 test('sign in requires a real authenticated user and session before continuing',()=>{
   assert.match(loginActions,/const \{data,error\}=signInResult/)
@@ -44,6 +45,16 @@ test('token-hash verification requires both a session and user before recovery o
   const inviteRedeem=verify.indexOf("if(rawType==='email'&&inviteId)")
   assert.ok(stateCheck>0&&stateCheck<recoveryRedirect,'auth state must be verified before password recovery continues')
   assert.ok(stateCheck<inviteRedeem,'auth state must be verified before private invitation redemption')
+})
+
+test('password update requires Auth to return the updated user before showing completion',()=>{
+  assert.match(resetPage,/const \{data,error\}=await supabase\.auth\.updateUser\(\{password\}\)/)
+  assert.match(resetPage,/if\(!data\?\.user\)\{console\.error\('password update returned incomplete auth state'/)
+  const stateCheck=resetPage.indexOf('password update returned incomplete auth state')
+  const completed=resetPage.indexOf('setCompleted(true)')
+  const signOut=resetPage.indexOf('finishPostResetSignOut(supabase)')
+  assert.ok(stateCheck>0&&stateCheck<completed,'password reset must not report completion without a returned user')
+  assert.ok(stateCheck<signOut,'post-reset sign-out must not run after an unverified password-update result')
 })
 
 test('incomplete auth state remains retryable and preserves validated join/invite context',()=>{
