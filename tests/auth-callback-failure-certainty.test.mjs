@@ -4,12 +4,15 @@ import test from 'node:test'
 
 const route=readFileSync(new URL('../src/app/auth/callback/route.ts',import.meta.url),'utf8')
 
-test('auth callback only labels ordinary 4xx exchange failures as expired links',()=>{
-  assert.match(route,/status>=400&&status<500&&status!==429\?'callback_expired':'login_failed'/)
+test('auth callback only labels explicit terminal auth-link codes as expired links',()=>{
+  assert.match(route,/TERMINAL_AUTH_LINK_CODES=new Set\(\['otp_expired','flow_state_expired','flow_state_not_found','invite_not_found'\]\)/)
+  assert.match(route,/TERMINAL_AUTH_LINK_CODES\.has\(code\)\?'callback_expired':'login_failed'/)
+  assert.doesNotMatch(route,/status>=400&&status<500&&status!==429\?'callback_expired'/)
   assert.match(route,/classification:failureCode/)
 })
 
-test('temporary or thrown callback exchange failures fail closed without claiming the newest link expired',()=>{
+test('temporary, ambiguous 4xx, or thrown callback failures fail closed without claiming the newest link expired',()=>{
+  assert.match(route,/Supabase may use the same HTTP status \(notably 403\)/)
   assert.match(route,/try\{[\s\S]*exchangeCodeForSession\(code\)[\s\S]*\}catch\(error\)\{/)
   assert.match(route,/auth callback session exchange unavailable/)
   assert.match(route,/return loginError\('login_failed'\)/)
