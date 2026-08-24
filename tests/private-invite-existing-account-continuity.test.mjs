@@ -14,8 +14,17 @@ test('existing-account private invite is redeemed only after authenticated sign-
   assert.match(loginActions,/p_invite_id:inviteId/)
   assert.match(loginActions,/redirect\(`\/start\?lang=\$\{lang\}&message_code=joined_existing`\)/)
   assert.match(loginActions,/auth\.signOut\(\{scope:'local'\}\)/)
-  assert.match(loginActions,/post-invite-failure sign out failed/)
+  assert.match(loginActions,/post-invite-failure local sign out failed/)
   assert.match(loginActions,/invite_redeem_failed/)
+})
+
+test('failed invite redemption verifies local cleanup before claiming the browser was signed out',()=>{
+  const localSignouts=loginActions.match(/auth\.signOut\(\{scope:'local'\}\)/g)??[]
+  assert.ok(localSignouts.length>=2,'expected one local cleanup attempt plus one safe retry')
+  assert.match(loginActions,/const \{error:retrySignOutError\}=await supabase\.auth\.signOut\(\{scope:'local'\}\)/)
+  assert.match(loginActions,/post-invite-failure local sign out retry failed/)
+  assert.match(loginActions,/redirect\(`\/account\/security\?lang=\$\{lang\}&invite=\$\{encodeURIComponent\(inviteId\)\}&status=signout_failed`\)/)
+  assert.match(loginActions,/redirect\(loginUrl\(lang,'&mode=signin'\+invitePart\+statusPart\('error','invite_redeem_failed'\)\)\)/)
 })
 
 test('login page carries only a validated open invite into sign-in and recovery actions',()=>{
