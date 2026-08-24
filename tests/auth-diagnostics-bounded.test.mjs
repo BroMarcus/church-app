@@ -18,11 +18,12 @@ test('auth and recovery diagnostics do not log raw provider messages',()=>{
   }
 })
 
-test('server auth diagnostics are bounded to provider error codes',()=>{
-  assert.match(loginActions,/const boundedCode=\(value:unknown\)=>String\(value\|\|'unknown'\)\.slice\(0,80\)/)
+test('server auth diagnostics use sanitized bounded provider codes',()=>{
+  assert.match(loginActions,/const boundedCode=\(value:unknown\)=>String\(value\|\|'unknown'\)\.replace\(\/\[\^a-zA-Z0-9_-\]\/g,''\)\.slice\(0,48\)\|\|'unknown'/)
   assert.match(loginActions,/signup failed',\{code:boundedCode\(error\.code\)\}/)
   assert.match(loginActions,/requestPasswordReset failed',\{code:boundedCode\(error\.code\)\}/)
   assert.match(loginActions,/resendConfirmation failed',\{code:boundedCode\(error\.code\)\}/)
+  assert.match(loginActions,/login unavailable',\{code:authCode,status:/)
   assert.match(callbackRoute,/session exchange failed',\{mode,code:boundedCode\(error\.code\)\}/)
   assert.match(verifyActions,/token verification failed',\{type:rawType,code:boundedCode\(error\.code\)\}/)
 })
