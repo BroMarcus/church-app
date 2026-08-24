@@ -19,6 +19,16 @@ test('login page distinguishes availability failures from real closed or invalid
   assert.doesNotMatch(page,/Boolean\(invite\?\.valid\)/)
 })
 
+test('known unusable invitations never claim signup is open when public signup is closed',()=>{
+  assert.ok(page.includes("invalidOpen:'That old invitation is no longer available, but public signup is open below.'"))
+  assert.ok(page.includes("invalidClosed:'That invitation is no longer available, and public signup is closed right now."))
+  assert.ok(page.includes("invalidOpen:'Esa invitación anterior ya no está disponible, pero el registro público está abierto abajo.'"))
+  assert.ok(page.includes("invalidClosed:'Esa invitación ya no está disponible y el registro público está cerrado en este momento."))
+  assert.match(page,/invalidInviteKnown&&<div className="notice">\{publicOpen\?t\.invalidOpen:t\.invalidClosed\}<\/div>/)
+  assert.match(page,/gridTemplateColumns:canCreate\?'1fr 1fr':'1fr'/)
+  assert.match(page,/\{canCreate&&<Link className=\{mode==='signup'\?'btn':'ghost'\} href=\{query\('signup'\)\}>\{t\.create\}<\/Link>\}/)
+})
+
 test('signup action does not mislabel backend read failures or indeterminate results as closed signup or invalid invitation',()=>{
   assert.match(actions,/if\(inviteError\)[\s\S]*fail\('invite_check_unavailable'\)/)
   assert.match(actions,/if\(typeof valid!==['"]boolean['"]\)[\s\S]*empty_invite_validation[\s\S]*fail\('invite_check_unavailable'\)/)
