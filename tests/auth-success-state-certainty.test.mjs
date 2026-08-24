@@ -4,6 +4,27 @@ import test from 'node:test'
 
 const callback=readFileSync(new URL('../src/app/auth/callback/route.ts',import.meta.url),'utf8')
 const verify=readFileSync(new URL('../src/app/auth/verify/actions.ts',import.meta.url),'utf8')
+const loginActions=readFileSync(new URL('../src/app/login/actions.ts',import.meta.url),'utf8')
+
+test('sign in requires a real authenticated user and session before continuing',()=>{
+  assert.match(loginActions,/const \{data,error\}=signInResult/)
+  assert.match(loginActions,/if\(!data\?\.session\|\|!data\.user\?\.id\)\{/)
+  assert.match(loginActions,/login returned incomplete auth state/)
+  const stateCheck=loginActions.indexOf('login returned incomplete auth state')
+  const inviteRedeem=loginActions.indexOf("redeemInvite(supabase,inviteId,'existing-account private')")
+  const joinRedirect=loginActions.indexOf('if(next)redirect(next)')
+  assert.ok(stateCheck>0&&stateCheck<inviteRedeem,'private invitation redemption must require a verified sign-in state')
+  assert.ok(stateCheck<joinRedirect,'church return redirects must require a verified sign-in state')
+})
+
+test('signup does not report account creation when Auth returns no user',()=>{
+  assert.match(loginActions,/if\(!data\?\.user\)\{/)
+  assert.match(loginActions,/signup returned incomplete auth state/)
+  assert.match(loginActions,/fail\('email_failed'\)/)
+  const stateCheck=loginActions.indexOf('signup returned incomplete auth state')
+  const successMessage=loginActions.indexOf("statusPart('message','account_created')")
+  assert.ok(stateCheck>0&&stateCheck<successMessage,'account-created message must require a returned Auth user')
+})
 
 test('modern callback does not treat an empty auth success payload as a verified session',()=>{
   assert.match(callback,/const \{data,error\}=await supabase\.auth\.exchangeCodeForSession\(code\)/)
@@ -18,7 +39,7 @@ test('token-hash verification requires both a session and user before recovery o
   assert.match(verify,/else verifiedAuthState=data/)
   assert.match(verify,/if\(!verifiedAuthState\?\.session\|\|!verifiedAuthState\.user\)\{/)
   assert.match(verify,/auth token verification returned incomplete auth state/)
-  const stateCheck=verify.indexOf("auth token verification returned incomplete auth state")
+  const stateCheck=verify.indexOf('auth token verification returned incomplete auth state')
   const recoveryRedirect=verify.indexOf("if(rawType==='recovery')")
   const inviteRedeem=verify.indexOf("if(rawType==='email'&&inviteId)")
   assert.ok(stateCheck>0&&stateCheck<recoveryRedirect,'auth state must be verified before password recovery continues')
