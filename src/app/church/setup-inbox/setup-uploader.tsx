@@ -30,8 +30,8 @@ export function SetupUploader({churchId,userId,lang}:{churchId:string;userId:str
   const extension=file.name.toLowerCase().match(/\.[^.]+$/)?.[0]??''
   if(!allowedExtensions.has(extension)||(file.type&&!allowedTypes.has(file.type))){fail(es?'Ese tipo de archivo no está permitido. Usa PDF, Word, PowerPoint, texto o una imagen.':'That file type is not allowed. Use PDF, Word, PowerPoint, text, or an image.');return}
   setSaving(true);setStatus(null)
-  const supabase=createClient();const path=`${churchId}/${crypto.randomUUID()}/${clean(file.name)}`
   try{
+   const supabase=createClient();const path=`${churchId}/${crypto.randomUUID()}/${clean(file.name)}`
    const upload=await supabase.storage.from('church-setup').upload(path,file,{contentType:file.type||undefined,upsert:false})
    if(upload.error){console.error('SetupUploader storage upload failed',{churchId,code:boundedCode(upload.error)});fail();return}
    const categoryValue=String(formData.get('category')||'unsorted'),category=allowedCategories.has(categoryValue)?categoryValue:'unsorted'
