@@ -56,6 +56,14 @@ test('confirmation callback applies the private invite with the verified session
   assert.match(startPage,/correo está confirmado/i)
 })
 
+test('confirmed-invite RPC or cleanup transport failures fail closed instead of leaving an uncertain signed-in session',()=>{
+  assert.match(callback,/confirmed private invitation redemption unavailable/)
+  assert.match(callback,/for\(let attempt=1;attempt<=2&&!cleanupSucceeded;attempt\+=1\)/)
+  assert.match(callback,/post-confirmation invite local sign out unavailable/)
+  assert.match(callback,/if\(!cleanupSucceeded\)return NextResponse\.redirect\(new URL\(`\/account\/security\?lang=\$\{lang\}&invite=\$\{encodeURIComponent\(inviteId\)\}&status=signout_failed`/)
+  assert.match(callback,/return loginError\('invite_redeem_failed'\)/)
+})
+
 test('new private-invite signup does not place invite id in unverified auth user metadata',()=>{
   assert.match(loginActions,/emailRedirectTo:callbackUrl\(lang,'signup',startPath,inviteId\)/)
   const signUpStart=loginActions.indexOf('supabase.auth.signUp')
