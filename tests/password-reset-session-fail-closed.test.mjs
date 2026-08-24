@@ -11,6 +11,14 @@ test('temporary reset session lookup failure is not mislabeled as an expired lin
   assert.match(page,/sessionUnavailable:'No pudimos verificar de forma segura tu sesión para cambiar la contraseña/)
 })
 
+test('reset code exchange distinguishes certain invalid links from temporary Auth outages',()=>{
+  assert.match(page,/function isCertainInvalidRecoveryLink\(error:unknown\)/)
+  assert.match(page,/status>=400&&status<500&&status!==429/)
+  assert.match(page,/if\(isCertainInvalidRecoveryLink\(error\)\)\{setRetryAvailable\(false\);setMessage\(c\.invalidBack\)\}/)
+  assert.match(page,/else\{setRetryAvailable\(true\);setMessage\(c\.sessionUnavailable\)\}/)
+  assert.match(page,/password reset session exchange failed',\{code:diagnosticCode\(error\),status:numericStatus\(error\)\|\|'unknown'\}/)
+})
+
 test('reset initialization failures offer an explicit retry without discarding safe church context',()=>{
   assert.match(page,/setRetryAvailable\(true\)/)
   assert.match(page,/onClick=\{\(\)=>window\.location\.reload\(\)\}/)
