@@ -11,9 +11,10 @@ test('temporary reset session lookup failure is not mislabeled as an expired lin
   assert.match(page,/sessionUnavailable:'No pudimos verificar de forma segura tu sesión para cambiar la contraseña/)
 })
 
-test('reset code exchange distinguishes certain invalid links from temporary Auth outages',()=>{
-  assert.match(page,/function isCertainInvalidRecoveryLink\(error:unknown\)/)
-  assert.match(page,/status>=400&&status<500&&status!==429/)
+test('reset code exchange only treats explicit terminal auth-link codes as invalid',()=>{
+  assert.match(page,/TERMINAL_AUTH_LINK_CODES=new Set\(\['otp_expired','flow_state_expired','flow_state_not_found','invite_not_found'\]\)/)
+  assert.match(page,/function isCertainInvalidRecoveryLink\(error:unknown\)\{[\s\S]*TERMINAL_AUTH_LINK_CODES\.has\(diagnosticCode\(error\)\)/)
+  assert.doesNotMatch(page,/status>=400&&status<500&&status!==429/)
   assert.match(page,/if\(isCertainInvalidRecoveryLink\(error\)\)\{setRetryAvailable\(false\);setMessage\(c\.invalidBack\)\}/)
   assert.match(page,/else\{setRetryAvailable\(true\);setMessage\(c\.sessionUnavailable\)\}/)
   assert.match(page,/password reset session exchange failed',\{code:diagnosticCode\(error\),status:numericStatus\(error\)\|\|'unknown'\}/)
