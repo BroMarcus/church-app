@@ -124,8 +124,22 @@ export async function verifyAuthLink(formData:FormData){
       for(let attempt=1;attempt<=2&&!cleanupSucceeded;attempt+=1){
         try{
           const {error:signOutError}=await supabase.auth.signOut({scope:'local'})
-          if(!signOutError)cleanupSucceeded=true
-          else console.error('post-token-hash invite local sign out failed',{attempt,code:boundedCode(signOutError.code)})
+          if(signOutError){
+            console.error('post-token-hash invite local sign out failed',{attempt,code:boundedCode(signOutError.code)})
+            continue
+          }
+          let verification
+          try{verification=await supabase.auth.getSession()}
+          catch(error){
+            console.error('post-token-hash invite local sign out verification unavailable',{attempt,code:boundedCode(error instanceof Error?error.name:'session_check_unavailable')})
+            continue
+          }
+          if(verification.error){
+            console.error('post-token-hash invite local sign out verification failed',{attempt,code:boundedCode(verification.error.code)})
+            continue
+          }
+          if(!verification.data.session)cleanupSucceeded=true
+          else console.error('post-token-hash invite local session still present after sign out',{attempt,code:'session_still_present'})
         }catch(error){
           console.error('post-token-hash invite local sign out unavailable',{attempt,code:boundedCode(error instanceof Error?error.name:'signout_unavailable')})
         }
