@@ -66,7 +66,7 @@ export async function login(formData:FormData){
     const row=Array.isArray(redeemed)?redeemed[0]:redeemed
     if(redeemError||!row?.church_id){
       console.error('existing-account private invitation redemption failed',{code:redeemError?boundedCode(redeemError.code):'empty_redeem_result'})
-      const {error:signOutError}=await supabase.auth.signOut()
+      const {error:signOutError}=await supabase.auth.signOut({scope:'local'})
       if(signOutError)console.error('post-invite-failure sign out failed',{code:boundedCode(signOutError.code)})
       redirect(loginUrl(lang,'&mode=signin'+invitePart+statusPart('error','invite_redeem_failed')))
     }
