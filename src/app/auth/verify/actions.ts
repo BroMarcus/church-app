@@ -8,6 +8,7 @@ const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel
 const boundedCode=(value:unknown)=>String(value||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48)||'unknown'
 const MAX_AUTH_VALUE_LENGTH=1000
 const allowedTypes:EmailOtpType[]=['email','recovery','invite','magiclink','email_change']
+const TERMINAL_AUTH_LINK_CODES=new Set(['otp_expired','flow_state_expired','flow_state_not_found','invite_not_found'])
 
 function safeLocalPath(raw:string){
   if(!raw||raw.length>MAX_AUTH_VALUE_LENGTH||!raw.startsWith('/')||raw.startsWith('//')||raw.includes('\\'))return ''
@@ -49,9 +50,8 @@ function numericStatus(value:unknown){
   return Number.isInteger(status)&&status>=100&&status<=599?status:0
 }
 
-function isCertainInvalidLink(error:{status?:unknown}|null|undefined){
-  const status=numericStatus(error?.status)
-  return status>=400&&status<500&&status!==429
+function isCertainInvalidLink(error:{code?:unknown}|null|undefined){
+  return TERMINAL_AUTH_LINK_CODES.has(boundedCode(error?.code))
 }
 
 function verifyRetryUrl(tokenHash:string,rawType:string,lang:'en'|'es',joinNext:string){
