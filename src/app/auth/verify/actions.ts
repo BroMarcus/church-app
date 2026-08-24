@@ -82,7 +82,14 @@ export async function verifyAuthLink(formData:FormData){
     redirect(`${loginBase}&error_code=callback_incomplete`)
   }
 
-  const supabase=await createClient()
+  let supabase:Awaited<ReturnType<typeof createClient>>
+  try{
+    supabase=await createClient()
+  }catch(error){
+    console.error('auth token verification client unavailable',{code:boundedCode(error instanceof Error?error.name:'client_unavailable')})
+    redirect(verifyRetryUrl(tokenHash,rawType,lang,joinNext,inviteId))
+  }
+
   let verificationFailure:{code?:unknown;status?:unknown}|null=null
   let failureWasThrown=false
   try{
