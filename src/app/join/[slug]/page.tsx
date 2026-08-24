@@ -28,6 +28,11 @@ const joinErrors={
 } as const
 
 const boundedCode=(value:unknown)=>String(value||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48)||'unknown'
+const diagnosticCode=(error:unknown,fallback:string)=>{
+  if(error&&typeof error==='object'&&'code' in error)return boundedCode((error as {code?:unknown}).code)
+  if(error instanceof Error)return boundedCode(error.name)
+  return boundedCode(fallback)
+}
 
 function UnavailableState({t,slug,lang}:{t:JoinCopy;slug:string;lang:Lang}){
   return <main className="login-wrap"><div className="login card" style={{maxWidth:620}}><div className="row" style={{justifyContent:'space-between',alignItems:'center',marginBottom:8}}><div className="pill">{t.join}</div><div className="row" style={{gap:6}}><Languages size={14}/><Link className="ghost" href={`/join/${encodeURIComponent(slug)}?lang=en`}>English</Link><Link className="ghost" href={`/join/${encodeURIComponent(slug)}?lang=es`}>Español</Link></div></div><div className="notice error" role="alert">{t.unavailable}</div><div style={{display:'grid',gap:10,marginTop:14}}><Link className="btn" href={`/join/${encodeURIComponent(slug)}?lang=${lang}`}>{t.retry}</Link><Link className="ghost" href={`/login?lang=${lang}&mode=signin&next=${encodeURIComponent(`/join/${slug}?lang=${lang}`)}`}>{t.signInAction}</Link></div></div></main>
@@ -40,7 +45,15 @@ export default async function JoinChurchPage({params,searchParams}:{params:Promi
   const lang:Lang=query.lang==='es'?'es':'en',t=copy[lang]
   const statusError=(joinErrors[lang] as Record<string,string>)[query.error_code??'']||''
   const supabase=createPublicClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}})
-  const {data,error:churchStatusError}=await supabase.rpc('get_public_signup_status_for_church',{p_church_slug:slug})
+  let data:any=null,churchStatusError:any=null
+  try{
+    const result=await supabase.rpc('get_public_signup_status_for_church',{p_church_slug:slug})
+    data=result.data
+    churchStatusError=result.error
+  }catch(error){
+    console.error('public church join status transport unavailable',{code:diagnosticCode(error,'signup_status_unavailable')})
+    return <UnavailableState t={t} slug={slug} lang={lang}/>
+  }
   if(churchStatusError){
     console.error('public church join status unavailable',{code:boundedCode(churchStatusError.code)})
     return <UnavailableState t={t} slug={slug} lang={lang}/>
@@ -55,12 +68,19 @@ export default async function JoinChurchPage({params,searchParams}:{params:Promi
     console.error('public church join status returned malformed result',{churchSlug:slug,code:'malformed_signup_status'})
     return <UnavailableState t={t} slug={slug} lang={lang}/>
   }
-  const server=await createServerClient(),{data:claims,error:claimsError}=await server.auth.getClaims()
-  if(claimsError){
-    console.error('public church join auth state unavailable',{code:boundedCode(claimsError.code)})
+  let signedIn=false
+  try{
+    const server=await createServerClient()
+    const {data:claims,error:claimsError}=await server.auth.getClaims()
+    if(claimsError){
+      console.error('public church join auth state unavailable',{code:boundedCode(claimsError.code)})
+      return <UnavailableState t={t} slug={slug} lang={lang}/>
+    }
+    signedIn=Boolean(claims?.claims?.sub)
+  }catch(error){
+    console.error('public church join auth state transport unavailable',{code:diagnosticCode(error,'auth_state_unavailable')})
     return <UnavailableState t={t} slug={slug} lang={lang}/>
   }
-  const signedIn=Boolean(claims?.claims?.sub)
   const swap=(next:'en'|'es')=>`/join/${encodeURIComponent(slug)}?lang=${next}`
   return <main className="login-wrap"><div className="login card" style={{maxWidth:620}}>
     <div className="row" style={{justifyContent:'space-between',alignItems:'center',marginBottom:8}}><div className="pill">{t.join}</div><div className="row" style={{gap:6}}><Languages size={14}/><Link className="ghost" href={swap('en')}>English</Link><Link className="ghost" href={swap('es')}>Español</Link></div></div>
