@@ -45,6 +45,8 @@ export default async function LoginPage({searchParams}:{searchParams:Promise<{er
       console.error('login invite preview unavailable',{code:boundedCode(error.code)})
     }else invite=Array.isArray(data)?data[0]:data
   }
+  const inviteDecisionInvalid=Boolean(inviteParam)&&!inviteCheckFailed&&(!invite||typeof invite.valid!=='boolean')
+  if(inviteDecisionInvalid)console.error('login invite preview returned no usable decision',{code:'invalid_invite_preview'})
   const {data:publicStatusData,error:publicStatusError}=await supabase.rpc('get_public_signup_status')
   if(publicStatusError)console.error('login public signup status unavailable',{code:boundedCode(publicStatusError.code)})
   const publicStatus:any=Array.isArray(publicStatusData)?publicStatusData[0]:publicStatusData
@@ -52,8 +54,8 @@ export default async function LoginPage({searchParams}:{searchParams:Promise<{er
   if(publicStatusInvalid)console.error('login public signup status returned no usable decision',{code:'invalid_signup_status'})
   const publicStatusFailed=Boolean(publicStatusError)||publicStatusInvalid
   const publicOpen=!publicStatusFailed&&publicStatus.open
-  const validInvite=!inviteMalformed&&!inviteCheckFailed&&Boolean(invite?.valid)
-  const availabilityFailed=inviteCheckFailed||(!validInvite&&publicStatusFailed)
+  const validInvite=!inviteMalformed&&!inviteCheckFailed&&!inviteDecisionInvalid&&invite?.valid===true
+  const availabilityFailed=inviteCheckFailed||inviteDecisionInvalid||(!validInvite&&publicStatusFailed)
   const canCreate=!availabilityFailed&&(validInvite||publicOpen)
   const mode=params.mode==='signin'||!canCreate?'signin':'signup'
   const query=(nextMode:string,nextLang=lang)=>`/login?lang=${nextLang}&mode=${nextMode}${inviteParam?`&invite=${encodeURIComponent(inviteParam)}`:''}${joinNext?`&next=${encodeURIComponent(joinNext)}`:''}`
@@ -63,7 +65,7 @@ export default async function LoginPage({searchParams}:{searchParams:Promise<{er
     <h1>{t.home}</h1><p className="muted">{t.homeBody}</p>
     {statusError&&<div className="notice error" role="alert">{statusError}</div>}{statusMessage&&<div className="notice success" role="status" aria-live="polite">{statusMessage}</div>}
     {availabilityFailed&&<div className="notice error" role="alert">{t.availabilityUnavailable}</div>}
-    {params.invite&&!validInvite&&!inviteCheckFailed&&!publicStatusFailed&&<div className="notice">{t.invalid}</div>}
+    {params.invite&&!validInvite&&!inviteCheckFailed&&!inviteDecisionInvalid&&!publicStatusFailed&&<div className="notice">{t.invalid}</div>}
     {!params.invite&&!publicOpen&&!publicStatusFailed&&<div className="notice">{t.closed}</div>}
     <div className="row" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,margin:'18px 0'}}><Link className={mode==='signup'?'btn':'ghost'} href={query('signup')}>{t.create}</Link><Link className={mode==='signin'?'btn':'ghost'} href={query('signin')}>{t.signinTitle}</Link></div>
     {mode==='signup'&&canCreate&&<>
