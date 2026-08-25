@@ -17,15 +17,31 @@ const failureUrl=(lang:string,status:string,next='',invite='')=>securityUrl(lang
 const EMAIL_MAX=254
 const PASSWORD_MAX=128
 const safeAuthDiagnostic=(error:unknown)=>{if(!error||typeof error!=='object')return {kind:String(typeof error).slice(0,80)};const candidate=error as {code?:unknown;status?:unknown;name?:unknown};return {name:typeof candidate.name==='string'?candidate.name.slice(0,80):undefined,code:typeof candidate.code==='string'?candidate.code.slice(0,80):undefined,status:typeof candidate.status==='number'?candidate.status:undefined}}
+type SupabaseServerClient=Awaited<ReturnType<typeof createClient>>
 
-async function requireSignedIn(supabase:Awaited<ReturnType<typeof createClient>>,lang:string,next='',invite=''){
-  const {data:claims,error}=await supabase.auth.getClaims()
+async function getSupabaseOrRedirect(lang:string,next='',invite=''){
+  try{return await createClient()}
+  catch(error){
+    console.error('Account security client unavailable',safeAuthDiagnostic(error))
+    redirect(failureUrl(lang,'auth_unavailable',next,invite))
+  }
+}
+
+async function requireSignedIn(supabase:SupabaseServerClient,lang:string,next='',invite=''){
+  let claimsResult
+  try{claimsResult=await supabase.auth.getClaims()}
+  catch(error){
+    console.error('Account security auth state request unavailable',safeAuthDiagnostic(error))
+    redirect(failureUrl(lang,'auth_unavailable',next,invite))
+  }
+  const {data:claims,error}=claimsResult
   if(error){console.error('Account security auth state unavailable',safeAuthDiagnostic(error));redirect(failureUrl(lang,'auth_unavailable',next,invite))}
   if(!claims?.claims?.sub)redirect(`/login?lang=${lang}&mode=signin${contextPart(next,invite)}`)
 }
 
 export async function changeLoginEmail(formData:FormData){
-  const lang=langOf(formData),next=safeJoinNext(text(formData,'next')),invite=safeInviteId(text(formData,'invite_id')),supabase=await createClient()
+  const lang=langOf(formData),next=safeJoinNext(text(formData,'next')),invite=safeInviteId(text(formData,'invite_id'))
+  const supabase=await getSupabaseOrRedirect(lang,next,invite)
   await requireSignedIn(supabase,lang,next,invite)
   const email=text(formData,'email').toLowerCase()
   if(!email||email.length>EMAIL_MAX||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))redirect(failureUrl(lang,'email_invalid',next,invite))
@@ -34,7 +50,8 @@ export async function changeLoginEmail(formData:FormData){
 }
 
 export async function changePassword(formData:FormData){
-  const lang=langOf(formData),next=safeJoinNext(text(formData,'next')),invite=safeInviteId(text(formData,'invite_id')),supabase=await createClient()
+  const lang=langOf(formData),next=safeJoinNext(text(formData,'next')),invite=safeInviteId(text(formData,'invite_id'))
+  const supabase=await getSupabaseOrRedirect(lang,next,invite)
   await requireSignedIn(supabase,lang,next,invite)
   const password=String(formData.get('password')??''),confirm=String(formData.get('confirm_password')??'')
   if(password.length<12)redirect(failureUrl(lang,'password_short',next,invite))
@@ -45,7 +62,8 @@ export async function changePassword(formData:FormData){
 }
 
 export async function signOutEverywhere(formData:FormData){
-  const lang=langOf(formData),next=safeJoinNext(text(formData,'next')),invite=safeInviteId(text(formData,'invite_id')),supabase=await createClient()
+  const lang=langOf(formData),next=safeJoinNext(text(formData,'next')),invite=safeInviteId(text(formData,'invite_id'))
+  const supabase=await getSupabaseOrRedirect(lang,next,invite)
   try{const result=await supabase.auth.signOut({scope:'global'});if(result.error){console.error('Account security global sign-out failed',safeAuthDiagnostic(result.error));redirect(failureUrl(lang,'signout_failed',next,invite))}}catch(error){console.error('Account security global sign-out request failed',safeAuthDiagnostic(error));redirect(failureUrl(lang,'signout_failed',next,invite))}
   redirect(`/login?lang=${lang}&mode=signin${contextPart(next,invite)}`)
 }
