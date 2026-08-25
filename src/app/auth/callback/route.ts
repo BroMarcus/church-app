@@ -42,7 +42,8 @@ export async function GET(request:NextRequest){
   const url=new URL(request.url)
   const code=url.searchParams.get('code')
   const lang=url.searchParams.get('lang')==='es'?'es':'en'
-  const mode=url.searchParams.get('mode')==='recovery'?'recovery':'signup'
+  const rawMode=url.searchParams.get('mode')
+  const mode=rawMode==='signup'||rawMode==='recovery'?rawMode:null
   const inviteId=safeInviteId(url.searchParams.get('invite'))
   const signupFallback=`/start?welcome=1${lang==='es'?'&lang=es':''}`
   const rawNext=url.searchParams.get('next')
@@ -53,6 +54,7 @@ export async function GET(request:NextRequest){
   const linkUnavailable=()=>NextResponse.redirect(new URL(`/auth/link-unavailable?lang=${lang}${inviteId?`&invite=${encodeURIComponent(inviteId)}`:''}${joinNext?`&next=${encodeURIComponent(joinNext)}`:''}`,siteUrl))
 
   if(url.searchParams.get('invite')&&!inviteId)return loginError('invite_invalid')
+  if(!mode)return loginError('callback_incomplete')
   if(!code||code.length>MAX_AUTH_VALUE_LENGTH)return loginError('callback_incomplete')
 
   let supabase:Awaited<ReturnType<typeof createClient>>
