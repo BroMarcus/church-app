@@ -21,6 +21,15 @@ function boundedCode(value:unknown){
   const code=typeof value==='object'&&value&&'code' in value?String((value as {code?:unknown}).code??'UNKNOWN'):'UNKNOWN'
   return code.replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48)||'UNKNOWN'
 }
+function exactBuildId(){
+  const server=(process.env.VERCEL_GIT_COMMIT_SHA??'').trim()
+  const browser=(process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA??'').trim()
+  const valid=(value:string)=>/^[0-9a-f]{40}$/i.test(value)
+  if(valid(server)&&valid(browser)&&server.toLowerCase()!==browser.toLowerCase())return 'unverified'
+  if(valid(server))return server.toLowerCase()
+  if(valid(browser))return browser.toLowerCase()
+  return 'unverified'
+}
 
 export default async function PhoneProofPage({searchParams}:{searchParams:Promise<{lang?:string}>}){
   const params=await searchParams
@@ -51,8 +60,7 @@ export default async function PhoneProofPage({searchParams}:{searchParams:Promis
     redirect(lang==='es'?'/?lang=es':'/')
   }
 
-  const rawBuildId=process.env.VERCEL_GIT_COMMIT_SHA||process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA||'local-dev'
-  const buildId=rawBuildId.trim().slice(0,40)||'local-dev'
+  const buildId=exactBuildId()
   // Browser-local evidence must never leak between two admins who use the same device/browser.
   // Scope it to church + authenticated tester + deployed build without displaying the user id.
   const evidenceScope=`${membership.church_id}:${userId}:${buildId}`
