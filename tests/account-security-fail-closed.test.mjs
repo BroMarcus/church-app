@@ -25,12 +25,25 @@ test('Account Security page catches thrown client and Auth verification failures
   assert.match(page,/const thrownCode=/)
 })
 
-test('Account Security actions fail closed when claims cannot be verified',()=>{
+test('Account Security actions fail closed when client startup or claims verification throws',()=>{
+  assert.match(actions,/async function getSupabaseOrRedirect/)
+  assert.match(actions,/try\{return await createClient\(\)\}/)
+  assert.match(actions,/Account security client unavailable/)
+  assert.match(actions,/redirect\(failureUrl\(lang,'auth_unavailable',next,invite\)\)/)
   assert.match(actions,/async function requireSignedIn/)
-  assert.match(actions,/const \{data:claims,error\}=await supabase\.auth\.getClaims\(\)/)
-  assert.match(actions,/failureUrl\(lang,'auth_unavailable'\)/)
-  assert.match(actions,/await requireSignedIn\(supabase,lang\)/)
-  assert.doesNotMatch(actions,/const lang=langOf\(formData\),supabase=await createClient\(\),\{data:claims\}=await supabase\.auth\.getClaims\(\)/)
+  assert.match(actions,/try\{claimsResult=await supabase\.auth\.getClaims\(\)\}/)
+  assert.match(actions,/Account security auth state request unavailable/)
+  assert.match(actions,/const \{data:claims,error\}=claimsResult/)
+  assert.match(actions,/await requireSignedIn\(supabase,lang,next,invite\)/)
+  assert.doesNotMatch(actions,/supabase=await createClient\(\)/)
+})
+
+test('All three Account Security actions use protected client startup',()=>{
+  const helperCalls=actions.match(/await getSupabaseOrRedirect\(lang,next,invite\)/g)??[]
+  assert.equal(helperCalls.length,3)
+  assert.match(actions,/export async function changeLoginEmail/)
+  assert.match(actions,/export async function changePassword/)
+  assert.match(actions,/export async function signOutEverywhere/)
 })
 
 test('Account Security diagnostics and changed credentials are bounded',()=>{
