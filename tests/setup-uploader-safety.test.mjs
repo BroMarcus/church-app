@@ -11,10 +11,10 @@ test('Fresh Church Setup requires an approved filename extension even when brows
 });
 
 test('Fresh Church Setup keeps browser client and path initialization inside safe upload recovery', () => {
-  assert.match(source, /setSaving\(true\);setStatus\(null\)\s*\n\s*try\{\s*\n\s*const supabase=createClient\(\);const path=`\$\{churchId\}\/\$\{crypto\.randomUUID\(\)\}\/\$\{clean\(file\.name\)\}`/);
+  assert.match(source, /setSaving\(true\);setStatus\(null\)\s*\n\s*let unlockAfterAttempt=true\s*\n\s*try\{\s*\n\s*const supabase=createClient\(\);const path=`\$\{churchId\}\/\$\{crypto\.randomUUID\(\)\}\/\$\{clean\(file\.name\)\}`/);
   assert.doesNotMatch(source, /setSaving\(true\);setStatus\(null\)\s*\n\s*const supabase=createClient\(\)/);
   assert.match(source, /SetupUploader unexpected failure'\,\{churchId,code:boundedCode\(error\)\}/);
-  assert.match(source, /finally\{setSaving\(false\)\}/);
+  assert.match(source, /finally\{if\(unlockAfterAttempt\)setSaving\(false\)\}/);
 });
 
 test('Fresh Church Setup keeps upload diagnostics bounded instead of logging raw exceptions', () => {
@@ -42,6 +42,15 @@ test('Fresh Church Setup cleans up uploaded storage after metadata transport fai
   assert.match(source, /let insert\s*\n\s*try\{\s*\n\s*insert=await supabase\.from\('church_setup_uploads'\)\.insert/);
   assert.match(source, /catch\(error\)\{\s*\n\s*console\.error\('SetupUploader metadata insert transport failed'/);
   assert.match(source, /if\(!\(await cleanupUploadedFile\(\)\)\)\{failCleanupUncertain\(\);return\}\s*\n\s*fail\(\);return/);
+});
+
+test('Fresh Church Setup keeps a confirmed successful upload locked until the page refreshes', () => {
+  assert.match(source, /let unlockAfterAttempt=true/);
+  assert.match(source, /unlockAfterAttempt=false\s*\n\s*setStatus\(\{kind:'success'/);
+  assert.match(source, /Refreshing the page…/);
+  assert.match(source, /Actualizando la página…/);
+  assert.match(source, /window\.setTimeout\(\(\)=>window\.location\.reload\(\),700\)/);
+  assert.match(source, /finally\{if\(unlockAfterAttempt\)setSaving\(false\)\}/);
 });
 
 test('Fresh Church Setup warns pilot testers not to upload sensitive real-world records', () => {
