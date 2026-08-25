@@ -28,10 +28,14 @@ test('Fresh Church Setup keeps upload diagnostics bounded instead of logging raw
   assert.match(source, /SetupUploader metadata insert transport failed'\,\{churchId,code:boundedCode\(error\)\}/);
 });
 
-test('Fresh Church Setup retries orphan cleanup and warns against duplicate re-upload when cleanup is uncertain', () => {
+test('Fresh Church Setup retries orphan cleanup and requires confirmed deletion before encouraging re-upload', () => {
   assert.match(source, /const cleanupUploadedFile=async\(\)=>\{/);
   assert.match(source, /for\(let attempt=1;attempt<=2;attempt\+\+\)/);
-  assert.match(source, /if\(!cleanup\.error\)return true/);
+  assert.match(source, /const confirmedDeleted=!cleanup\.error&&Array\.isArray\(cleanup\.data\)&&cleanup\.data\.some/);
+  assert.match(source, /item\.name===path\|\|path\.endsWith\(`/);
+  assert.match(source, /if\(confirmedDeleted\)return true/);
+  assert.match(source, /SetupUploader cleanup unconfirmed/);
+  assert.match(source, /DELETE_NOT_CONFIRMED/);
   assert.match(source, /return false/);
   assert.match(source, /if\(!\(await cleanupUploadedFile\(\)\)\)\{failCleanupUncertain\(\);return\}/);
   assert.match(source, /Do not upload this same file again yet\./);
