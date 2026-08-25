@@ -14,19 +14,26 @@ const statusCopy={
 } as const
 
 type PrivacyStatus=keyof typeof statusCopy
-const bounded=(value:unknown)=>String(value||'unknown').slice(0,80)
+const bounded=(value:unknown)=>String(value||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,80)||'unknown'
+const thrownCode=(error:unknown)=>bounded((error as {code?:unknown})?.code??(error instanceof Error?error.name:'thrown'))
 
 export default async function PrivacyPage({searchParams}:{searchParams:Promise<{saved?:string;status?:string;error?:string;lang?:string}>}){
   const query=await searchParams,es=query.lang==='es',t=(en:string,sp:string)=>es?sp:en,l=(path:string)=>es?`${path}${path.includes('?')?'&':'?'}lang=es`:path
   const recovery=(code:string)=>{console.error('Privacy page unavailable',{code});return <main className="shell"><section className="card" style={{maxWidth:720,margin:'40px auto',padding:24}}><div className="pill">{t('PRIVACY','PRIVACIDAD')}</div><h1>{t('We could not load your privacy settings.','No pudimos cargar tu configuración de privacidad.')}</h1><p className="muted">{t('Nothing was changed. Please try again.','No se cambió nada. Inténtalo otra vez.')}</p><div className="row"><Link className="btn" href={l('/account/privacy')}>{t('Try again','Intentar otra vez')}</Link><Link className="ghost" href={l('/')}>{t('Home','Inicio')}</Link></div></section></main>}
-  const supabase=await createClient(),{data:claims,error:claimsError}=await supabase.auth.getClaims(),userId=claims?.claims?.sub
+  let supabase
+  try{supabase=await createClient()}catch(error){return recovery(`client:${thrownCode(error)}`)}
+  let claimsResult
+  try{claimsResult=await supabase.auth.getClaims()}catch(error){return recovery(`claims:${thrownCode(error)}`)}
+  const {data:claims,error:claimsError}=claimsResult,userId=claims?.claims?.sub
   if(claimsError)return recovery(`claims:${bounded(claimsError.code)}`)
-  if(!userId)redirect(l('/login'))
-  const membershipResult=await supabase.from('church_memberships').select('church_id,churches(name)').eq('user_id',userId).eq('status','active').limit(1).maybeSingle()
+  if(!userId)redirect(`/login?mode=signin&lang=${es?'es':'en'}`)
+  let membershipResult
+  try{membershipResult=await supabase.from('church_memberships').select('church_id,churches(name)').eq('user_id',userId).eq('status','active').limit(1).maybeSingle()}catch(error){return recovery(`membership:${thrownCode(error)}`)}
   if(membershipResult.error)return recovery(`membership:${bounded(membershipResult.error.code)}`)
   const membership=membershipResult.data
   if(!membership?.church_id)redirect(l('/'))
-  const profileResult=await supabase.from('profiles').select('directory_visible,messaging_preference,show_contact_email,show_verified_credentials,show_learning_trophies,contact_email').eq('id',userId).maybeSingle()
+  let profileResult
+  try{profileResult=await supabase.from('profiles').select('directory_visible,messaging_preference,show_contact_email,show_verified_credentials,show_learning_trophies,contact_email').eq('id',userId).maybeSingle()}catch(error){return recovery(`profile:${thrownCode(error)}`)}
   if(profileResult.error)return recovery(`profile:${bounded(profileResult.error.code)}`)
   const profile=profileResult.data
   const church:any=Array.isArray(membership.churches)?membership.churches[0]:membership.churches
