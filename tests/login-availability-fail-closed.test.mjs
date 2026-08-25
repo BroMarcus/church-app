@@ -14,7 +14,7 @@ test('login page distinguishes availability failures from real closed or invalid
   assert.match(page,/publicStatusFailed=Boolean\(publicStatusError\)\|\|publicStatusInvalid/)
   assert.match(page,/const validInvite=!inviteMalformed&&!inviteCheckFailed&&!inviteDecisionInvalid&&invite\?\.valid===true/)
   assert.match(page,/const availabilityFailed=inviteCheckFailed\|\|inviteDecisionInvalid\|\|\(!explicitSignin&&!validInvite&&publicStatusFailed\)/)
-  assert.match(page,/const invalidInviteKnown=Boolean\(params\.invite\)&&!validInvite&&!inviteCheckFailed&&!inviteDecisionInvalid/)
+  assert.match(page,/const invalidInviteKnown=Boolean\(params\.invite\)&&!inviteMalformed&&!validInvite&&!inviteCheckFailed&&!inviteDecisionInvalid/)
   assert.match(page,/!explicitSignin&&!params\.invite&&!publicOpen&&!publicStatusFailed/)
   assert.doesNotMatch(page,/Boolean\(invite\?\.valid\)/)
 })
@@ -22,7 +22,7 @@ test('login page distinguishes availability failures from real closed or invalid
 test('explicit returning-user sign in does not depend on public signup availability',()=>{
   assert.match(page,/const explicitSignin=params\.mode===['"]signin['"]/)
   assert.match(page,/if\(!explicitSignin\)\{[\s\S]*get_public_signup_status/)
-  assert.match(page,/const canCreate=!explicitSignin&&!availabilityFailed&&\(validInvite\|\|publicOpen\)/)
+  assert.match(page,/const canCreate=!explicitSignin&&!inviteMalformed&&!availabilityFailed&&\(validInvite\|\|publicOpen\)/)
   assert.match(page,/const mode=explicitSignin\|\|!canCreate\?['"]signin['"]:['"]signup['"]/)
   assert.match(page,/!explicitSignin&&!params\.invite&&!publicOpen&&!publicStatusFailed/)
   assert.ok(page.includes("invalidSignin:'That invitation is no longer available. Sign in with your same account."))
@@ -38,6 +38,15 @@ test('known unusable invitations never claim signup is open when public signup i
   assert.match(page,/explicitSignin\?t\.invalidSignin:\(publicOpen\?t\.invalidOpen:t\.invalidClosed\)/)
   assert.match(page,/gridTemplateColumns:canCreate\?'1fr 1fr':'1fr'/)
   assert.match(page,/\{canCreate&&<Link className=\{mode==='signup'\?'btn':'ghost'\} href=\{query\('signup'\)\}>\{t\.create\}<\/Link>\}/)
+})
+
+test('temporary private-invite preview failures preserve same-account sign-in and recovery context without enabling signup',()=>{
+  assert.match(page,/const carryInviteContext=Boolean\(inviteParam\)&&!invalidInviteKnown/)
+  assert.match(page,/const canCreate=!explicitSignin&&!inviteMalformed&&!availabilityFailed&&\(validInvite\|\|publicOpen\)/)
+  assert.match(page,/<form action=\{login\}>[\s\S]*\{carryInviteContext&&<input type="hidden" name="invite_id" value=\{inviteParam\}\/>\}/)
+  assert.match(page,/<details[\s\S]*<form>[\s\S]*\{carryInviteContext&&<input type="hidden" name="invite_id" value=\{inviteParam\}\/>\}/)
+  assert.match(page,/<form action=\{signup\}>[\s\S]*\{validInvite&&<input type="hidden" name="invite_id" value=\{inviteParam\}\/>\}/)
+  assert.doesNotMatch(page,/<form action=\{signup\}>[\s\S]*\{carryInviteContext&&<input type="hidden" name="invite_id"/)
 })
 
 test('sign in branches on stable Auth codes and keeps uncertain failures neutral',()=>{
