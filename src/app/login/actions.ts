@@ -99,7 +99,7 @@ export async function login(formData:FormData){
   const rawInviteId=text(formData,'invite_id'),inviteId=safeInviteId(rawInviteId)
   const invitePart=inviteId?`&invite=${encodeURIComponent(inviteId)}`:''
   const nextPart=next?`&next=${encodeURIComponent(next)}`:''
-  if(rawInviteId&&!inviteId)redirect(loginUrl(lang,'&mode=signin'+statusPart('error','invite_invalid')))
+  if(rawInviteId&&!inviteId)redirect(loginUrl(lang,'&mode=signin'+statusPart('error','invite_malformed')))
   const email=text(formData,'email').toLowerCase(),password=String(formData.get('password')??'')
   const emailError=emailIssue(email)
   if(emailError)redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error',emailError)))
@@ -179,7 +179,7 @@ export async function signup(formData:FormData){
   const inviteId=safeInviteId(rawInviteId)
   const invitePart=inviteId?`&invite=${encodeURIComponent(inviteId)}`:''
   const fail=(code:string)=>redirect(loginUrl(lang,invitePart+'&mode=signup'+statusPart('error',code)))
-  if(rawInviteId&&!inviteId)fail('invite_invalid')
+  if(rawInviteId&&!inviteId)redirect(loginUrl(lang,'&mode=signin'+statusPart('error','invite_malformed')))
   if(!firstName||!lastName)fail('missing_name')
   if(firstName.length>NAME_MAX||lastName.length>NAME_MAX)fail('name_too_long')
   const emailError=emailIssue(email)
@@ -263,7 +263,7 @@ export async function requestPasswordReset(formData:FormData){
   const rawInviteId=text(formData,'invite_id'),inviteId=safeInviteId(rawInviteId)
   const invitePart=inviteId?`&invite=${encodeURIComponent(inviteId)}`:''
   const nextPart=next?`&next=${encodeURIComponent(next)}`:''
-  if(rawInviteId&&!inviteId)redirect(loginUrl(lang,'&mode=signin'+statusPart('error','invite_invalid')))
+  if(rawInviteId&&!inviteId)redirect(loginUrl(lang,'&mode=signin'+statusPart('error','invite_malformed')))
   const email=text(formData,'reset_email').toLowerCase()
   const emailError=emailIssue(email)
   if(emailError)redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error',emailError)))
@@ -287,7 +287,7 @@ export async function resendConfirmation(formData:FormData){
   const rawInviteId=text(formData,'invite_id'),inviteId=safeInviteId(rawInviteId)
   const invitePart=inviteId?`&invite=${encodeURIComponent(inviteId)}`:''
   const nextPart=next?`&next=${encodeURIComponent(next)}`:''
-  if(rawInviteId&&!inviteId)redirect(loginUrl(lang,'&mode=signin'+statusPart('error','invite_invalid')))
+  if(rawInviteId&&!inviteId)redirect(loginUrl(lang,'&mode=signin'+statusPart('error','invite_malformed')))
   const email=text(formData,'reset_email').toLowerCase()
   const emailError=emailIssue(email)
   if(emailError)redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error',emailError)))
