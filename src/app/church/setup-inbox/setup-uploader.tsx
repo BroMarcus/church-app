@@ -22,6 +22,7 @@ export function SetupUploader({churchId,userId,lang}:{churchId:string;userId:str
  const [saving,setSaving]=useState(false),[status,setStatus]=useState<UploadStatus>(null)
  const es=lang==='es'
  const fail=(message?:string)=>setStatus({kind:'error',message:message||(es?'No se pudo subir el archivo. Inténtalo de nuevo.':'The file could not be uploaded. Try again.')})
+ const failCleanupUncertain=()=>fail(es?'No pudimos terminar ni confirmar la limpieza de este archivo. No vuelvas a subir este mismo archivo todavía. Inténtalo más tarde o pide ayuda si se repite.':'We could not finish or confirm cleanup for this file. Do not upload this same file again yet. Try later or ask for help if it repeats.')
  async function submit(formData:FormData){
   if(saving)return
   const file=formData.get('file') as File|null
@@ -34,23 +35,29 @@ export function SetupUploader({churchId,userId,lang}:{churchId:string;userId:str
    const supabase=createClient();const path=`${churchId}/${crypto.randomUUID()}/${clean(file.name)}`
    const upload=await supabase.storage.from('church-setup').upload(path,file,{contentType:file.type||undefined,upsert:false})
    if(upload.error){console.error('SetupUploader storage upload failed',{churchId,code:boundedCode(upload.error)});fail();return}
-   const categoryValue=String(formData.get('category')||'unsorted'),category=allowedCategories.has(categoryValue)?categoryValue:'unsorted'
-   const notes=String(formData.get('notes')||'').trim().slice(0,1000)||null
-   const insert=await supabase.from('church_setup_uploads').insert({church_id:churchId,uploaded_by:userId,file_name:file.name.slice(0,255),storage_path:path,content_type:file.type||null,size_bytes:file.size,category,notes,suggested_destination:category==='curriculum'?'Learning Center':category==='branding'?'Church Settings / Media':category==='leadership'?'Leadership records':category==='forms'?'Forms & workflows':category==='calendar'?'Calendar':'Kingdom Guide review queue'})
-   if(insert.error){
-    console.error('SetupUploader metadata insert failed',{churchId,code:boundedCode(insert.error)})
-    let cleanupConfirmed=false
-    for(let attempt=1;attempt<=2&&!cleanupConfirmed;attempt++){
+   const cleanupUploadedFile=async()=>{
+    for(let attempt=1;attempt<=2;attempt++){
      try{
       const cleanup=await supabase.storage.from('church-setup').remove([path])
-      if(cleanup.error)console.error('SetupUploader cleanup failed',{churchId,attempt,code:boundedCode(cleanup.error)})
-      else cleanupConfirmed=true
+      if(!cleanup.error)return true
+      console.error('SetupUploader cleanup failed',{churchId,attempt,code:boundedCode(cleanup.error)})
      }catch(error){console.error('SetupUploader cleanup transport failed',{churchId,attempt,code:boundedCode(error)})}
     }
-    if(!cleanupConfirmed){
-     fail(es?'No pudimos terminar ni confirmar la limpieza de este archivo. No vuelvas a subir este mismo archivo todavía. Inténtalo más tarde o pide ayuda si se repite.':'We could not finish or confirm cleanup for this file. Do not upload this same file again yet. Try later or ask for help if it repeats.')
-     return
-    }
+    return false
+   }
+   const categoryValue=String(formData.get('category')||'unsorted'),category=allowedCategories.has(categoryValue)?categoryValue:'unsorted'
+   const notes=String(formData.get('notes')||'').trim().slice(0,1000)||null
+   let insert
+   try{
+    insert=await supabase.from('church_setup_uploads').insert({church_id:churchId,uploaded_by:userId,file_name:file.name.slice(0,255),storage_path:path,content_type:file.type||null,size_bytes:file.size,category,notes,suggested_destination:category==='curriculum'?'Learning Center':category==='branding'?'Church Settings / Media':category==='leadership'?'Leadership records':category==='forms'?'Forms & workflows':category==='calendar'?'Calendar':'Kingdom Guide review queue'})
+   }catch(error){
+    console.error('SetupUploader metadata insert transport failed',{churchId,code:boundedCode(error)})
+    if(!(await cleanupUploadedFile())){failCleanupUncertain();return}
+    fail();return
+   }
+   if(insert.error){
+    console.error('SetupUploader metadata insert failed',{churchId,code:boundedCode(insert.error)})
+    if(!(await cleanupUploadedFile())){failCleanupUncertain();return}
     fail();return
    }
    setStatus({kind:'success',message:es?'Recibido. Kingdom Network lo agregó a la bandeja de configuración.':'Received. Kingdom Network added it to the setup inbox.'})
