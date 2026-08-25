@@ -42,10 +42,11 @@ test('invitation recovery copy prevents unsafe assumptions, duplicate work, and 
   assert.match(personError,/Revisa las invitaciones existentes antes de crear otra/)
 })
 
-test('Join Center and Invitations catch thrown startup/read failures and keep returning users on Sign In',()=>{
+test('all invitation admin pages catch thrown startup/read failures and keep returning users on Sign In',()=>{
   const join=read('src/app/church/join-center/page.tsx')
   const invites=read('src/app/church/invites/page.tsx')
-  for(const [name,source] of [['Join Center',join],['Invitations',invites]]){
+  const person=read('src/app/church/invite-person/page.tsx')
+  for(const [name,source] of [['Join Center',join],['Invitations',invites],['Invite Person',person]]){
     assert.match(source,/try\{supabase=await createClient\(\)\}/,`${name} should catch client startup`)
     assert.match(source,/try\{claimsResult=await supabase\.auth\.getClaims\(\)\}/,`${name} should catch Auth transport failures`)
     assert.match(source,/membership transport failed/,`${name} should catch membership transport failures`)
@@ -56,4 +57,6 @@ test('Join Center and Invitations catch thrown startup/read failures and keep re
   assert.match(join,/public signup status transport failed/)
   assert.match(invites,/member invitations list transport failed/)
   assert.match(invites,/member invitations profile labels transport failed/)
+  assert.match(person,/invite-person permission transport failed/)
+  assert.match(person,/created invitation lookup transport failed/)
 })
