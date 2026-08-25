@@ -171,7 +171,7 @@ export async function verifyAuthLink(formData:FormData){
   if(rawType==='email')redirect(signupNext)
   if(rawType==='invite')redirect(signupFallback)
   if(rawType==='magiclink')redirect(joinNext||(lang==='es'?'/?lang=es':'/'))
-  if(rawType==='email_change')redirect(`/account/security?lang=${lang}&email=1`)
+  if(rawType==='email_change')redirect(`/account/security?lang=${lang}`)
 
   redirect(`${loginBase}&error_code=callback_incomplete`)
 }
