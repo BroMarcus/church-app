@@ -2,18 +2,29 @@
 
 import {useEffect,useState} from 'react'
 
+const boundedDigest=(value:unknown)=>String(value||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,80)||'unknown'
+
 export default function HomeError({error,reset}:{error:Error&{digest?:string};reset:()=>void}){
   const [lang,setLang]=useState<'en'|'es'>('en')
 
   useEffect(()=>{
-    console.error('Kingdom Network page failed',{digest:error.digest??'unknown'})
-    setLang(new URLSearchParams(window.location.search).get('lang')==='es'?'es':'en')
+    console.error('Kingdom Network page failed',{digest:boundedDigest(error.digest)})
+    const selected=new URLSearchParams(window.location.search).get('lang')==='es'?'es':'en'
+    setLang(selected)
+    document.documentElement.lang=selected
   },[error])
 
   const es=lang==='es'
   const t=(en:string,sp:string)=>es?sp:en
   const withLang=(path:string)=>es?`${path}${path.includes('?')?'&':'?'}lang=es`:path
   const go=(path:string)=>{window.location.assign(withLang(path))}
+  const selectLanguage=(next:'en'|'es')=>{
+    setLang(next)
+    document.documentElement.lang=next
+    const url=new URL(window.location.href)
+    url.searchParams.set('lang',next)
+    window.history.replaceState(window.history.state,'',`${url.pathname}${url.search}${url.hash}`)
+  }
 
   return <main style={{maxWidth:760,margin:'0 auto',padding:'28px 18px 80px'}}>
     <div role="alert" aria-live="assertive" style={{border:'1px solid #fecaca',borderRadius:18,padding:24,background:'#fff'}}>
@@ -26,8 +37,8 @@ export default function HomeError({error,reset}:{error:Error&{digest?:string};re
         <button type="button" onClick={()=>go('/login?mode=signin')} style={{minHeight:44,padding:'10px 16px',borderRadius:10,border:'1px solid #d1d5db',background:'#fff',fontWeight:700,cursor:'pointer'}}>{t('Sign in','Iniciar sesión')}</button>
       </div>
       <div style={{display:'flex',gap:8,marginTop:18,flexWrap:'wrap'}} aria-label={t('Language','Idioma')}>
-        <button type="button" onClick={()=>setLang('en')} aria-pressed={!es} style={{border:0,background:'transparent',textDecoration:'underline',cursor:'pointer'}}>English</button>
-        <button type="button" onClick={()=>setLang('es')} aria-pressed={es} style={{border:0,background:'transparent',textDecoration:'underline',cursor:'pointer'}}>Español</button>
+        <button type="button" onClick={()=>selectLanguage('en')} aria-pressed={!es} style={{border:0,background:'transparent',textDecoration:'underline',cursor:'pointer'}}>English</button>
+        <button type="button" onClick={()=>selectLanguage('es')} aria-pressed={es} style={{border:0,background:'transparent',textDecoration:'underline',cursor:'pointer'}}>Español</button>
       </div>
     </div>
   </main>
