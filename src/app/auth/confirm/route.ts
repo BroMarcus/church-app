@@ -58,7 +58,10 @@ function legacyRedirectContext(raw:string|null,fallback:string){
       if(mode==='recovery'){
         return {inviteId,signupNext:'',recoveryNext:safeJoinDestination(redirectTarget.searchParams.get('next'))}
       }
-      return {inviteId,signupNext:safeSignupDestination(redirectTarget.searchParams.get('next'),fallback),recoveryNext:''}
+      if(mode==='signup'){
+        return {inviteId,signupNext:safeSignupDestination(redirectTarget.searchParams.get('next'),fallback),recoveryNext:''}
+      }
+      return empty
     }
 
     if(redirectTarget.pathname==='/auth/update-password'){
