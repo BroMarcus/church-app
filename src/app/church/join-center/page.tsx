@@ -7,6 +7,11 @@ import { JoinQr } from './join-qr'
 
 const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
 const boundedCode=(value:unknown)=>String(value??'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48)||'unknown'
+const diagnosticCode=(error:unknown,fallback:string)=>{
+  if(error&&typeof error==='object'&&'code' in error)return boundedCode((error as {code?:unknown}).code)
+  if(error instanceof Error)return boundedCode(error.name)
+  return boundedCode(fallback)
+}
 type Lang='en'|'es'
 
 function AccessRecovery({lang,kind}:{lang:Lang;kind:'unavailable'|'unauthorized'}){
@@ -16,14 +21,35 @@ function AccessRecovery({lang,kind}:{lang:Lang;kind:'unavailable'|'unauthorized'
 
 export default async function JoinCenterPage({searchParams}:{searchParams:Promise<{lang?:string}>}){
   const params=await searchParams,es=params.lang==='es',lang:Lang=es?'es':'en';const l=(p:string)=>`${p}${p.includes('?')?'&':'?'}lang=${lang}`
-  const supabase=await createClient();const {data:claims,error:claimsError}=await supabase.auth.getClaims();const userId=claims?.claims?.sub
+  let supabase
+  try{supabase=await createClient()}
+  catch(error){console.error('join center client unavailable',{errorCode:diagnosticCode(error,'client_unavailable')});return <AccessRecovery lang={lang} kind="unavailable"/>}
+
+  let claimsResult
+  try{claimsResult=await supabase.auth.getClaims()}
+  catch(error){console.error('join center auth transport failed',{errorCode:diagnosticCode(error,'auth_unavailable')});return <AccessRecovery lang={lang} kind="unavailable"/>}
+  const {data:claims,error:claimsError}=claimsResult
+  const userId=claims?.claims?.sub
   if(claimsError){console.error('join center auth lookup failed',{errorCode:boundedCode(claimsError.code)});return <AccessRecovery lang={lang} kind="unavailable"/>}
-  if(!userId)redirect(`/login?lang=${lang}&next=${encodeURIComponent(l('/church/join-center'))}`)
-  const {data:membership,error:membershipError}=await supabase.from('church_memberships').select('church_id,role,churches(name,slug,public_signup_enabled)').eq('user_id',userId).eq('status','active').limit(1).maybeSingle()
+  if(!userId)redirect(`/login?lang=${lang}&mode=signin&next=${encodeURIComponent(l('/church/join-center'))}`)
+
+  let membershipResult
+  try{membershipResult=await supabase.from('church_memberships').select('church_id,role,churches(name,slug,public_signup_enabled)').eq('user_id',userId).eq('status','active').limit(1).maybeSingle()}
+  catch(error){console.error('join center membership transport failed',{errorCode:diagnosticCode(error,'membership_unavailable')});return <AccessRecovery lang={lang} kind="unavailable"/>}
+  const {data:membership,error:membershipError}=membershipResult
   if(membershipError){console.error('join center membership lookup failed',{errorCode:boundedCode(membershipError.code)});return <AccessRecovery lang={lang} kind="unavailable"/>}
   if(!membership?.church_id||!['pastor','church_admin'].includes(membership.role))return <AccessRecovery lang={lang} kind="unauthorized"/>
   const church:any=Array.isArray(membership.churches)?membership.churches[0]:membership.churches;const slug=church?.slug;if(!slug)redirect(l('/church/settings'))
-  const {data:statusData,error:statusError}=await supabase.rpc('get_public_signup_status_for_church',{p_church_slug:slug})
+
+  let statusData:any=null,statusError:any=null
+  try{
+    const statusResult=await supabase.rpc('get_public_signup_status_for_church',{p_church_slug:slug})
+    statusData=statusResult.data
+    statusError=statusResult.error
+  }catch(error){
+    statusError={code:diagnosticCode(error,'signup_status_unavailable')}
+    console.error('join center public signup status transport failed',{errorCode:diagnosticCode(error,'signup_status_unavailable')})
+  }
   const status:any=!statusError?(Array.isArray(statusData)?statusData[0]:statusData):null
   if(statusError)console.error('join center public signup status failed',{errorCode:boundedCode(statusError.code)})
   if(!statusError&&!status)console.error('join center public signup status empty',{errorCode:'empty_status'})
