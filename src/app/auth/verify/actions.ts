@@ -82,7 +82,7 @@ export async function verifyAuthLink(formData:FormData){
     redirect(`${loginBase}&error_code=callback_incomplete`)
   }
   if(inviteId&&rawType!=='email'&&rawType!=='recovery'){
-    redirect(`${loginBase}&error_code=invite_context_invalid`)
+    redirect(`${loginBase}&error_code=invite_malformed`)
   }
 
   let supabase:Awaited<ReturnType<typeof createClient>>
