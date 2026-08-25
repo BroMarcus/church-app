@@ -49,8 +49,10 @@ export default function PhoneProofError({ reset }: { error: Error & { digest?: s
         <div className="pill">{t.pill}</div>
         <h1>{t.title}</h1>
         <p>{t.body}</p>
+        <div className="proof-actions">
+          <button type="button" className="primary" onClick={reset}>{t.retry}</button>
+        </div>
         <div className="proof-links">
-          <button type="button" onClick={reset}>{t.retry}</button>
           <Link href={`/church/readiness${langQuery}`}>{t.readiness}</Link>
           <Link href={`/login${langQuery}&mode=signin`}>{t.signIn}</Link>
         </div>
