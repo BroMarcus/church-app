@@ -95,7 +95,7 @@ export async function GET(request:NextRequest){
 
   if(explicitInviteRaw&&!explicitInviteId){
     const nextPart=joinNext?`&next=${encodeURIComponent(joinNext)}`:''
-    return NextResponse.redirect(new URL(`/login?lang=${lang}&mode=signin${nextPart}&error_code=invite_invalid`,siteUrl))
+    return NextResponse.redirect(new URL(`/login?lang=${lang}&mode=signin${nextPart}&error_code=invite_malformed`,siteUrl))
   }
 
   if(!tokenHash||tokenHash.length>MAX_AUTH_VALUE_LENGTH||!type||!allowedTypes.has(type)){
