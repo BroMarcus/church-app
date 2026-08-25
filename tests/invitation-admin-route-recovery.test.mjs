@@ -41,3 +41,19 @@ test('invitation recovery copy prevents unsafe assumptions, duplicate work, and 
   assert.match(personError,/Review existing invitations before creating another one/)
   assert.match(personError,/Revisa las invitaciones existentes antes de crear otra/)
 })
+
+test('Join Center and Invitations catch thrown startup/read failures and keep returning users on Sign In',()=>{
+  const join=read('src/app/church/join-center/page.tsx')
+  const invites=read('src/app/church/invites/page.tsx')
+  for(const [name,source] of [['Join Center',join],['Invitations',invites]]){
+    assert.match(source,/try\{supabase=await createClient\(\)\}/,`${name} should catch client startup`)
+    assert.match(source,/try\{claimsResult=await supabase\.auth\.getClaims\(\)\}/,`${name} should catch Auth transport failures`)
+    assert.match(source,/membership transport failed/,`${name} should catch membership transport failures`)
+    assert.match(source,/mode=signin&next=/,`${name} signed-out recovery should force Sign In`)
+    assert.match(source,/const diagnosticCode=/,`${name} should bound thrown diagnostics`)
+    assert.doesNotMatch(source,/error\.message/,`${name} should not expose thrown provider text`)
+  }
+  assert.match(join,/public signup status transport failed/)
+  assert.match(invites,/member invitations list transport failed/)
+  assert.match(invites,/member invitations profile labels transport failed/)
+})
