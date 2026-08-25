@@ -30,9 +30,13 @@ test('failed invite redemption verifies local cleanup before claiming the browse
   assert.match(loginActions,/if\(!cleanupSucceeded\)redirect\(`\/account\/security\?lang=\$\{lang\}&invite=\$\{encodeURIComponent\(inviteId\)\}&status=signout_failed`\)/)
 })
 
-test('login page carries only a validated open invite into sign-in and recovery actions',()=>{
+test('login page keeps a syntactically safe private invite through temporary preview uncertainty but never uses uncertainty to enable signup',()=>{
   assert.match(loginPage,/INVITE_ID_PATTERN/)
-  assert.match(loginPage,/validInvite&&<input type="hidden" name="invite_id" value=\{inviteParam\}/)
+  assert.match(loginPage,/const carryInviteContext=Boolean\(inviteParam\)&&!invalidInviteKnown/)
+  assert.match(loginPage,/<form action=\{login\}>[\s\S]*carryInviteContext&&<input type="hidden" name="invite_id" value=\{inviteParam\}/)
+  assert.match(loginPage,/<details[\s\S]*carryInviteContext&&<input type="hidden" name="invite_id" value=\{inviteParam\}/)
+  assert.match(loginPage,/<form action=\{signup\}>[\s\S]*validInvite&&<input type="hidden" name="invite_id" value=\{inviteParam\}/)
+  assert.match(loginPage,/const canCreate=!explicitSignin&&!inviteMalformed&&!availabilityFailed&&\(validInvite\|\|publicOpen\)/)
   assert.match(loginPage,/inviteReturning/)
   assert.match(loginPage,/do not create a second account/i)
   assert.match(loginPage,/no crees una segunda cuenta/i)
