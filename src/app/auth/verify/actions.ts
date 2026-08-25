@@ -73,13 +73,16 @@ export async function verifyAuthLink(formData:FormData){
   const inviteId=safeInviteId(rawInviteId)
   const joinNext=safeJoinDestination(rawNext)
   const signupFallback=`/start?welcome=1${lang==='es'?'&lang=es':''}`
-  const next=rawType==='recovery'?joinNext:safeSignupDestination(rawNext,signupFallback)
+  const signupNext=safeSignupDestination(rawNext,signupFallback)
   const invitePart=inviteId?`&invite=${encodeURIComponent(inviteId)}`:''
   const loginBase=`/login?lang=${lang}&mode=signin${invitePart}${joinNext?`&next=${encodeURIComponent(joinNext)}`:''}`
 
   if(rawInviteId&&!inviteId)redirect(`${loginBase}&error_code=invite_invalid`)
   if(!tokenHash||tokenHash.length>MAX_AUTH_VALUE_LENGTH||!allowedTypes.includes(rawType as EmailOtpType)){
     redirect(`${loginBase}&error_code=callback_incomplete`)
+  }
+  if(inviteId&&rawType!=='email'&&rawType!=='recovery'){
+    redirect(`${loginBase}&error_code=invite_context_invalid`)
   }
 
   let supabase:Awaited<ReturnType<typeof createClient>>
@@ -165,5 +168,10 @@ export async function verifyAuthLink(formData:FormData){
     redirect(`/start?lang=${lang}&message_code=joined_invite`)
   }
 
-  redirect(next)
+  if(rawType==='email')redirect(signupNext)
+  if(rawType==='invite')redirect(signupFallback)
+  if(rawType==='magiclink')redirect(joinNext||(lang==='es'?'/?lang=es':'/'))
+  if(rawType==='email_change')redirect(`/account/security?lang=${lang}&email=1`)
+
+  redirect(`${loginBase}&error_code=callback_incomplete`)
 }
