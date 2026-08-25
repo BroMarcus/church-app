@@ -10,16 +10,17 @@ test('token-hash verification routes each supported auth purpose explicitly',()=
   assert.match(action,/if\(rawType==='email'\)redirect\(signupNext\)/)
   assert.match(action,/if\(rawType==='invite'\)redirect\(signupFallback\)/)
   assert.match(action,/if\(rawType==='magiclink'\)redirect\(joinNext\|\|\(lang==='es'\?'\/\?lang=es':'\/'\)\)/)
-  assert.match(action,/if\(rawType==='email_change'\)redirect\(`\/account\/security\?lang=\$\{lang\}&email=1`\)/)
+  assert.match(action,/if\(rawType==='email_change'\)redirect\(`\/account\/security\?lang=\$\{lang\}`\)/)
 })
 
-test('email-change verification cannot fall through to first-login Start Here routing',()=>{
+test('email-change verification cannot fall through to first-login Start Here routing or stale request guidance',()=>{
   const emailChangeIndex=action.indexOf("if(rawType==='email_change')")
   const finalFallbackIndex=action.lastIndexOf("redirect(`${loginBase}&error_code=callback_incomplete`)")
   assert.ok(emailChangeIndex>0)
   assert.ok(finalFallbackIndex>emailChangeIndex)
   assert.match(action.slice(emailChangeIndex,finalFallbackIndex),/account\/security/)
   assert.doesNotMatch(action.slice(emailChangeIndex,finalFallbackIndex),/\/start\?welcome=1/)
+  assert.doesNotMatch(action.slice(emailChangeIndex,finalFallbackIndex),/&email=1/)
 })
 
 test('private church invite context is only accepted with email confirmation or password recovery links',()=>{
