@@ -1,12 +1,8 @@
 'use client'
 
-export default function InvitesError({reset}:{reset:()=>void}){
-  return <main style={{maxWidth:1000,margin:'0 auto',padding:'28px 18px 80px'}}>
-    <div role="alert" style={{border:'1px solid #fecaca',borderRadius:18,padding:24,background:'#fff'}}>
-      <div style={{fontSize:12,fontWeight:800,letterSpacing:'.08em',textTransform:'uppercase'}}>Church Invitations / Invitaciones de la Iglesia</div>
-      <h1 style={{margin:'10px 0 8px'}}>Invitations could not load. / No se pudieron cargar las invitaciones.</h1>
-      <p style={{margin:'0 0 16px',color:'#6b7280'}}>No invitation, membership, or church access was changed. / No se cambió ninguna invitación, membresía ni acceso a la iglesia.</p>
-      <button type="button" onClick={()=>reset()} style={{minHeight:44,padding:'10px 16px',borderRadius:10,border:'1px solid #d1d5db',background:'#fff',fontWeight:700,cursor:'pointer'}}>Try again / Intentar de nuevo</button>
-    </div>
-  </main>
-}
+import Link from 'next/link'
+import {useEffect,useState} from 'react'
+type Lang='en'|'es'
+const copy={en:{pill:'CHURCH INVITATIONS',title:'We could not verify invitations',body:'This may be a temporary connection or account-check problem. No invitation, membership, or church access was changed. Refresh before creating, copying, or revoking an invitation.',retry:'Try Invitations again',admin:'Church Admin',signIn:'Sign in again'},es:{pill:'INVITACIONES DE LA IGLESIA',title:'No pudimos verificar las invitaciones',body:'Puede ser un problema temporal de conexión o verificación de cuenta. No se cambió ninguna invitación, membresía ni acceso a la iglesia. Actualiza antes de crear, copiar o revocar una invitación.',retry:'Intentar Invitaciones otra vez',admin:'Administración',signIn:'Iniciar sesión otra vez'}} as const
+function currentLanguage():Lang{if(typeof window==='undefined')return'en';const requested=new URLSearchParams(window.location.search).get('lang');if(requested==='es')return'es';if(requested==='en')return'en';return document.documentElement.lang.toLowerCase().startsWith('es')?'es':'en'}
+export default function InvitesError({reset}:{error:Error&{digest?:string};reset:()=>void}){const[lang,setLang]=useState<Lang>('en');useEffect(()=>setLang(currentLanguage()),[]);const t=copy[lang];return <main className="shell"><header className="topbar"><Link href={`/?lang=${lang}`} className="brand">Kingdom <span>Network</span></Link></header><section className="card" role="alert" aria-live="assertive" style={{padding:26,marginTop:24,maxWidth:760}}><div className="pill">{t.pill}</div><h1>{t.title}</h1><p className="muted">{t.body}</p><div className="row" style={{gap:10,flexWrap:'wrap',marginTop:14}}><button className="btn" type="button" onClick={reset}>{t.retry}</button><Link className="ghost" href={`/church?lang=${lang}`}>{t.admin}</Link><Link className="ghost" href={`/login?lang=${lang}&mode=signin`}>{t.signIn}</Link></div></section></main>}
