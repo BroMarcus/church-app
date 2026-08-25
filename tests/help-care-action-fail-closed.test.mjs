@@ -3,7 +3,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 
-const actions=fs.readFileSync(path.join(process.cwd(),'src/app/help/actions.ts'),'utf8')
+const read=(file)=>fs.readFileSync(path.join(process.cwd(),file),'utf8')
+const actions=read('src/app/help/actions.ts')
+const page=read('src/app/help/page.tsx')
 
 test('Private Care server actions distinguish Auth uncertainty from a real signed-out user',()=>{
   assert.match(actions,/try\{supabase=await createClient\(\)\}catch\(error\)/)
@@ -33,12 +35,16 @@ test('Private Care consequential targets require UUID-shaped identifiers before 
 test('Private Care diagnostics stay bounded and do not expose provider messages',()=>{
   assert.match(actions,/replace\(\/\[\^a-zA-Z0-9_-\]\/g,''\)\.slice\(0,80\)/)
   assert.match(actions,/console\.error\('\[help-care\]',\{area,code:safeCode\(error\)\}\)/)
+  assert.match(page,/replace\(\/\[\^a-zA-Z0-9_-\]\/g,''\)\.slice\(0,80\)/)
   assert.doesNotMatch(actions,/\.message/)
   assert.doesNotMatch(actions,/console\.error\([^\n]*,\s*error\s*\)/)
 })
 
-test('Private Care preserves selected language through signed-out and no-membership recovery',()=>{
+test('Private Care preserves selected language and sends returning signed-out users directly to Sign In',()=>{
   assert.match(actions,/mode=signin&lang=\$\{lang\}/)
   assert.match(actions,/membership\?\.church_id\)redirect\(lang==='es'\?'\/\?lang=es':'\/'\)/)
   assert.match(actions,/helpUrl\(lang,'temporary_problem'\)/)
+  assert.match(page,/if\(!userId\)redirect\(`\/login\?mode=signin&lang=\$\{es\?'es':'en'\}`\)/)
+  assert.match(page,/if\(!membership\?\.church_id\)redirect\(l\('\/'\)\)/)
+  assert.doesNotMatch(page,/if\(!userId\)redirect\(l\('\/login'\)\)/)
 })
