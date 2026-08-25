@@ -24,6 +24,16 @@ test('Fresh Church Setup keeps upload diagnostics bounded instead of logging raw
   assert.match(source, /code:boundedCode\(upload\.error\)/);
   assert.match(source, /code:boundedCode\(insert\.error\)/);
   assert.match(source, /code:boundedCode\(cleanup\.error\)/);
+  assert.match(source, /SetupUploader cleanup transport failed'\,\{churchId,attempt,code:boundedCode\(error\)\}/);
+});
+
+test('Fresh Church Setup retries orphan cleanup and warns against duplicate re-upload when cleanup is uncertain', () => {
+  assert.match(source, /let cleanupConfirmed=false/);
+  assert.match(source, /for\(let attempt=1;attempt<=2&&!cleanupConfirmed;attempt\+\+\)/);
+  assert.match(source, /else cleanupConfirmed=true/);
+  assert.match(source, /if\(!cleanupConfirmed\)/);
+  assert.match(source, /Do not upload this same file again yet\./);
+  assert.match(source, /No vuelvas a subir este mismo archivo todavía\./);
 });
 
 test('Fresh Church Setup warns pilot testers not to upload sensitive real-world records', () => {
