@@ -28,21 +28,26 @@ export function PendingAction({label,pendingLabel,cooldownLabel,cooldownKey,cool
 
   useEffect(()=>{
     if(!successCode)return
-    const params=new URLSearchParams(window.location.search)
-    if(params.get('message_code')!==successCode)return
+    const url=new URL(window.location.href)
+    if(url.searchParams.get('message_code')!==successCode)return
     const now=Date.now()
     const until=now+cooldownSeconds*1000
     try{
       const existing=Number(window.localStorage.getItem(storageKey)||0)
       if(existing>now){
         setRemaining(Math.max(0,Math.ceil((existing-now)/1000)))
-        return
+      }else{
+        window.localStorage.setItem(storageKey,String(until))
+        setRemaining(cooldownSeconds)
       }
-      window.localStorage.setItem(storageKey,String(until))
     }catch{
       // Storage is optional. Keep this page safe; server-side rate limits remain the authority.
+      setRemaining(cooldownSeconds)
     }
-    setRemaining(cooldownSeconds)
+    // Consume the one-time success marker without a navigation. Otherwise a later refresh of the
+    // same stale success URL could incorrectly start a brand-new cooldown even though no email was sent.
+    url.searchParams.delete('message_code')
+    window.history.replaceState(window.history.state,'',`${url.pathname}${url.search}${url.hash}`)
   },[cooldownSeconds,storageKey,successCode])
 
   const cooling=remaining>0
