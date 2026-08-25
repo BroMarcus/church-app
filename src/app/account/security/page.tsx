@@ -21,6 +21,7 @@ const errorCopy={
 
 type ErrorStatus=keyof typeof errorCopy
 const boundedCode=(value:unknown)=>String(value||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,80)||'unknown'
+const thrownCode=(error:unknown)=>boundedCode((error as {code?:unknown})?.code??(error instanceof Error?error.name:'thrown'))
 const INVITE_ID_PATTERN=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 function safeInviteId(value:string|undefined){return value&&value.length<=128&&INVITE_ID_PATTERN.test(value)?value:''}
 function safeJoinNext(value:string|undefined){
@@ -32,13 +33,18 @@ export default async function AccountSecurityPage({searchParams}:{searchParams:P
   const contextPart=`${inviteId?`&invite=${encodeURIComponent(inviteId)}`:''}${joinNext?`&next=${encodeURIComponent(joinNext)}`:''}`
   const l=(path:string)=>es?`${path}${path.includes('?')?'&':'?'}lang=es`:path
   const securityHref=(lang:'en'|'es')=>`/account/security?lang=${lang}${contextPart}`
-  const supabase=await createClient()
-  const {data:claims,error:claimsError}=await supabase.auth.getClaims()
   const recovery=(code:string)=>{console.error('Account security unavailable',{code});return <main className="shell"><section className="card" style={{marginTop:24,maxWidth:720}}><div className="pill">{t('ACCOUNT SECURITY','SEGURIDAD DE LA CUENTA')}</div><h1>{t('We could not safely load Account Security.','No pudimos cargar Seguridad de la Cuenta de forma segura.')}</h1><p className="muted">{t('Nothing was changed. This is usually temporary. Try again; if it continues, return Home and use Help & Feedback.','No se cambió nada. Normalmente esto es temporal. Inténtalo otra vez; si continúa, vuelve a Inicio y usa Ayuda y Comentarios.')}</p><div className="row"><Link className="btn" href={securityHref(es?'es':'en')}>{t('Try again','Intentar otra vez')}</Link><Link className="ghost" href={l('/')}>{t('Home','Inicio')}</Link><Link className="ghost" href={l('/feedback')}>{t('Help & Feedback','Ayuda y Comentarios')}</Link></div></section></main>}
+  let supabase
+  try{supabase=await createClient()}catch(error){return recovery(`client:${thrownCode(error)}`)}
+  let claimsResult
+  try{claimsResult=await supabase.auth.getClaims()}catch(error){return recovery(`claims:${thrownCode(error)}`)}
+  const {data:claims,error:claimsError}=claimsResult
   if(claimsError)return recovery(`claims:${boundedCode(claimsError.code)}`)
   const userId=claims?.claims?.sub
   if(!userId)redirect(`/login?lang=${es?'es':'en'}&mode=signin${contextPart}`)
-  const {data:userData,error:userError}=await supabase.auth.getUser()
+  let userDataResult
+  try{userDataResult=await supabase.auth.getUser()}catch(error){return recovery(`user:${thrownCode(error)}`)}
+  const {data:userData,error:userError}=userDataResult
   if(userError)return recovery(`user:${boundedCode(userError.code)}`)
   const loginEmail=userData.user?.email||String(claims?.claims?.email??'')
   const status=(query.status&&Object.prototype.hasOwnProperty.call(errorCopy,query.status)?query.status:query.error?'generic':null) as ErrorStatus|null
