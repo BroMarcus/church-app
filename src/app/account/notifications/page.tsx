@@ -13,7 +13,8 @@ const statusCopy={
 } as const
 
 type NotificationStatus=keyof typeof statusCopy
-const bounded=(value:unknown)=>String(value||'unknown').slice(0,80)
+const bounded=(value:unknown)=>String(value||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,80)||'unknown'
+const thrownCode=(error:unknown)=>bounded((error as {code?:unknown})?.code??(error instanceof Error?error.name:'thrown'))
 
 export default async function NotificationPreferencesPage({searchParams}:{searchParams:Promise<{saved?:string;status?:string;error?:string;lang?:string}>}){
   const query=await searchParams,es=query.lang==='es',t=(en:string,sp:string)=>es?sp:en,l=(path:string)=>es?`${path}${path.includes('?')?'&':'?'}lang=es`:path
@@ -29,10 +30,15 @@ export default async function NotificationPreferencesPage({searchParams}:{search
     ['pastoral_care',t('Private Care','Cuidado Privado'),t('Updates about your private pastoral-care requests.','Cambios en tus solicitudes privadas de cuidado pastoral.'),HandHeart,'care']
   ] as const
   const recovery=(code:string)=>{console.error('Notification preferences unavailable',{code});return <main className="shell"><section className="card" style={{maxWidth:720,margin:'40px auto',padding:24}}><div className="pill">{t('NOTIFICATIONS','NOTIFICACIONES')}</div><h1>{t('We could not load your notification preferences.','No pudimos cargar tus preferencias de notificación.')}</h1><p className="muted">{t('Nothing was changed. Please try again.','No se cambió nada. Inténtalo otra vez.')}</p><div className="row"><Link className="btn" href={l('/account/notifications')}>{t('Try again','Intentar otra vez')}</Link><Link className="ghost" href={l('/')}>{t('Home','Inicio')}</Link></div></section></main>}
-  const supabase=await createClient(),{data:claims,error:claimsError}=await supabase.auth.getClaims(),userId=claims?.claims?.sub
+  let supabase
+  try{supabase=await createClient()}catch(error){return recovery(`client:${thrownCode(error)}`)}
+  let claimsResult
+  try{claimsResult=await supabase.auth.getClaims()}catch(error){return recovery(`claims:${thrownCode(error)}`)}
+  const {data:claims,error:claimsError}=claimsResult,userId=claims?.claims?.sub
   if(claimsError)return recovery(`claims:${bounded(claimsError.code)}`)
-  if(!userId)redirect(l('/login'))
-  const prefsResult=await supabase.from('notification_preferences').select('*').eq('user_id',userId).maybeSingle()
+  if(!userId)redirect(`/login?mode=signin&lang=${es?'es':'en'}`)
+  let prefsResult
+  try{prefsResult=await supabase.from('notification_preferences').select('*').eq('user_id',userId).maybeSingle()}catch(error){return recovery(`preferences:${thrownCode(error)}`)}
   if(prefsResult.error)return recovery(`preferences:${bounded(prefsResult.error.code)}`)
   const prefs=prefsResult.data,on=(key:string)=>prefs?Boolean((prefs as Record<string,unknown>)[key]):true
   const groups=[['community',t('MESSAGES & COMMUNITY','MENSAJES Y COMUNIDAD')],['church',t('CHURCH LIFE','VIDA DE IGLESIA')],['growth',t('SERVING & GROWTH','SERVICIO Y CRECIMIENTO')],['care',t('PRIVATE CARE','CUIDADO PRIVADO')]] as const
