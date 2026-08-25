@@ -60,7 +60,7 @@ const copy={
     resetTitle:'Prueba la recuperación de contraseña',resetBody:'Desde Iniciar sesión, solicita un solo correo para cambiar la contraseña, abre únicamente el enlace más reciente, crea una contraseña nueva y vuelve a entrar. También prueba “Nunca confirmé mi correo” con una cuenta de prueba.',resetOpen:'Abrir Iniciar sesión →',
     spanishTest:'Prueba el primer ingreso en español desde un teléfono',spanishBody:'Cambia el registro a Español y confirma que la confirmación, inicio de sesión, Empieza Aquí, Kingdom Guide y la primera pantalla de Inicio sean claras sin instrucciones en inglés.',spanishOpen:'Abrir Empieza Aquí →',
     guideTitle:'Prueba la ayuda de recuperación de Kingdom Guide',guideBody:'En un teléfono, en inglés y español, pregunta cómo confirmar el correo, cambiar una contraseña y unirse a una iglesia con una cuenta existente. Confirma que la guía mantenga a la persona en una sola cuenta y dé un próximo toque claro.',guideOpen:'Abrir Kingdom Guide →',
-    setupTitle:'Prueba Fresh Church Setup / Church Builder',setupBody:'Desde una cuenta de prueba de pastor/administrador, abre Church Builder → Setup Inbox, sube material seguro de prueba, revisa la recomendación, apruébala y confirma que el curso resultante abra como borrador sin publicar. No uses archivos originales irremplazables.',setupOpen:'Abrir Setup Inbox →',
+    setupTitle:'Prueba la Configuración Inicial / Constructor de Iglesia',setupBody:'Desde una cuenta de prueba de pastor/administrador, abre Constructor de Iglesia → Bandeja de Configuración, sube material seguro de prueba, revisa la recomendación, apruébala y confirma que el curso resultante abra como borrador sin publicar. No uses archivos originales irremplazables.',setupOpen:'Abrir Bandeja de Configuración →',
     security:'SEGURIDAD',passwordTitle:'Protección contra contraseñas filtradas',passwordBody:'Activa la protección contra contraseñas filtradas antes de un piloto más amplio si el plan actual lo permite. Es una mejora de seguridad, no un bloqueo para un piloto pequeño.',
     verified:'DESPLIEGUE',deployTitle:'Salud del despliegue de producción',deployBody:'Los cambios de la rama principal deben llegar a un despliegue READY antes de probarlos. Mantén la última versión estable si una compilación nueva falla.',
     plan:'PLAN DEL PILOTO',smallTitle:'Empieza con pocos',smallBody:'Unos pocos usuarios reales de confianza son suficientes. Prueba incorporación, Aprendizaje, Grupos, Calendario, Oración/Cuidado Privado, Comentarios, privacidad y uso móvil antes de ampliar a toda la iglesia.',
@@ -72,7 +72,7 @@ const copy={
 function safeErrorCode(error:unknown){
   if(!error||typeof error!=='object')return 'unknown'
   const value=error as {code?:unknown;name?:unknown}
-  return String(value.code??value.name??'unknown').slice(0,80)
+  return String(value.code??value.name??'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,80)||'unknown'
 }
 
 function localizedCheck(r:any,lang:'en'|'es'){
@@ -102,25 +102,54 @@ export default async function ReadinessPage({searchParams}:{searchParams:Promise
   const lang:'en'|'es'=params.lang==='es'?'es':'en'
   const t=copy[lang]
   const languageQuery=lang==='es'?'?lang=es':''
-  const supabase=await createClient()
-  const {data:claims,error:claimsError}=await supabase.auth.getClaims()
+  const accessRecovery=()=> <main className="shell"><header className="topbar"><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="row"><Link className="ghost" href="/church/readiness?lang=en">{t.english}</Link><Link className="ghost" href="/church/readiness?lang=es">{t.spanish}</Link></div></header><section className="card readiness-recovery" role="alert"><div className="pill">{t.pill}</div><h1>{t.accessTitle}</h1><p>{t.accessBody}</p><div className="row"><Link href={`/church/readiness${languageQuery}`}>{t.retry}</Link><Link href={`/login?lang=${lang}&mode=signin`}>{t.signIn}</Link></div></section></main>
+
+  let supabase
+  try{supabase=await createClient()}
+  catch(error){
+    console.error('Pilot readiness client unavailable',{code:safeErrorCode(error)})
+    return accessRecovery()
+  }
+
+  let claimsResult
+  try{claimsResult=await supabase.auth.getClaims()}
+  catch(error){
+    console.error('Pilot readiness auth transport failed',{code:safeErrorCode(error)})
+    return accessRecovery()
+  }
+  const {data:claims,error:claimsError}=claimsResult
   const userId=claims?.claims?.sub
 
   if(claimsError){
     console.error('Pilot readiness auth check failed',{code:safeErrorCode(claimsError)})
-    return <main className="shell"><header className="topbar"><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="row"><Link className="ghost" href="/church/readiness?lang=en">{t.english}</Link><Link className="ghost" href="/church/readiness?lang=es">{t.spanish}</Link></div></header><section className="card readiness-recovery" role="alert"><div className="pill">{t.pill}</div><h1>{t.accessTitle}</h1><p>{t.accessBody}</p><div className="row"><Link href={`/church/readiness${languageQuery}`}>{t.retry}</Link><Link href={`/login?lang=${lang}&mode=signin`}>{t.signIn}</Link></div></section></main>
+    return accessRecovery()
   }
   if(!userId)redirect(`/login?lang=${lang}&mode=signin`)
 
-  const {data:membership,error:membershipError}=await supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).maybeSingle()
+  let membershipResult
+  try{membershipResult=await supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).maybeSingle()}
+  catch(error){
+    console.error('Pilot readiness membership transport failed',{code:safeErrorCode(error)})
+    return accessRecovery()
+  }
+  const {data:membership,error:membershipError}=membershipResult
   if(membershipError){
     console.error('Pilot readiness membership check failed',{code:safeErrorCode(membershipError)})
-    return <main className="shell"><header className="topbar"><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="row"><Link className="ghost" href="/church/readiness?lang=en">{t.english}</Link><Link className="ghost" href="/church/readiness?lang=es">{t.spanish}</Link></div></header><section className="card readiness-recovery" role="alert"><div className="pill">{t.pill}</div><h1>{t.accessTitle}</h1><p>{t.accessBody}</p><div className="row"><Link href={`/church/readiness${languageQuery}`}>{t.retry}</Link><Link href={lang==='es'?'/?lang=es':'/'}>{t.home}</Link></div></section></main>
+    return accessRecovery()
   }
   if(!membership?.church_id||!['pastor','church_admin'].includes(membership.role))redirect(lang==='es'?'/?lang=es':'/')
 
-  const {data:checks,error:readinessError}=await supabase.rpc('church_pilot_readiness',{p_church_id:membership.church_id})
-  if(readinessError)console.error('Pilot readiness check failed',{churchId:membership.church_id,code:safeErrorCode(readinessError)})
+  let checks:any=null
+  let readinessError:any=null
+  try{
+    const readinessResult=await supabase.rpc('church_pilot_readiness',{p_church_id:membership.church_id})
+    checks=readinessResult.data
+    readinessError=readinessResult.error
+  }catch(error){
+    readinessError={code:safeErrorCode(error)}
+    console.error('Pilot readiness transport failed',{code:safeErrorCode(error)})
+  }
+  if(readinessError)console.error('Pilot readiness check failed',{code:safeErrorCode(readinessError)})
 
   const rows=readinessError?[]:(checks??[]).map((r:any)=>localizedCheck(r,lang))
   const scored=rows.filter((r:any)=>!['optional','info'].includes(r.check_status))
