@@ -46,6 +46,16 @@ test('All three Account Security actions use protected client startup',()=>{
   assert.match(actions,/export async function signOutEverywhere/)
 })
 
+test('Sign out everywhere verifies the local browser session is actually gone',()=>{
+  assert.match(actions,/signOut\(\{scope:'global'\}\)/)
+  assert.match(actions,/verification=await supabase\.auth\.getSession\(\)/)
+  assert.match(actions,/global sign-out verification unavailable/)
+  assert.match(actions,/global sign-out verification failed/)
+  assert.match(actions,/global sign-out left local session present/)
+  assert.match(actions,/if\(verification\.data\.session\)/)
+  assert.match(actions,/failureUrl\(lang,'signout_failed',next,invite\)/)
+})
+
 test('Account Security diagnostics and changed credentials are bounded',()=>{
   assert.match(actions,/candidate\.name\.slice\(0,80\)/)
   assert.match(actions,/candidate\.code\.slice\(0,80\)/)
