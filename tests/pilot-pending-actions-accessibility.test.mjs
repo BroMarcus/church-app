@@ -34,13 +34,16 @@ test('forgot-password and resend cooldown survives browsers where local storage 
 
 test('auth email cooldown begins only after the server confirms an email was sent',()=>{
   assert.match(loginAction,/successCode=cooldownKey==='password-reset'\?'reset_sent':cooldownKey==='confirmation-resend'\?'confirmation_sent':''/)
-  assert.match(loginAction,/params\.get\('message_code'\)!==successCode/)
+  assert.match(loginAction,/url\.searchParams\.get\('message_code'\)!==successCode/)
   assert.match(loginAction,/window\.localStorage\.setItem\(storageKey,String\(until\)\)/)
   assert.doesNotMatch(loginAction,/if\(status\.pending&&!started\.current\)/)
   assert.doesNotMatch(loginAction,/Date\.now\(\)\+cooldownSeconds\*1000[\s\S]*status\.pending/)
 })
 
-test('confirmed-send cooldown does not extend itself on a normal page reload',()=>{
+test('confirmed-send cooldown consumes the one-time success marker so a stale URL cannot restart it later',()=>{
   assert.match(loginAction,/const existing=Number\(window\.localStorage\.getItem\(storageKey\)\|\|0\)/)
-  assert.match(loginAction,/if\(existing>now\)\{[\s\S]*setRemaining\(Math\.max\(0,Math\.ceil\(\(existing-now\)\/1000\)\)\)[\s\S]*return/)
+  assert.match(loginAction,/if\(existing>now\)\{[\s\S]*setRemaining\(Math\.max\(0,Math\.ceil\(\(existing-now\)\/1000\)\)\)/)
+  assert.match(loginAction,/url\.searchParams\.delete\('message_code'\)/)
+  assert.match(loginAction,/window\.history\.replaceState\(window\.history\.state,''/)
+  assert.match(loginAction,/stale success URL could incorrectly start a brand-new cooldown/)
 })
