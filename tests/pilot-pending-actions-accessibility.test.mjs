@@ -27,7 +27,20 @@ test('critical pending labels are announced politely for low-tech and assistive 
 test('forgot-password and resend cooldown survives browsers where local storage is unavailable',()=>{
   assert.match(loginAction,/try\{\s*const until=Number\(window\.localStorage\.getItem/)
   assert.match(loginAction,/catch\{\s*\/\/ Storage can be unavailable/)
-  assert.match(loginAction,/try\{window\.localStorage\.setItem/)
+  assert.match(loginAction,/try\{[\s\S]*window\.localStorage\.setItem/)
   assert.match(loginAction,/server-side rate limits remain the authority/)
   assert.match(loginAction,/setRemaining\(0\)/)
+})
+
+test('auth email cooldown begins only after the server confirms an email was sent',()=>{
+  assert.match(loginAction,/successCode=cooldownKey==='password-reset'\?'reset_sent':cooldownKey==='confirmation-resend'\?'confirmation_sent':''/)
+  assert.match(loginAction,/params\.get\('message_code'\)!==successCode/)
+  assert.match(loginAction,/window\.localStorage\.setItem\(storageKey,String\(until\)\)/)
+  assert.doesNotMatch(loginAction,/if\(status\.pending&&!started\.current\)/)
+  assert.doesNotMatch(loginAction,/Date\.now\(\)\+cooldownSeconds\*1000[\s\S]*status\.pending/)
+})
+
+test('confirmed-send cooldown does not extend itself on a normal page reload',()=>{
+  assert.match(loginAction,/const existing=Number\(window\.localStorage\.getItem\(storageKey\)\|\|0\)/)
+  assert.match(loginAction,/if\(existing>now\)\{[\s\S]*setRemaining\(Math\.max\(0,Math\.ceil\(\(existing-now\)\/1000\)\)\)[\s\S]*return/)
 })
