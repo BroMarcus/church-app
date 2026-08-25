@@ -22,6 +22,17 @@ test('Kingdom Guide explains the safe Fresh Church Setup handoff in both languag
   assert.match(help,/href:'\/church\/setup-inbox'/)
 })
 
+test('Kingdom Guide keeps first-day guidance centered on Home in English and Spanish',()=>{
+  assert.match(help,/Open Start Here once, then use Home as your main starting place/)
+  assert.match(help,/Open Home\. It brings together the main things that need your attention now/)
+  assert.match(help,/href:'\/',cta:'Open Home'/)
+  assert.match(help,/Abre Empieza Aquí una vez y después usa Inicio como tu lugar principal/)
+  assert.match(help,/Abre Inicio\. Allí verás las cosas principales que necesitan tu atención ahora/)
+  assert.match(help,/href:'\/',cta:'Abrir Inicio'/)
+  assert.doesNotMatch(help,/Open Start Here for the basic map, then check My Profile, My Journey and My Today/)
+  assert.doesNotMatch(help,/Mi Día reúne lo que necesita tu atención ahora/)
+})
+
 test('Spanish trusted-resource metadata is localized without changing stored values',()=>{
   assert.match(guide,/const displayMeta=/)
   assert.match(guide,/'official organization':'Organización oficial'/)
