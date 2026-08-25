@@ -20,13 +20,36 @@ const esPlanCopy:Record<string,{title:string;summary:string;destination:string}>
 const esStatus:Record<string,string>={received:'recibido',reviewing:'en revisión',ready:'aprobado'}
 const esCategory:Record<string,string>={unsorted:'sin organizar',curriculum:'currículo',branding:'identidad',calendar:'calendario',forms:'formularios',policies:'políticas',certificates:'certificados',leadership:'liderazgo',media:'medios',resource:'recurso'}
 const esConfidence:Record<string,string>={low:'BAJA',medium:'MEDIA',high:'ALTA'}
-const boundedCode=(value:unknown)=>String(value||'unknown').slice(0,80)
+const boundedCode=(value:unknown)=>String(value||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,80)||'unknown'
+const diagnosticCode=(error:unknown,fallback:string)=>{
+ if(error&&typeof error==='object'&&'code' in error)return boundedCode((error as {code?:unknown}).code)
+ if(error instanceof Error)return boundedCode(error.name)
+ return boundedCode(fallback)
+}
+const failLoad=(area:string,error:unknown)=>{
+ console.error('SetupInbox load failed',{area:boundedCode(area),code:diagnosticCode(error,'unavailable')})
+ throw new Error('setup-inbox-load-failed')
+}
 
 export default async function SetupInbox({searchParams}:{searchParams:Promise<{lang?:string;error?:string}>}){
  const q=await searchParams,lang=q.lang==='es'?'es':'en',es=lang==='es',l=(p:string)=>es?`${p}${p.includes('?')?'&':'?'}lang=es`:p
- const supabase=await createClient();const {data:claims,error:claimsError}=await supabase.auth.getClaims();if(claimsError){console.error('SetupInbox claims read failed',{code:boundedCode(claimsError.code)});throw new Error('setup-inbox-load-failed')}const userId=claims?.claims?.sub;if(!userId)redirect(l('/login?mode=signin'))
- const {data:m,error:membershipError}=await supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).single();if(membershipError){console.error('SetupInbox membership read failed',{userId,code:boundedCode(membershipError.code)});throw new Error('setup-inbox-load-failed')}if(!m?.church_id||!['pastor','church_admin'].includes(m.role))redirect(l('/'))
- const {data:rows,error:rowsError}=await supabase.from('church_setup_uploads').select('*').eq('church_id',m.church_id).order('created_at',{ascending:false});if(rowsError){console.error('SetupInbox records read failed',{churchId:m.church_id,code:boundedCode(rowsError.code)});throw new Error('setup-inbox-load-failed')}
+ let supabase
+ try{supabase=await createClient()}catch(error){failLoad('client',error)}
+ let claimsResult
+ try{claimsResult=await supabase.auth.getClaims()}catch(error){failLoad('auth',error)}
+ const {data:claims,error:claimsError}=claimsResult
+ if(claimsError)failLoad('auth',claimsError)
+ const userId=claims?.claims?.sub
+ if(!userId)redirect(l('/login?mode=signin'))
+ let membershipResult
+ try{membershipResult=await supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).single()}catch(error){failLoad('membership',error)}
+ const {data:m,error:membershipError}=membershipResult
+ if(membershipError)failLoad('membership',membershipError)
+ if(!m?.church_id||!['pastor','church_admin'].includes(m.role))redirect(l('/'))
+ let rowsResult
+ try{rowsResult=await supabase.from('church_setup_uploads').select('*').eq('church_id',m.church_id).order('created_at',{ascending:false})}catch(error){failLoad('records',error)}
+ const {data:rows,error:rowsError}=rowsResult
+ if(rowsError)failLoad('records',rowsError)
  const church:any=Array.isArray(m.churches)?m.churches[0]:m.churches
  const counts={received:(rows??[]).filter((x:any)=>x.status==='received').length,reviewing:(rows??[]).filter((x:any)=>x.status==='reviewing').length,ready:(rows??[]).filter((x:any)=>x.status==='ready').length}
  const errorMessage=q.error==='access'?(es?'No pudimos verificar tu acceso de liderazgo en este momento. Nada se cambió. Recarga esta página e inténtalo otra vez.':'We could not verify your leadership access right now. Nothing was changed. Reload this page and try again.'):q.error==='approve'?(es?'No se pudo aprobar ese plan. Nada se marcó como listo. Inténtalo de nuevo.':'That plan could not be approved. Nothing was marked ready. Try again.'):q.error==='review'?(es?'No se pudo crear el plan recomendado. Inténtalo de nuevo.':'The recommended plan could not be created. Try again.'):null
