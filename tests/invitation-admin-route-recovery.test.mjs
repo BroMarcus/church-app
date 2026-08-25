@@ -28,14 +28,16 @@ test('invitation admin routes have one-language bilingual recovery instead of mi
   }
 })
 
-test('invitation recovery copy prevents unsafe assumptions or duplicate work',()=>{
+test('invitation recovery copy prevents unsafe assumptions, duplicate work, and false certainty',()=>{
   const joinError=read('src/app/church/join-center/error.tsx')
   const invitesError=read('src/app/church/invites/error.tsx')
   const personError=read('src/app/church/invite-person/error.tsx')
   assert.match(joinError,/Do not assume signup is open or paused/)
   assert.match(joinError,/No asumas que el registro está abierto o pausado/)
-  assert.match(invitesError,/Refresh before creating, copying, or revoking an invitation/)
-  assert.match(invitesError,/Actualiza antes de crear, copiar o revocar una invitación/)
-  assert.match(personError,/Check existing invitations before creating another one/)
+  assert.match(invitesError,/could not verify whether the last invitation action finished/i)
+  assert.match(invitesError,/No pudimos confirmar si terminó la última acción de invitación/)
+  assert.match(invitesError,/Refresh and review the invitation list before creating, copying, or revoking anything again/)
+  assert.match(personError,/could not verify whether the last invitation action finished/i)
+  assert.match(personError,/Review existing invitations before creating another one/)
   assert.match(personError,/Revisa las invitaciones existentes antes de crear otra/)
 })
