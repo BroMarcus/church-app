@@ -40,8 +40,10 @@ export function SetupUploader({churchId,userId,lang}:{churchId:string;userId:str
     for(let attempt=1;attempt<=2;attempt++){
      try{
       const cleanup=await supabase.storage.from('church-setup').remove([path])
-      if(!cleanup.error)return true
-      console.error('SetupUploader cleanup failed',{churchId,attempt,code:boundedCode(cleanup.error)})
+      const confirmedDeleted=!cleanup.error&&Array.isArray(cleanup.data)&&cleanup.data.some(item=>typeof item?.name==='string'&&(item.name===path||path.endsWith(`/${item.name}`)))
+      if(confirmedDeleted)return true
+      if(cleanup.error)console.error('SetupUploader cleanup failed',{churchId,attempt,code:boundedCode(cleanup.error)})
+      else console.error('SetupUploader cleanup unconfirmed',{churchId,attempt,code:'DELETE_NOT_CONFIRMED'})
      }catch(error){console.error('SetupUploader cleanup transport failed',{churchId,attempt,code:boundedCode(error)})}
     }
     return false
