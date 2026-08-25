@@ -21,5 +21,5 @@ test('private invitation redemption can only occur after an explicit signup call
 test('legacy callback redirect context does not default unknown modes to signup',()=>{
   assert.match(confirm,/if\(mode==='recovery'\)[\s\S]*if\(mode==='signup'\)[\s\S]*return empty/)
   assert.match(confirm,/if\(mode==='signup'\)\{[\s\S]*signupNext:safeSignupDestination/)
-  assert.doesNotMatch(confirm,/if\(mode==='recovery'\)[\s\S]*return \{inviteId,signupNext:safeSignupDestination[\s\S]*\}\s*\n\s*\}/)
+  assert.match(confirm,/if\(mode==='signup'\)\{[\s\S]*recoveryNext:''\}\s*\n\s*\}\s*\n\s*return empty/)
 })
