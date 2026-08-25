@@ -13,8 +13,16 @@ test('Account Security page distinguishes Auth outages from real signed-out stat
   assert.match(page,/error:userError/)
   assert.match(page,/if\(userError\)return recovery/)
   assert.match(page,/if\(!userId\)redirect/)
+  assert.match(page,/mode=signin/)
   assert.match(page,/We could not safely load Account Security/)
   assert.match(page,/No pudimos cargar Seguridad de la Cuenta de forma segura/)
+})
+
+test('Account Security page catches thrown client and Auth verification failures',()=>{
+  assert.match(page,/try\{supabase=await createClient\(\)\}catch\(error\)\{return recovery\(`client:/)
+  assert.match(page,/try\{claimsResult=await supabase\.auth\.getClaims\(\)\}catch\(error\)\{return recovery\(`claims:/)
+  assert.match(page,/try\{userDataResult=await supabase\.auth\.getUser\(\)\}catch\(error\)\{return recovery\(`user:/)
+  assert.match(page,/const thrownCode=/)
 })
 
 test('Account Security actions fail closed when claims cannot be verified',()=>{
@@ -32,6 +40,7 @@ test('Account Security diagnostics and changed credentials are bounded',()=>{
   assert.match(actions,/const PASSWORD_MAX=128/)
   assert.match(actions,/email\.length>EMAIL_MAX/)
   assert.match(actions,/password\.length>PASSWORD_MAX\|\|confirm\.length>PASSWORD_MAX/)
+  assert.match(page,/replace\(\/\[\^a-zA-Z0-9_-\]\/g,''\)\.slice\(0,80\)/)
   assert.match(page,/maxLength=\{254\}/)
   assert.match(page,/maxLength=\{128\}/)
 })
