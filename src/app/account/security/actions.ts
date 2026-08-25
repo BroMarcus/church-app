@@ -64,6 +64,14 @@ export async function changePassword(formData:FormData){
 export async function signOutEverywhere(formData:FormData){
   const lang=langOf(formData),next=safeJoinNext(text(formData,'next')),invite=safeInviteId(text(formData,'invite_id'))
   const supabase=await getSupabaseOrRedirect(lang,next,invite)
-  try{const result=await supabase.auth.signOut({scope:'global'});if(result.error){console.error('Account security global sign-out failed',safeAuthDiagnostic(result.error));redirect(failureUrl(lang,'signout_failed',next,invite))}}catch(error){console.error('Account security global sign-out request failed',safeAuthDiagnostic(error));redirect(failureUrl(lang,'signout_failed',next,invite))}
+  try{
+    const result=await supabase.auth.signOut({scope:'global'})
+    if(result.error){console.error('Account security global sign-out failed',safeAuthDiagnostic(result.error));redirect(failureUrl(lang,'signout_failed',next,invite))}
+    let verification
+    try{verification=await supabase.auth.getSession()}
+    catch(error){console.error('Account security global sign-out verification unavailable',safeAuthDiagnostic(error));redirect(failureUrl(lang,'signout_failed',next,invite))}
+    if(verification.error){console.error('Account security global sign-out verification failed',safeAuthDiagnostic(verification.error));redirect(failureUrl(lang,'signout_failed',next,invite))}
+    if(verification.data.session){console.error('Account security global sign-out left local session present',{code:'session_still_present'});redirect(failureUrl(lang,'signout_failed',next,invite))}
+  }catch(error){console.error('Account security global sign-out request failed',safeAuthDiagnostic(error));redirect(failureUrl(lang,'signout_failed',next,invite))}
   redirect(`/login?lang=${lang}&mode=signin${contextPart(next,invite)}`)
 }
