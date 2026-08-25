@@ -25,15 +25,23 @@ test('Fresh Church Setup keeps upload diagnostics bounded instead of logging raw
   assert.match(source, /code:boundedCode\(insert\.error\)/);
   assert.match(source, /code:boundedCode\(cleanup\.error\)/);
   assert.match(source, /SetupUploader cleanup transport failed'\,\{churchId,attempt,code:boundedCode\(error\)\}/);
+  assert.match(source, /SetupUploader metadata insert transport failed'\,\{churchId,code:boundedCode\(error\)\}/);
 });
 
 test('Fresh Church Setup retries orphan cleanup and warns against duplicate re-upload when cleanup is uncertain', () => {
-  assert.match(source, /let cleanupConfirmed=false/);
-  assert.match(source, /for\(let attempt=1;attempt<=2&&!cleanupConfirmed;attempt\+\+\)/);
-  assert.match(source, /else cleanupConfirmed=true/);
-  assert.match(source, /if\(!cleanupConfirmed\)/);
+  assert.match(source, /const cleanupUploadedFile=async\(\)=>\{/);
+  assert.match(source, /for\(let attempt=1;attempt<=2;attempt\+\+\)/);
+  assert.match(source, /if\(!cleanup\.error\)return true/);
+  assert.match(source, /return false/);
+  assert.match(source, /if\(!\(await cleanupUploadedFile\(\)\)\)\{failCleanupUncertain\(\);return\}/);
   assert.match(source, /Do not upload this same file again yet\./);
   assert.match(source, /No vuelvas a subir este mismo archivo todavía\./);
+});
+
+test('Fresh Church Setup cleans up uploaded storage after metadata transport failures before allowing retry', () => {
+  assert.match(source, /let insert\s*\n\s*try\{\s*\n\s*insert=await supabase\.from\('church_setup_uploads'\)\.insert/);
+  assert.match(source, /catch\(error\)\{\s*\n\s*console\.error\('SetupUploader metadata insert transport failed'/);
+  assert.match(source, /if\(!\(await cleanupUploadedFile\(\)\)\)\{failCleanupUncertain\(\);return\}\s*\n\s*fail\(\);return/);
 });
 
 test('Fresh Church Setup warns pilot testers not to upload sensitive real-world records', () => {
