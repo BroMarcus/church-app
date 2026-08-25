@@ -1,10 +1,9 @@
 'use client'
 
-export default function JoinCenterError({reset}:{reset:()=>void}){
-  return <main className="shell"><section className="card" role="alert" style={{padding:26,marginTop:24}}>
-    <div className="pill">JOIN CENTER • CENTRO DE REGISTRO</div>
-    <h1>Join Center could not load.</h1>
-    <p className="muted">No join link, QR code, invitation, or membership was changed. / No se cambió ningún enlace, código QR, invitación ni membresía.</p>
-    <button className="btn" type="button" onClick={()=>reset()} style={{marginTop:14}}>Try again / Intentar de nuevo</button>
-  </section></main>
-}
+import Link from 'next/link'
+import { useEffect,useState } from 'react'
+
+type Lang='en'|'es'
+const copy={en:{pill:'JOIN CENTER',title:'We could not verify Join Center',body:'This may be a temporary connection or account-check problem. Nothing was changed. Do not assume signup is open or paused, and do not share a new join link until this page loads correctly.',retry:'Try Join Center again',admin:'Church Admin',signIn:'Sign in again'},es:{pill:'CENTRO DE INGRESO',title:'No pudimos verificar el Centro de Ingreso',body:'Puede ser un problema temporal de conexión o verificación de cuenta. No se cambió nada. No asumas que el registro está abierto o pausado y no compartas un enlace nuevo hasta que esta página cargue correctamente.',retry:'Intentar Centro de Ingreso otra vez',admin:'Administración',signIn:'Iniciar sesión otra vez'}} as const
+function currentLanguage():Lang{if(typeof window==='undefined')return'en';const requested=new URLSearchParams(window.location.search).get('lang');if(requested==='es')return'es';if(requested==='en')return'en';return document.documentElement.lang.toLowerCase().startsWith('es')?'es':'en'}
+export default function JoinCenterError({reset}:{error:Error&{digest?:string};reset:()=>void}){const[lang,setLang]=useState<Lang>('en');useEffect(()=>setLang(currentLanguage()),[]);const t=copy[lang];return <main className="shell"><header className="topbar"><Link href={`/?lang=${lang}`} className="brand">Kingdom <span>Network</span></Link></header><section className="card" role="alert" aria-live="assertive" style={{padding:26,marginTop:24,maxWidth:760}}><div className="pill">{t.pill}</div><h1>{t.title}</h1><p className="muted">{t.body}</p><div className="row" style={{gap:10,flexWrap:'wrap',marginTop:14}}><button className="btn" type="button" onClick={reset}>{t.retry}</button><Link className="ghost" href={`/church?lang=${lang}`}>{t.admin}</Link><Link className="ghost" href={`/login?lang=${lang}&mode=signin`}>{t.signIn}</Link></div></section></main>}
