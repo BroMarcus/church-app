@@ -17,7 +17,7 @@ test('server actions bound account inputs before calling auth providers',()=>{
   assert.match(actions,/if\(firstName\.length>NAME_MAX\|\|lastName\.length>NAME_MAX\)fail\('name_too_long'\)/)
   assert.match(actions,/if\(password\.length>NEW_PASSWORD_MAX\|\|confirmPassword\.length>NEW_PASSWORD_MAX\)fail\('password_too_long'\)/)
   assert.match(actions,/if\(password\.length>EXISTING_PASSWORD_MAX\).*password_too_long/)
-  assert.match(actions,/if\(rawInviteId&&!inviteId\)fail\('invite_invalid'\)/)
+  assert.ok((actions.match(/rawInviteId&&!inviteId\)redirect\(loginUrl\(lang,'&mode=signin'\+statusPart\('error','invite_malformed'\)\)\)/g)||[]).length>=4)
 })
 
 test('email validation is reused by sign in, signup, reset, and confirmation resend',()=>{
@@ -67,8 +67,18 @@ test('bilingual messages explain bounded-input failures without provider text',(
   assert.ok(page.includes('Esa contraseña es demasiado larga. Usa una contraseña más corta e inténtalo otra vez.'))
 })
 
+test('malformed invitation context cannot quietly fall through into ordinary public signup',()=>{
+  assert.match(page,/const inviteMalformed=Boolean\(params\.invite&&!inviteParam\)/)
+  assert.match(page,/const canCreate=!explicitSignin&&!inviteMalformed&&!availabilityFailed&&\(validInvite\|\|publicOpen\)/)
+  assert.match(page,/const invalidInviteKnown=Boolean\(params\.invite\)&&!inviteMalformed/)
+  assert.ok(page.includes('This invitation link is incomplete or damaged. Do not create a new account from this link.'))
+  assert.ok(page.includes('Este enlace de invitación está incompleto o dañado. No crees una cuenta nueva desde este enlace.'))
+  assert.ok(page.includes("invite_malformed:'This invitation link is incomplete or damaged. Do not create another account."))
+  assert.ok(page.includes("invite_malformed:'Este enlace de invitación está incompleto o dañado. No crees otra cuenta."))
+})
+
 test('malformed oversized invitation ids are not echoed back into login links',()=>{
-  assert.match(page,/const inviteParam=params\.invite&&params\.invite\.length<=128\?params\.invite:''/)
+  assert.match(page,/const inviteParam=params\.invite&&params\.invite\.length<=128&&INVITE_ID_PATTERN\.test\(params\.invite\)\?params\.invite:''/)
   assert.match(page,/const inviteMalformed=Boolean\(params\.invite&&!inviteParam\)/)
   assert.match(page,/if\(inviteParam\)\{/)
   assert.match(page,/inviteParam\?`&invite=\$\{encodeURIComponent\(inviteParam\)\}`:''/)
