@@ -44,7 +44,8 @@ export async function GET(request:NextRequest){
   const lang=url.searchParams.get('lang')==='es'?'es':'en'
   const rawMode=url.searchParams.get('mode')
   const mode=rawMode==='signup'||rawMode==='recovery'?rawMode:null
-  const inviteId=safeInviteId(url.searchParams.get('invite'))
+  const rawInvite=url.searchParams.get('invite')
+  const inviteId=safeInviteId(rawInvite)
   const signupFallback=`/start?welcome=1${lang==='es'?'&lang=es':''}`
   const rawNext=url.searchParams.get('next')
   const joinNext=safeJoinDestination(rawNext)
@@ -53,7 +54,7 @@ export async function GET(request:NextRequest){
   const loginError=(errorCode:string)=>NextResponse.redirect(new URL(`/login?lang=${lang}&mode=signin${inviteId?`&invite=${encodeURIComponent(inviteId)}`:''}${joinNext?`&next=${encodeURIComponent(joinNext)}`:''}&error_code=${encodeURIComponent(errorCode)}`,siteUrl))
   const linkUnavailable=()=>NextResponse.redirect(new URL(`/auth/link-unavailable?lang=${lang}${inviteId?`&invite=${encodeURIComponent(inviteId)}`:''}${joinNext?`&next=${encodeURIComponent(joinNext)}`:''}`,siteUrl))
 
-  if(url.searchParams.get('invite')&&!inviteId)return loginError('invite_invalid')
+  if(rawInvite&&!inviteId)return loginError('invite_malformed')
   if(!mode)return loginError('callback_incomplete')
   if(!code||code.length>MAX_AUTH_VALUE_LENGTH)return loginError('callback_incomplete')
 
