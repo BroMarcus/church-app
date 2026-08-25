@@ -32,8 +32,9 @@ test('Private Care consequential targets require UUID-shaped identifiers before 
 
 test('Private Care diagnostics stay bounded and do not expose provider messages',()=>{
   assert.match(actions,/replace\(\/\[\^a-zA-Z0-9_-\]\/g,''\)\.slice\(0,80\)/)
+  assert.match(actions,/console\.error\('\[help-care\]',\{area,code:safeCode\(error\)\}\)/)
   assert.doesNotMatch(actions,/\.message/)
-  assert.doesNotMatch(actions,/console\.error\([^\n]*error\)/)
+  assert.doesNotMatch(actions,/console\.error\([^\n]*,\s*error\s*\)/)
 })
 
 test('Private Care preserves selected language through signed-out and no-membership recovery',()=>{
