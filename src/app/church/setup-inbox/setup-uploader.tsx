@@ -37,7 +37,22 @@ export function SetupUploader({churchId,userId,lang}:{churchId:string;userId:str
    const categoryValue=String(formData.get('category')||'unsorted'),category=allowedCategories.has(categoryValue)?categoryValue:'unsorted'
    const notes=String(formData.get('notes')||'').trim().slice(0,1000)||null
    const insert=await supabase.from('church_setup_uploads').insert({church_id:churchId,uploaded_by:userId,file_name:file.name.slice(0,255),storage_path:path,content_type:file.type||null,size_bytes:file.size,category,notes,suggested_destination:category==='curriculum'?'Learning Center':category==='branding'?'Church Settings / Media':category==='leadership'?'Leadership records':category==='forms'?'Forms & workflows':category==='calendar'?'Calendar':'Kingdom Guide review queue'})
-   if(insert.error){console.error('SetupUploader metadata insert failed',{churchId,code:boundedCode(insert.error)});const cleanup=await supabase.storage.from('church-setup').remove([path]);if(cleanup.error)console.error('SetupUploader cleanup failed',{churchId,code:boundedCode(cleanup.error)});fail();return}
+   if(insert.error){
+    console.error('SetupUploader metadata insert failed',{churchId,code:boundedCode(insert.error)})
+    let cleanupConfirmed=false
+    for(let attempt=1;attempt<=2&&!cleanupConfirmed;attempt++){
+     try{
+      const cleanup=await supabase.storage.from('church-setup').remove([path])
+      if(cleanup.error)console.error('SetupUploader cleanup failed',{churchId,attempt,code:boundedCode(cleanup.error)})
+      else cleanupConfirmed=true
+     }catch(error){console.error('SetupUploader cleanup transport failed',{churchId,attempt,code:boundedCode(error)})}
+    }
+    if(!cleanupConfirmed){
+     fail(es?'No pudimos terminar ni confirmar la limpieza de este archivo. No vuelvas a subir este mismo archivo todavía. Inténtalo más tarde o pide ayuda si se repite.':'We could not finish or confirm cleanup for this file. Do not upload this same file again yet. Try later or ask for help if it repeats.')
+     return
+    }
+    fail();return
+   }
    setStatus({kind:'success',message:es?'Recibido. Kingdom Network lo agregó a la bandeja de configuración.':'Received. Kingdom Network added it to the setup inbox.'})
    window.setTimeout(()=>window.location.reload(),700)
   }catch(error){console.error('SetupUploader unexpected failure',{churchId,code:boundedCode(error)});fail()}
