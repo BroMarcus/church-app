@@ -14,7 +14,7 @@ const allowedNotices=new Set(['created','saved','withdrawn','invalid_request','i
 const label=(rows:readonly (readonly [string,string,string])[],v:string,es:boolean)=>rows.find(([k])=>k===v)?.[es?2:1]??v.replaceAll('_',' ')
 const personName=(p:any,fallback:string)=>p?.display_name||[p?.first_name,p?.last_name].filter(Boolean).join(' ')||fallback
 const niceDate=(v:string,es:boolean)=>new Date(v).toLocaleString(es?'es-US':'en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})
-const safeCode=(error:unknown)=>error&&typeof error==='object'&&'code' in error?String((error as {code?:unknown}).code??'unknown').slice(0,80):'unknown'
+const safeCode=(error:unknown)=>error&&typeof error==='object'&&'code' in error?(String((error as {code?:unknown}).code??'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,80)||'unknown'):'unknown'
 const readFailure=(area:string,error:unknown):never=>{console.error('[help-care-read]',{area,code:safeCode(error)});throw new Error('HELP_CARE_READ_FAILED')}
 
 export default async function HelpPage({searchParams}:{searchParams:Promise<{created?:string;saved?:string;withdrawn?:string;error?:string;status?:string;lang?:string}>}){
@@ -23,7 +23,7 @@ export default async function HelpPage({searchParams}:{searchParams:Promise<{cre
   const {data:claims,error:claimsError}=await supabase.auth.getClaims()
   if(claimsError)readFailure('claims',claimsError)
   const userId=claims?.claims?.sub
-  if(!userId)redirect(l('/login'))
+  if(!userId)redirect(`/login?mode=signin&lang=${es?'es':'en'}`)
 
   const {data:membership,error:membershipError}=await supabase
     .from('church_memberships')
@@ -33,7 +33,7 @@ export default async function HelpPage({searchParams}:{searchParams:Promise<{cre
     .limit(1)
     .maybeSingle()
   if(membershipError)readFailure('membership',membershipError)
-  if(!membership?.church_id)redirect('/')
+  if(!membership?.church_id)redirect(l('/'))
 
   const churchId=membership.church_id,church:any=Array.isArray(membership.churches)?membership.churches[0]:membership.churches,isPastoral=['pastor','church_admin'].includes(membership.role)
   const {data:myRequests,error:myRequestsError}=await supabase.from('care_requests').select('id,category,urgency,subject,message,preferred_contact,status,created_at,updated_at,closed_at').eq('church_id',churchId).eq('user_id',userId).order('created_at',{ascending:false})
