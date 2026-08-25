@@ -8,6 +8,11 @@ import { InvitePendingSubmit } from '../invites/pending-submit'
 
 const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
 const boundedCode=(value:unknown)=>String(value??'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48)||'unknown'
+const diagnosticCode=(error:unknown,fallback:string)=>{
+  if(error&&typeof error==='object'&&'code' in error)return boundedCode((error as {code?:unknown}).code)
+  if(error instanceof Error)return boundedCode(error.name)
+  return boundedCode(fallback)
+}
 const inviteIdPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const messages={
   en:{created:'Invitation ready. Send only this newest link.',role_not_allowed:'That starting role is not allowed for invitations.',create_failed:'We could not create the invitation. Nothing was changed. Check the information and try again.',access_unavailable:'We could not verify your invitation access right now. Nothing was changed. Try again in a moment.',not_authorized:'This account does not have permission to invite people.',invalid_email:'Enter a complete email address before creating the invitation.',input_too_long:'One of the fields is too long. Shorten it and try again.'},
@@ -24,17 +29,28 @@ function AccessRecovery({lang,kind}:{lang:Lang;kind:'unavailable'|'unauthorized'
 export default async function InvitePersonPage({searchParams}:{searchParams:Promise<{lang?:string;created?:string;status?:string}>}){
   const params=await searchParams,es=params.lang==='es',lang:Lang=es?'es':'en'
   const l=(p:string)=>`${p}${p.includes('?')?'&':'?'}lang=${lang}`
-  const supabase=await createClient()
-  const {data:claims,error:claimsError}=await supabase.auth.getClaims()
+  let supabase
+  try{supabase=await createClient()}
+  catch(error){console.error('invite-person client unavailable',{errorCode:diagnosticCode(error,'client_unavailable')});return <AccessRecovery lang={lang} kind="unavailable"/>}
+  let claimsResult
+  try{claimsResult=await supabase.auth.getClaims()}
+  catch(error){console.error('invite-person auth transport failed',{errorCode:diagnosticCode(error,'auth_unavailable')});return <AccessRecovery lang={lang} kind="unavailable"/>}
+  const {data:claims,error:claimsError}=claimsResult
   const userId=claims?.claims?.sub
   if(claimsError){console.error('invite-person auth lookup failed',{errorCode:boundedCode(claimsError.code)});return <AccessRecovery lang={lang} kind="unavailable"/>}
-  if(!userId)redirect(`/login?lang=${lang}&next=${encodeURIComponent(l('/church/invite-person'))}`)
+  if(!userId)redirect(`/login?lang=${lang}&mode=signin&next=${encodeURIComponent(l('/church/invite-person'))}`)
 
-  const {data:membership,error:membershipError}=await supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).maybeSingle()
+  let membershipResult
+  try{membershipResult=await supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).maybeSingle()}
+  catch(error){console.error('invite-person membership transport failed',{errorCode:diagnosticCode(error,'membership_unavailable')});return <AccessRecovery lang={lang} kind="unavailable"/>}
+  const {data:membership,error:membershipError}=membershipResult
   if(membershipError){console.error('invite-person membership lookup failed',{errorCode:boundedCode(membershipError.code)});return <AccessRecovery lang={lang} kind="unavailable"/>}
   if(!membership?.church_id)return <AccessRecovery lang={lang} kind="unauthorized"/>
 
-  const {data:custom,error:permissionError}=await supabase.rpc('current_user_has_church_permission',{p_church_id:membership.church_id,p_permission_key:'manage_members'})
+  let permissionResult
+  try{permissionResult=await supabase.rpc('current_user_has_church_permission',{p_church_id:membership.church_id,p_permission_key:'manage_members'})}
+  catch(error){console.error('invite-person permission transport failed',{errorCode:diagnosticCode(error,'permission_unavailable')});return <AccessRecovery lang={lang} kind="unavailable"/>}
+  const {data:custom,error:permissionError}=permissionResult
   if(permissionError){console.error('invite-person permission lookup failed',{errorCode:boundedCode(permissionError.code)});return <AccessRecovery lang={lang} kind="unavailable"/>}
   const canInvite=['pastor','church_admin'].includes(membership.role)||Boolean(custom)
   if(!canInvite)return <AccessRecovery lang={lang} kind="unauthorized"/>
@@ -45,14 +61,18 @@ export default async function InvitePersonPage({searchParams}:{searchParams:Prom
   const createdId=params.created?.slice(0,80)??''
   const hasCreatedParam=Boolean(params.created)
   if(createdId&&inviteIdPattern.test(createdId)){
-    const r=await supabase.from('church_invites').select('id,email,first_name,last_name,phone,role,expires_at,revoked_at,redeemed_at').eq('id',createdId).eq('church_id',membership.church_id).maybeSingle()
-    if(r.error){
-      console.error('created invitation lookup failed',{errorCode:boundedCode(r.error.code)})
-    }else if(r.data){
-      const expiresAt=Date.parse(String(r.data.expires_at??''))
-      const isOpen=!r.data.revoked_at&&!r.data.redeemed_at&&Number.isFinite(expiresAt)&&expiresAt>Date.now()
-      if(isOpen)invite=r.data
-      else createdInviteClosed=true
+    try{
+      const r=await supabase.from('church_invites').select('id,email,first_name,last_name,phone,role,expires_at,revoked_at,redeemed_at').eq('id',createdId).eq('church_id',membership.church_id).maybeSingle()
+      if(r.error){
+        console.error('created invitation lookup failed',{errorCode:boundedCode(r.error.code)})
+      }else if(r.data){
+        const expiresAt=Date.parse(String(r.data.expires_at??''))
+        const isOpen=!r.data.revoked_at&&!r.data.redeemed_at&&Number.isFinite(expiresAt)&&expiresAt>Date.now()
+        if(isOpen)invite=r.data
+        else createdInviteClosed=true
+      }
+    }catch(error){
+      console.error('created invitation lookup transport failed',{errorCode:diagnosticCode(error,'invite_lookup_unavailable')})
     }
   }
   const inviteUrl=invite?`${siteUrl}/login?invite=${encodeURIComponent(invite.id)}&lang=${lang}`:''
