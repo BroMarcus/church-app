@@ -10,7 +10,7 @@ const copy={
   en:{
     pill:'PRIVATE INVITE PROOF',title:'Prove private invitations on a real phone',body:'Use test accounts only. These checks prove the same-account, confirmation, and recovery safeguards that matter most before pilot launch.',
     back:'← Phone Proof',runbook:'Safe test runbook',readiness:'Pilot Readiness',home:'Home',english:'English',spanish:'Español',build:'Build under test',
-    buildWarning:'STOP — this deployed page does not expose an exact 40-character Git commit. Do not record PASS evidence for private invitations here.',
+    buildWarning:'STOP — this deployed page does not expose one exact 40-character Git commit. Do not record PASS evidence for private invitations here.',
     ruleTitle:'One rule before every test',rules:['Use only the newest private invitation unless a step explicitly asks you to test an old/revoked/malformed link.','Keep the same Kingdom Network account through recovery. Never create a second account for an existing user.','Never paste invitation tokens, confirmation links, reset links, passwords, one-time codes, or real member information into test notes.','Run every scenario in English and Spanish on the same exact deployed build before treating it as PASS.'],
     scenarios:'Required private-invite scenarios',accountLabel:'Account',passLabel:'PASS means',stopLabel:'Stop and record FAIL if',
     finish:'When these are green',finishBody:'Return to Phone Proof and record the invitation evidence there. These instructions do not write church/member data; only the normal test flows you intentionally perform can change designated test records.'
@@ -18,7 +18,7 @@ const copy={
   es:{
     pill:'PRUEBA DE INVITACIÓN PRIVADA',title:'Comprueba invitaciones privadas en un teléfono real',body:'Usa solamente cuentas de prueba. Estas pruebas comprueban las protecciones de misma cuenta, confirmación y recuperación más importantes antes del piloto.',
     back:'← Prueba con Teléfono',runbook:'Guía segura de prueba',readiness:'Preparación del Piloto',home:'Inicio',english:'English',spanish:'Español',build:'Versión que estás probando',
-    buildWarning:'DETENTE — esta página desplegada no muestra un commit Git exacto de 40 caracteres. No registres PASÓ para invitaciones privadas aquí.',
+    buildWarning:'DETENTE — esta página desplegada no muestra un solo commit Git exacto de 40 caracteres. No registres PASÓ para invitaciones privadas aquí.',
     ruleTitle:'Una regla antes de cada prueba',rules:['Usa solamente la invitación privada más reciente a menos que un paso te pida probar un enlace viejo/revocado/dañado.','Conserva la misma cuenta de Kingdom Network durante la recuperación. Nunca crees una segunda cuenta para un usuario existente.','Nunca pegues tokens de invitación, enlaces de confirmación, enlaces de restablecimiento, contraseñas, códigos de un solo uso ni información real de miembros en las notas.','Prueba cada escenario en inglés y español en la misma versión desplegada exacta antes de tratarlo como PASÓ.'],
     scenarios:'Escenarios requeridos de invitación privada',accountLabel:'Cuenta',passLabel:'PASÓ significa',stopLabel:'Detente y registra FALLÓ si',
     finish:'Cuando todo esté en verde',finishBody:'Regresa a Phone Proof y registra allí la evidencia de invitación. Estas instrucciones no escriben datos de la iglesia/miembro; solamente los flujos normales de prueba que tú hagas intencionalmente pueden cambiar registros de prueba designados.'
@@ -109,6 +109,14 @@ function boundedCode(value:unknown){
   return code.replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48)||'UNKNOWN'
 }
 function isVerifiedBuild(buildId:string){return /^[0-9a-f]{40}$/i.test(buildId.trim())}
+function exactBuildId(){
+  const server=(process.env.VERCEL_GIT_COMMIT_SHA??'').trim()
+  const browser=(process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA??'').trim()
+  if(isVerifiedBuild(server)&&isVerifiedBuild(browser)&&server.toLowerCase()!==browser.toLowerCase())return 'unverified'
+  if(isVerifiedBuild(server))return server.toLowerCase()
+  if(isVerifiedBuild(browser))return browser.toLowerCase()
+  return 'unverified'
+}
 
 export default async function PrivateInvitePhoneProof({searchParams}:{searchParams:Promise<{lang?:string}>}){
   const params=await searchParams
@@ -136,7 +144,7 @@ export default async function PrivateInvitePhoneProof({searchParams}:{searchPara
   }
   if(!membership?.church_id||!['pastor','church_admin'].includes(membership.role))redirect(lang==='es'?'/?lang=es':'/')
 
-  const buildId=(process.env.VERCEL_GIT_COMMIT_SHA||process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA||'local-dev').trim().slice(0,40)||'local-dev'
+  const buildId=exactBuildId()
   const verifiedBuild=isVerifiedBuild(buildId)
 
   return <main className="phone-proof-shell">
