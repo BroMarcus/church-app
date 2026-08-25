@@ -6,12 +6,13 @@ const requiredHeaders = new Map([
   ['Cache-Control', 'no-store, max-age=0'],
   ['Referrer-Policy', 'no-referrer'],
   ['X-Content-Type-Options', 'nosniff'],
+  ['X-Robots-Tag', 'noindex, nofollow, noarchive'],
 ])
 
-test('sensitive account-entry routes are never cached and do not leak referrers', async () => {
+test('sensitive account-entry routes are never cached, indexed, or allowed to leak referrers', async () => {
   assert.equal(typeof nextConfig.headers, 'function')
   const rules = await nextConfig.headers()
-  const expectedSources = ['/auth/:path*', '/login', '/join/:path*']
+  const expectedSources = ['/auth/:path*', '/login', '/join/:path*', '/account/security']
 
   for (const source of expectedSources) {
     const rule = rules.find((entry) => entry.source === source)
