@@ -50,6 +50,17 @@ test('private-invite proof fails closed on bad links and uncertain redemption cl
   assert.match(proof,/Seguridad de Cuenta en lugar de afirmar que cerró sesión/)
 })
 
+test('phone proof accepts only an exact build identity and never manufactures one by truncation',()=>{
+  for(const source of [station,proof]){
+    assert.match(source,/\^\[0-9a-f\]\{40\}\$/i)
+    assert.match(source,/return 'unverified'/)
+    assert.match(source,/VERCEL_GIT_COMMIT_SHA/)
+    assert.match(source,/NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA/)
+    assert.doesNotMatch(source,/slice\(0,40\)/)
+    assert.match(source,/server\.toLowerCase\(\)!==browser\.toLowerCase\(\)/)
+  }
+})
+
 test('private-invite proof is admin-only, exact-build aware, read-only as a proof page, and does not expose raw errors',()=>{
   assert.match(proof,/\['pastor','church_admin'\]\.includes\(membership\.role\)/)
   assert.match(proof,/\^\[0-9a-f\]\{40\}\$/i)
