@@ -17,10 +17,17 @@ for(const [label,page,actions] of [
     assert.match(page,/error:claimsError/)
     assert.match(page,/if\(claimsError\)return recovery/)
     assert.match(page,/if\(!userId\)redirect/)
+    assert.match(page,/mode=signin/)
     assert.match(actions,/error:claimsError/)
     assert.match(actions,/if\(claimsError\)/)
     assert.match(actions,/status=auth_unavailable/)
     assert.match(actions,/if\(!userId\)redirect/)
+  })
+
+  test(`${label} catches thrown client and claims failures before rendering account state`,()=>{
+    assert.match(page,/try\{supabase=await createClient\(\)\}catch\(error\)\{return recovery\(`client:/)
+    assert.match(page,/try\{claimsResult=await supabase\.auth\.getClaims\(\)\}catch\(error\)\{return recovery\(`claims:/)
+    assert.match(page,/const thrownCode=/)
   })
 
   test(`${label} keeps backend diagnostics bounded and out of user-facing text`,()=>{
@@ -31,15 +38,21 @@ for(const [label,page,actions] of [
   })
 }
 
-test('Privacy read failures share one bilingual fail-closed recovery state',()=>{
+test('Privacy read failures and thrown reads share one bilingual fail-closed recovery state',()=>{
   assert.match(privacyPage,/membershipResult\.error\)return recovery/)
   assert.match(privacyPage,/profileResult\.error\)return recovery/)
+  assert.match(privacyPage,/try\{membershipResult=await supabase\.from\('church_memberships'\)/)
+  assert.match(privacyPage,/catch\(error\)\{return recovery\(`membership:/)
+  assert.match(privacyPage,/try\{profileResult=await supabase\.from\('profiles'\)/)
+  assert.match(privacyPage,/catch\(error\)\{return recovery\(`profile:/)
   assert.match(privacyPage,/We could not load your privacy settings/)
   assert.match(privacyPage,/No pudimos cargar tu configuración de privacidad/)
 })
 
 test('Notification preference read failures cannot look like legitimate defaults',()=>{
   assert.match(notificationPage,/prefsResult\.error\)return recovery/)
+  assert.match(notificationPage,/try\{prefsResult=await supabase\.from\('notification_preferences'\)/)
+  assert.match(notificationPage,/catch\(error\)\{return recovery\(`preferences:/)
   assert.match(notificationPage,/We could not load your notification preferences/)
   assert.match(notificationPage,/No pudimos cargar tus preferencias de notificación/)
   assert.match(notificationPage,/const prefs=prefsResult\.data,on=/)
