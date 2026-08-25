@@ -10,6 +10,11 @@ import './invites.css'
 const roleLabel=(v:string,lang:'en'|'es')=>{const es:Record<string,string>={member:'Miembro',group_leader:'Líder de grupo',ministry_leader:'Líder de ministerio',minister:'Ministro'};return lang==='es'?(es[v]??v):v.replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase())}
 const dateTime=(v:string)=>new Date(v).toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})
 const boundedCode=(value:unknown)=>String(value??'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48)||'unknown'
+const diagnosticCode=(error:unknown,fallback:string)=>{
+  if(error&&typeof error==='object'&&'code' in error)return boundedCode((error as {code?:unknown}).code)
+  if(error instanceof Error)return boundedCode(error.name)
+  return boundedCode(fallback)
+}
 const statusCopy={
   en:{created:'Invitation created. Copy the newest link and send it to the invited person.',revoked:'Invitation revoked.',invalid_email:'Enter a complete email address.',role_not_allowed:'That starting role is not allowed for invitations.',duplicate_open:'An open invitation already exists for this email. Use that newest open link, or revoke it before creating a replacement.',create_failed:'We could not create the invitation. Nothing was changed. Try again.',invite_missing:'Invitation not found.',revoke_failed:'We could not revoke the invitation. Nothing was changed. Try again.',invite_not_open:'That invitation is already used, revoked, or no longer available. Refresh before trying again.',access_unavailable:'We could not verify invitation access right now. Nothing was changed. Try again in a moment.',not_authorized:'This account does not have permission to manage invitations.'},
   es:{created:'Invitación creada. Copia el enlace más reciente y envíaselo a la persona invitada.',revoked:'Invitación revocada.',invalid_email:'Escribe un correo electrónico completo.',role_not_allowed:'Ese rol inicial no está permitido para invitaciones.',duplicate_open:'Ya existe una invitación abierta para este correo. Usa ese enlace abierto más reciente o revócalo antes de crear otro.',create_failed:'No pudimos crear la invitación. No se cambió nada. Inténtalo otra vez.',invite_missing:'No se encontró la invitación.',revoke_failed:'No pudimos revocar la invitación. No se cambió nada. Inténtalo otra vez.',invite_not_open:'Esa invitación ya fue usada, revocada o ya no está disponible. Actualiza la página antes de intentarlo otra vez.',access_unavailable:'No pudimos verificar el acceso a invitaciones en este momento. No se cambió nada. Inténtalo de nuevo en un momento.',not_authorized:'Esta cuenta no tiene permiso para administrar invitaciones.'}
@@ -18,22 +23,52 @@ const statusCopy={
 type Lang='en'|'es'
 function AccessRecovery({lang,kind}:{lang:Lang;kind:'unavailable'|'unauthorized'}){
   const es=lang==='es'
-  return <main className="shell"><header className="topbar"><Link href="/" className="brand">Kingdom <span>Network</span></Link></header><section className="card" style={{padding:24,maxWidth:720,margin:'30px auto'}}><div className="pill">{es?'INVITACIONES':'INVITATIONS'}</div><h1>{kind==='unavailable'?(es?'No pudimos verificar tu acceso.':'We could not verify your access.'):(es?'Acceso no disponible':'Access not available')}</h1><p className="muted">{kind==='unavailable'?(es?'Puede ser un problema temporal de conexión. No se creó, cambió ni revocó ninguna invitación.':'This may be a temporary connection problem. No invitation was created, changed, or revoked.'):(es?'Esta cuenta no tiene permiso para administrar invitaciones.':'This account does not have permission to manage invitations.')}</p><div className="row" style={{gap:10,flexWrap:'wrap'}}><Link className="btn" href={`/church/invites?lang=${lang}`}>{es?'Intentar de nuevo':'Try again'}</Link><Link className="ghost" href={`/?lang=${lang}`}>{es?'Inicio':'Home'}</Link><Link className="ghost" href={`/help?lang=${lang}`}>{es?'Ayuda':'Help'}</Link></div></section></main>
+  return <main className="shell"><header className="topbar"><Link href={`/?lang=${lang}`} className="brand">Kingdom <span>Network</span></Link></header><section className="card" style={{padding:24,maxWidth:720,margin:'30px auto'}}><div className="pill">{es?'INVITACIONES':'INVITATIONS'}</div><h1>{kind==='unavailable'?(es?'No pudimos verificar tu acceso.':'We could not verify your access.'):(es?'Acceso no disponible':'Access not available')}</h1><p className="muted">{kind==='unavailable'?(es?'Puede ser un problema temporal de conexión. No se creó, cambió ni revocó ninguna invitación.':'This may be a temporary connection problem. No invitation was created, changed, or revoked.'):(es?'Esta cuenta no tiene permiso para administrar invitaciones.':'This account does not have permission to manage invitations.')}</p><div className="row" style={{gap:10,flexWrap:'wrap'}}><Link className="btn" href={`/church/invites?lang=${lang}`}>{es?'Intentar de nuevo':'Try again'}</Link><Link className="ghost" href={`/?lang=${lang}`}>{es?'Inicio':'Home'}</Link><Link className="ghost" href={`/help?lang=${lang}`}>{es?'Ayuda':'Help'}</Link></div></section></main>
 }
 
 export default async function InvitesPage({searchParams}:{searchParams:Promise<{status?:string;lang?:string}>}){
   const query=await searchParams;const lang:Lang=query.lang==='es'?'es':'en';const es=lang==='es';const l=(p:string)=>`${p}${p.includes('?')?'&':'?'}lang=${lang}`
-  const supabase=await createClient();const {data:claims,error:claimsError}=await supabase.auth.getClaims();const userId=claims?.claims?.sub
+  let supabase
+  try{supabase=await createClient()}
+  catch(error){console.error('member invitations client unavailable',{errorCode:diagnosticCode(error,'client_unavailable')});return <AccessRecovery lang={lang} kind="unavailable"/>}
+
+  let claimsResult
+  try{claimsResult=await supabase.auth.getClaims()}
+  catch(error){console.error('member invitations auth transport failed',{errorCode:diagnosticCode(error,'auth_unavailable')});return <AccessRecovery lang={lang} kind="unavailable"/>}
+  const {data:claims,error:claimsError}=claimsResult
+  const userId=claims?.claims?.sub
   if(claimsError){console.error('member invitations auth lookup failed',{errorCode:boundedCode(claimsError.code)});return <AccessRecovery lang={lang} kind="unavailable"/>}
-  if(!userId)redirect(`/login?lang=${lang}&next=${encodeURIComponent(l('/church/invites'))}`)
-  const {data:membership,error:membershipError}=await supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).maybeSingle()
+  if(!userId)redirect(`/login?lang=${lang}&mode=signin&next=${encodeURIComponent(l('/church/invites'))}`)
+
+  let membershipResult
+  try{membershipResult=await supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).maybeSingle()}
+  catch(error){console.error('member invitations membership transport failed',{errorCode:diagnosticCode(error,'membership_unavailable')});return <AccessRecovery lang={lang} kind="unavailable"/>}
+  const {data:membership,error:membershipError}=membershipResult
   if(membershipError){console.error('member invitations membership lookup failed',{errorCode:boundedCode(membershipError.code)});return <AccessRecovery lang={lang} kind="unavailable"/>}
   if(!membership?.church_id||!['pastor','church_admin'].includes(membership.role))return <AccessRecovery lang={lang} kind="unauthorized"/>
-  const {data:invites,error:invitesError}=await supabase.from('church_invites').select('id,email,role,first_name,last_name,expires_at,redeemed_at,revoked_at,created_at,created_by,redeemed_by').eq('church_id',membership.church_id).order('created_at',{ascending:false}).limit(100)
+
+  let invites:any[]|null=null,invitesError:any=null
+  try{
+    const invitesResult=await supabase.from('church_invites').select('id,email,role,first_name,last_name,expires_at,redeemed_at,revoked_at,created_at,created_by,redeemed_by').eq('church_id',membership.church_id).order('created_at',{ascending:false}).limit(100)
+    invites=invitesResult.data
+    invitesError=invitesResult.error
+  }catch(error){
+    invitesError={code:diagnosticCode(error,'invites_unavailable')}
+    console.error('member invitations list transport failed',{errorCode:diagnosticCode(error,'invites_unavailable')})
+  }
   if(invitesError)console.error('member invitations list failed',{errorCode:boundedCode(invitesError.code)})
   const safeInvites=invitesError?[]:(invites??[])
   const ids=Array.from(new Set(safeInvites.flatMap((i:any)=>[i.created_by,i.redeemed_by]).filter(Boolean)))
-  let profiles:any[]=[];if(ids.length){const r=await supabase.from('profiles').select('id,display_name,first_name,last_name').in('id',ids);if(r.error)console.error('member invitations profile labels failed',{errorCode:boundedCode(r.error.code)});else profiles=r.data??[]}
+  let profiles:any[]=[]
+  if(ids.length){
+    try{
+      const r=await supabase.from('profiles').select('id,display_name,first_name,last_name').in('id',ids)
+      if(r.error)console.error('member invitations profile labels failed',{errorCode:boundedCode(r.error.code)})
+      else profiles=r.data??[]
+    }catch(error){
+      console.error('member invitations profile labels transport failed',{errorCode:diagnosticCode(error,'profiles_unavailable')})
+    }
+  }
   const pm=new Map(profiles.map((p:any)=>[p.id,p]));const person=(id?:string|null)=>{const p=id?pm.get(id):null;return p?.display_name||[p?.first_name,p?.last_name].filter(Boolean).join(' ')||'—'};const invitee=(i:any)=>[i.first_name,i.last_name].filter(Boolean).join(' ')
   const church:any=Array.isArray(membership.churches)?membership.churches[0]:membership.churches;const now=Date.now();const rows=safeInvites.map((i:any)=>({...i,state:i.redeemed_at?'redeemed':i.revoked_at?'revoked':new Date(i.expires_at).getTime()<=now?'expired':'open'}));const open=rows.filter((i:any)=>i.state==='open').length
   const notice=(query.status&&query.status in statusCopy[lang])?statusCopy[lang][query.status as keyof typeof statusCopy.en]:null;const success=query.status==='created'||query.status==='revoked'
