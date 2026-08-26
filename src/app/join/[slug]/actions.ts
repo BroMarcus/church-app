@@ -103,7 +103,11 @@ export async function joinChurch(formData:FormData){
     console.error('public church signup failed',{churchSlug:slug,code:boundedCode(error.code)})
     fail(joinSignupErrorCode(error))
   }
-  if(data.user&&Array.isArray(data.user.identities)&&data.user.identities.length===0){
+  if(!data?.user){
+    console.error('public church signup returned incomplete auth state',{churchSlug:slug,code:'auth_state_missing'})
+    fail('signup_failed')
+  }
+  if(Array.isArray(data.user.identities)&&data.user.identities.length===0){
     const next=`/join/${encodeURIComponent(slug)}?lang=${lang}`
     redirect(`/login?lang=${lang}&mode=signin&next=${encodeURIComponent(next)}&message_code=account_exists`)
   }
@@ -166,5 +170,9 @@ export async function joinExistingChurch(formData:FormData){
     console.error('existing-account church join returned no result',{churchSlug:slug,code:'empty_join_result'})
     fail('join_failed')
   }
-  redirect(`/start?lang=${lang}&message_code=${row?.already_member?'already_joined':'joined_existing'}`)
+  if(typeof row.already_member!=='boolean'){
+    console.error('existing-account church join returned malformed result',{churchSlug:slug,code:'malformed_join_result'})
+    fail('join_failed')
+  }
+  redirect(`/start?lang=${lang}&message_code=${row.already_member?'already_joined':'joined_existing'}`)
 }
