@@ -25,7 +25,8 @@ as $function$
   );
 $function$;
 
-revoke all on function private.can_operate_outreach_contact_group_history(uuid,uuid) from public,anon,authenticated;
+revoke all on function private.can_operate_outreach_contact_group_history(uuid,uuid) from public,anon;
+grant execute on function private.can_operate_outreach_contact_group_history(uuid,uuid) to authenticated;
 
 -- CONTACT READ -------------------------------------------------------------
 drop policy if exists outreach_read on public.outreach_contacts;
