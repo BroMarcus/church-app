@@ -30,7 +30,9 @@ set search_path to ''
 as $function$
 declare
   v_user uuid:=auth.uid();
-  v_link record;
+  v_link_id uuid;
+  v_church_id uuid;
+  v_source_group_id uuid;
   v_result text;
   v_interaction_id uuid;
   v_occurred_at timestamptz;
@@ -43,7 +45,7 @@ begin
   end if;
 
   select l.id,l.church_id,l.source_group_id,g.meeting_time,coalesce(c.timezone,'UTC')
-    into v_link.id,v_link.church_id,v_link.source_group_id,v_meeting_time,v_timezone
+    into v_link_id,v_church_id,v_source_group_id,v_meeting_time,v_timezone
   from public.outreach_source_links l
   join public.churches c on c.id=l.church_id
   join public.groups g on g.id=l.source_group_id and g.church_id=l.church_id and g.active=true
@@ -52,8 +54,8 @@ begin
     and l.active=true
     and (l.expires_at is null or l.expires_at>now());
 
-  if v_link.id is null then raise exception 'Friendship Group connection source is not available'; end if;
-  if not private.can_operate_group(v_link.source_group_id) then
+  if v_link_id is null then raise exception 'Friendship Group connection source is not available'; end if;
+  if not private.can_operate_group(v_source_group_id) then
     raise exception 'You do not have permission to record visits for this Friendship Group';
   end if;
 
@@ -77,8 +79,8 @@ begin
       set visit_ordinal=p_visit_ordinal,
           occurred_at=v_occurred_at
       where id=v_interaction_id
-        and church_id=v_link.church_id
-        and source_group_id=v_link.source_group_id;
+        and church_id=v_church_id
+        and source_group_id=v_source_group_id;
     end if;
   elsif v_result='needs_review' then
     update public.outreach_connection_reviews
@@ -86,8 +88,8 @@ begin
         reported_occurred_at=v_occurred_at,
         updated_at=now()
     where request_key=p_request_key
-      and church_id=v_link.church_id
-      and source_group_id=v_link.source_group_id
+      and church_id=v_church_id
+      and source_group_id=v_source_group_id
       and status='pending';
   end if;
 
