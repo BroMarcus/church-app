@@ -13,10 +13,21 @@ test('auth INSERT trigger never claims pre-existing Outreach history',()=>{
   assert.match(triggerSql,/if not v_unlinked_candidate_exists then/i)
 })
 
+test('auth INSERT creates a new linked Outreach row only when no unlinked candidate exists',()=>{
+  assert.match(triggerSql,/if not v_unlinked_candidate_exists then[\s\S]*?insert into public\.outreach_contacts/i)
+  assert.match(triggerSql,/member_user_id[\s\S]*?new\.id/i)
+  assert.match(triggerSql,/o\.member_user_id is null/i)
+})
+
 test('existing-account automatic claim requires a verified account email',()=>{
   assert.match(existingJoinSql,/u\.email_confirmed_at/)
   assert.match(existingJoinSql,/if v_email is null or v_email_confirmed_at is null then/i)
   assert.match(existingJoinSql,/A verified account email is required/i)
+})
+
+test('existing-account public join still grants only base member authority',()=>{
+  assert.match(existingJoinSql,/values\(\s*v_church\.id,v_user,'member','active','guest','public_join'\s*\)/s)
+  assert.doesNotMatch(existingJoinSql,/p_role/i)
 })
 
 test('phone is conflict detection only and cannot authorize an Outreach claim',()=>{
