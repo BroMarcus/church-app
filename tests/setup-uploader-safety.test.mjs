@@ -11,15 +11,15 @@ test('Fresh Church Setup requires an approved filename extension even when brows
 });
 
 test('Fresh Church Setup keeps browser client and path initialization inside safe upload recovery', () => {
-  assert.match(source, /setSaving\(true\);setStatus\(null\)\s*\n\s*let unlockAfterAttempt=true\s*\n\s*try\{\s*\n\s*const supabase=createClient\(\);const path=`\$\{churchId\}\/\$\{crypto\.randomUUID\(\)\}\/\$\{clean\(file\.name\)\}`/);
+  assert.match(source, /setSaving\(true\);setStatus\(null\)\s*\n\s*let unlockAfterAttempt=true\s*\n\s*let metadataCommitted=false\s*\n\s*try\{\s*\n\s*const supabase=createClient\(\);const path=`\$\{churchId\}\/\$\{crypto\.randomUUID\(\)\}\/\$\{clean\(file\.name\)\}`/);
   assert.doesNotMatch(source, /setSaving\(true\);setStatus\(null\)\s*\n\s*const supabase=createClient\(\)/);
-  assert.match(source, /SetupUploader unexpected failure'\,\{churchId,code:boundedCode\(error\)\}/);
+  assert.match(source, /SetupUploader unexpected failure'\,\{churchId,code:boundedCode\(error\),phase:metadataCommitted\?'post_commit':'pre_commit'\}/);
   assert.match(source, /finally\{if\(unlockAfterAttempt\)setSaving\(false\)\}/);
 });
 
 test('Fresh Church Setup keeps upload diagnostics bounded instead of logging raw exceptions', () => {
   assert.match(source, /const boundedCode=/);
-  assert.match(source, /SetupUploader unexpected failure'\,\{churchId,code:boundedCode\(error\)\}/);
+  assert.match(source, /SetupUploader unexpected failure'\,\{churchId,code:boundedCode\(error\),phase:/);
   assert.doesNotMatch(source, /SetupUploader unexpected failure'\,\{churchId,error\}/);
   assert.match(source, /code:boundedCode\(upload\.error\)/);
   assert.match(source, /code:boundedCode\(insert\.error\)/);
@@ -49,12 +49,25 @@ test('Fresh Church Setup cleans up uploaded storage after metadata transport fai
 });
 
 test('Fresh Church Setup keeps a confirmed successful upload locked until the page refreshes', () => {
-  assert.match(source, /let unlockAfterAttempt=true/);
-  assert.match(source, /unlockAfterAttempt=false\s*\n\s*setStatus\(\{kind:'success'/);
+  assert.match(source, /metadataCommitted=true\s*\n\s*unlockAfterAttempt=false\s*\n\s*setStatus\(\{kind:'success'/);
   assert.match(source, /Refreshing the page…/);
   assert.match(source, /Actualizando la página…/);
   assert.match(source, /window\.setTimeout\(\(\)=>window\.location\.reload\(\),700\)/);
+  assert.match(source, /const uploadSaved=status\?\.kind==='success'&&saving/);
+  assert.match(source, /The file has already been saved\. Do not upload it again\./);
+  assert.match(source, /El archivo ya fue guardado\. No lo vuelvas a subir\./);
+  assert.match(source, /Reload inbox/);
+  assert.match(source, /Recargar bandeja/);
   assert.match(source, /finally\{if\(unlockAfterAttempt\)setSaving\(false\)\}/);
+});
+
+test('Fresh Church Setup does not turn a post-commit refresh problem into a false upload failure', () => {
+  assert.match(source, /let metadataCommitted=false/);
+  assert.match(source, /metadataCommitted=true/);
+  assert.match(source, /if\(metadataCommitted\)\{unlockAfterAttempt=false;savedButRefreshFailed\(\)\}/);
+  assert.match(source, /The file was saved, but this page did not refresh\. Do not upload it again\./);
+  assert.match(source, /El archivo sí se guardó, pero esta página no se actualizó\. No vuelvas a subirlo\./);
+  assert.doesNotMatch(source, /if\(metadataCommitted\)\{[^}]*fail\(\)/);
 });
 
 test('Fresh Church Setup warns pilot testers not to upload sensitive real-world records', () => {
