@@ -89,6 +89,12 @@ A Madera pilot is PILOT PROVEN when all of the following are true:
 8. Feedback has been triaged, and remaining requests are classified as P2, KEEP/REPAIR/HIDE, or Phase 2 rather than being left ambiguous.
 9. Marcus confirms the system is useful enough to continue operating at Madera while the next phase is planned.
 
+### Borderline gate authority
+
+ChatGPT must report each criterion as PASS, FAIL, or BORDERLINE with the evidence and reasoning. ChatGPT should recommend whether the gate is met, but Marcus, as founder, makes the final go/no-go decision when a criterion requires ministry or product judgment.
+
+Marcus should not override a verified P0 security, privacy, tenant-isolation, or data-integrity failure merely to advance the phase. Those remain hard blockers until corrected and verified.
+
 If the four-week window ends and the gate is not met:
 - do not open broad feature work
 - identify the smallest set of unresolved P0/P1 causes
