@@ -98,7 +98,10 @@ export async function submitGroupReport(formData:FormData){
 
   const namedGuests=Array.from({length:5},(_,i)=>{const n=i+1;return {first_name:text(formData,`guest_${n}_first_name`),last_name:text(formData,`guest_${n}_last_name`)||null,phone:text(formData,`guest_${n}_phone`)||null,email:text(formData,`guest_${n}_email`)||null}}).filter(g=>g.first_name)
   const baptismNames=names(text(formData,'baptism_names')),holyGhostNames=names(text(formData,'holy_ghost_names')),meetingDate=text(formData,'meeting_date')
-  const meetingType=['regular','outreach','fellowship','special'].includes(text(formData,'meeting_type'))?text(formData,'meeting_type'):'regular'
+  const requestedMeetingType=text(formData,'meeting_type')
+  const allowedMeetingTypes=['regular','matthew_party','picnic','barbecue','special_event','other']
+  const legacyMeetingTypeAliases:Record<string,string>={outreach:'other',fellowship:'other',special:'special_event'}
+  const meetingType=allowedMeetingTypes.includes(requestedMeetingType)?requestedMeetingType:(legacyMeetingTypeAliases[requestedMeetingType]??'regular')
   if(!/^\d{4}-\d{2}-\d{2}$/.test(meetingDate))redirect(`/groups/${groupId}?error=`+encodeURIComponent('Choose a valid meeting date.'))
 
   const [{data:roster},{data:checkins},{data:wallPrayers}]=await Promise.all([
@@ -114,7 +117,11 @@ export async function submitGroupReport(formData:FormData){
   const prayerNeeds=[leaderPrayer,wallPrayerText?`Group prayer wall:\n${wallPrayerText}`:''].filter(Boolean).join('\n\n')||null
 
   const {data:report,error}=await supabase.from('group_reports').insert({group_id:groupId,submitted_by:userId,meeting_date:meetingDate,attendance_count:attendanceCount,first_time_guests:firstTimeGuests,active_bible_studies:number(formData,'active_bible_studies'),baptisms,holy_ghost_received:holyGhostReceived,lesson_title:text(formData,'lesson_title')||null,follow_up_notes:text(formData,'follow_up_notes')||null,meeting_type:meetingType,location_label:text(formData,'location_label')||null,prayer_needs:prayerNeeds,issues_notes:text(formData,'issues_notes')||null,general_notes:text(formData,'general_notes')||null}).select('id').single()
-  if(error||!report){console.error('submitGroupReport failed',{message:error?.message});redirect(`/groups/${groupId}?error=`+encodeURIComponent('Unable to save the group report.'))}
+  if(error||!report){
+    console.error('submitGroupReport failed',{code:error?.code,message:error?.message})
+    const message=error?.code==='23505'?'A report for this meeting date already exists. It was not submitted twice.':'We could not save the group report. Check the information and try again.'
+    redirect(`/groups/${groupId}?error=`+encodeURIComponent(message))
+  }
 
   let attendanceRecorded=0
   if(attendanceRows.length){const {error:attendanceError}=await supabase.from('group_report_attendance').insert(attendanceRows.map(r=>({church_id:group.church_id,group_id:groupId,group_report_id:report.id,user_id:r.user_id,present:r.status!=='missing',attendance_status:r.status,checked_in_at:r.checked_in_at})));if(attendanceError)console.error('group report attendance failed',{message:attendanceError.message});else attendanceRecorded=attendanceRows.length}

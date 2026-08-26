@@ -1,0 +1,79 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import {readFile} from 'node:fs/promises'
+
+const read=(path)=>readFile(new URL(`../${path}`,import.meta.url),'utf8')
+
+test('Friendship Group join actions prevent duplicate mobile submissions',async()=>{
+  const source=await read('src/app/groups/[groupId]/join-requests.tsx')
+  assert.match(source,/useFormStatus/)
+  assert.match(source,/disabled=\{pending\}/)
+  assert.match(source,/aria-disabled=\{pending\}/)
+  assert.match(source,/You do not need to send another request\./)
+  assert.match(source,/No necesitas enviar otra solicitud\./)
+})
+
+test('Friendship Group join states are available in English and Spanish',async()=>{
+  const source=await read('src/app/groups/[groupId]/join-requests.tsx')
+  assert.match(source,/Request to join/)
+  assert.match(source,/Solicitar unirme/)
+  assert.match(source,/This group is currently full\./)
+  assert.match(source,/Este grupo está lleno por ahora\./)
+  assert.match(source,/Your request is pending\./)
+  assert.match(source,/Tu solicitud está pendiente\./)
+})
+
+test('Friendship Groups crash recovery is language-aware and avoids provider text',async()=>{
+  const source=await read('src/app/groups/error.tsx')
+  assert.match(source,/params\.get\('lang'\)==='es'/)
+  assert.match(source,/We could not load your groups\./)
+  assert.match(source,/No pudimos cargar tus grupos\./)
+  assert.match(source,/Try again/)
+  assert.match(source,/Intentar de nuevo/)
+  assert.match(source,/console\.error\('Friendship Groups route failed'/)
+  assert.doesNotMatch(source,/error\.message/)
+})
+
+test('Friendship Groups loading state follows selected language and announces progress',async()=>{
+  const source=await read('src/app/groups/loading.tsx')
+  assert.match(source,/params\.get\('lang'\)==='es'/)
+  assert.match(source,/aria-busy="true"/)
+  assert.match(source,/aria-live="polite"/)
+  assert.match(source,/Loading your groups…/)
+  assert.match(source,/Cargando tus grupos…/)
+  assert.doesNotMatch(source,/Friendship Groups \/ Grupos de Amistad/)
+})
+
+test('Friendship Group leader settings prevent repeat saves on slow phones',async()=>{
+  const source=await read('src/app/groups/[groupId]/group-settings.tsx')
+  assert.match(source,/useFormStatus/)
+  assert.match(source,/disabled=\{pending\}/)
+  assert.match(source,/aria-disabled=\{pending\}/)
+  assert.match(source,/Tap Save once\./)
+  assert.match(source,/Toca Guardar una sola vez\./)
+})
+
+test('Friendship Group leader settings follow selected English or Spanish language',async()=>{
+  const source=await read('src/app/groups/[groupId]/group-settings.tsx')
+  assert.match(source,/useSearchParams/)
+  assert.match(source,/searchParams\.get\('lang'\)==='es'/)
+  assert.match(source,/Meeting information/)
+  assert.match(source,/Información de la reunión/)
+  assert.match(source,/Save meeting details/)
+  assert.match(source,/Guardar detalles de la reunión/)
+  assert.match(source,/Solo miembros del grupo y liderazgo autorizado/)
+})
+
+test('Friendship Group reports normalize UI meeting types to the live database contract',async()=>{
+  const source=await read('src/app/groups/actions.ts')
+  assert.match(source,/allowedMeetingTypes=\['regular','matthew_party','picnic','barbecue','special_event','other'\]/)
+  assert.match(source,/legacyMeetingTypeAliases:Record<string,string>=\{outreach:'other',fellowship:'other',special:'special_event'\}/)
+  assert.doesNotMatch(source,/\['regular','outreach','fellowship','special'\]\.includes/)
+})
+
+test('Friendship Group reports turn duplicate date submits into a safe recovery message',async()=>{
+  const source=await read('src/app/groups/actions.ts')
+  assert.match(source,/error\?\.code==='23505'/)
+  assert.match(source,/A report for this meeting date already exists\. It was not submitted twice\./)
+  assert.match(source,/We could not save the group report\. Check the information and try again\./)
+})
