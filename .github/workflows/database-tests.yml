@@ -1,0 +1,111 @@
+name: Supabase Migration Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/tests/**'
+      - '.github/workflows/database-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-migration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.115.0
+
+      - name: Show Supabase CLI version
+        run: supabase --version
+
+      - name: Initialize disposable local Supabase config
+        run: |
+          if [ ! -f supabase/config.toml ]; then
+            supabase init
+          fi
+
+      - name: Start disposable local database
+        run: supabase db start
+
+      - name: Replay full migration chain from scratch
+        run: supabase db reset
+
+      - name: Verify Package 1 database objects
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql 'postgresql://postgres:postgres@127.0.0.1:54322/postgres' -v ON_ERROR_STOP=1 <<'SQL'
+          do $$
+          begin
+            if to_regclass('public.outreach_source_links') is null then
+              raise exception 'outreach_source_links is missing';
+            end if;
+            if to_regclass('public.outreach_connection_receipts') is null then
+              raise exception 'outreach_connection_receipts is missing';
+            end if;
+            if to_regclass('public.outreach_connection_reviews') is null then
+              raise exception 'outreach_connection_reviews is missing';
+            end if;
+            if not exists (
+              select 1 from information_schema.columns
+              where table_schema='public' and table_name='outreach_contacts' and column_name='first_steps_interest'
+            ) then
+              raise exception 'outreach_contacts.first_steps_interest is missing';
+            end if;
+            if not exists (
+              select 1 from information_schema.columns
+              where table_schema='public' and table_name='outreach_interactions' and column_name='source_key'
+            ) then
+              raise exception 'outreach_interactions.source_key is missing';
+            end if;
+            if not exists (
+              select 1 from information_schema.columns
+              where table_schema='public' and table_name='outreach_interactions' and column_name='visit_ordinal'
+            ) then
+              raise exception 'outreach_interactions.visit_ordinal is missing';
+            end if;
+            if to_regprocedure('public.resolve_outreach_source_link(text)') is null then
+              raise exception 'resolve_outreach_source_link is missing';
+            end if;
+            if to_regprocedure('public.submit_outreach_connection(text,uuid,text,text,text,text,text,boolean,boolean,boolean,boolean,text)') is null then
+              raise exception 'submit_outreach_connection is missing';
+            end if;
+            if to_regprocedure('public.resolve_outreach_connection_review(uuid,uuid,boolean)') is null then
+              raise exception 'resolve_outreach_connection_review is missing';
+            end if;
+            if to_regprocedure('public.record_friendship_group_guest_visit(uuid,uuid,integer,text,text,text,text,text)') is null then
+              raise exception 'record_friendship_group_guest_visit is missing';
+            end if;
+            if not exists (
+              select 1 from pg_policies
+              where schemaname='public' and tablename='outreach_contacts' and policyname='outreach_read'
+            ) then
+              raise exception 'outreach_read policy is missing';
+            end if;
+            if not exists (
+              select 1 from pg_policies
+              where schemaname='public' and tablename='outreach_contacts' and policyname='outreach_update'
+            ) then
+              raise exception 'outreach_update policy is missing';
+            end if;
+          end
+          $$;
+          SQL
+
+      - name: Stop disposable local database
+        if: always()
+        run: supabase stop --no-backup || true
