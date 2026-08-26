@@ -5,8 +5,18 @@ import { Upload } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 const clean=(name:string)=>name.replace(/[^a-zA-Z0-9._-]/g,'_').slice(-140)||'upload'
-const allowedTypes=new Set(['application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.ms-powerpoint','application/vnd.openxmlformats-officedocument.presentationml.presentation','text/plain','image/jpeg','image/png','image/webp'])
-const allowedExtensions=new Set(['.pdf','.doc','.docx','.ppt','.pptx','.txt','.jpg','.jpeg','.png','.webp'])
+const allowedMimesByExtension=new Map<string,ReadonlySet<string>>([
+ ['.pdf',new Set(['application/pdf'])],
+ ['.doc',new Set(['application/msword'])],
+ ['.docx',new Set(['application/vnd.openxmlformats-officedocument.wordprocessingml.document'])],
+ ['.ppt',new Set(['application/vnd.ms-powerpoint'])],
+ ['.pptx',new Set(['application/vnd.openxmlformats-officedocument.presentationml.presentation'])],
+ ['.txt',new Set(['text/plain'])],
+ ['.jpg',new Set(['image/jpeg'])],
+ ['.jpeg',new Set(['image/jpeg'])],
+ ['.png',new Set(['image/png'])],
+ ['.webp',new Set(['image/webp'])]
+])
 const allowedCategories=new Set(['unsorted','curriculum','forms','branding','leadership','policies','certificates','media','calendar','other'])
 type UploadStatus={kind:'success'|'error';message:string}|null
 
@@ -30,13 +40,15 @@ export function SetupUploader({churchId,userId,lang}:{churchId:string;userId:str
   if(!file||!file.size){fail(es?'Selecciona un archivo primero.':'Choose a file first.');return}
   if(file.size>20*1024*1024){fail(es?'El archivo debe ser de 20 MB o menos.':'File must be 20 MB or smaller.');return}
   const extension=file.name.toLowerCase().match(/\.[^.]+$/)?.[0]??''
-  if(!allowedExtensions.has(extension)||(file.type&&!allowedTypes.has(file.type))){fail(es?'Ese tipo de archivo no está permitido. Usa PDF, Word, PowerPoint, texto o una imagen.':'That file type is not allowed. Use PDF, Word, PowerPoint, text, or an image.');return}
+  const allowedMimes=allowedMimesByExtension.get(extension)
+  const normalizedMime=file.type.trim().toLowerCase()
+  if(!allowedMimes||(normalizedMime&&!allowedMimes.has(normalizedMime))){fail(es?'Ese tipo de archivo no está permitido o no coincide con su extensión. Usa PDF, Word, PowerPoint, texto o una imagen.':'That file type is not allowed or does not match its extension. Use PDF, Word, PowerPoint, text, or an image.');return}
   setSaving(true);setStatus(null)
   let unlockAfterAttempt=true
   let metadataCommitted=false
   try{
    const supabase=createClient();const path=`${churchId}/${crypto.randomUUID()}/${clean(file.name)}`
-   const upload=await supabase.storage.from('church-setup').upload(path,file,{contentType:file.type||undefined,upsert:false})
+   const upload=await supabase.storage.from('church-setup').upload(path,file,{contentType:normalizedMime||undefined,upsert:false})
    if(upload.error){console.error('SetupUploader storage upload failed',{churchId,code:boundedCode(upload.error)});fail();return}
    const cleanupUploadedFile=async()=>{
     for(let attempt=1;attempt<=2;attempt++){
@@ -54,7 +66,7 @@ export function SetupUploader({churchId,userId,lang}:{churchId:string;userId:str
    const notes=String(formData.get('notes')||'').trim().slice(0,1000)||null
    let insert
    try{
-    insert=await supabase.from('church_setup_uploads').insert({church_id:churchId,uploaded_by:userId,file_name:file.name.slice(0,255),storage_path:path,content_type:file.type||null,size_bytes:file.size,category,notes,suggested_destination:category==='curriculum'?'Learning Center':category==='branding'?'Church Settings / Media':category==='leadership'?'Leadership records':category==='forms'?'Forms & workflows':category==='calendar'?'Calendar':'Kingdom Guide review queue'})
+    insert=await supabase.from('church_setup_uploads').insert({church_id:churchId,uploaded_by:userId,file_name:file.name.slice(0,255),storage_path:path,content_type:normalizedMime||null,size_bytes:file.size,category,notes,suggested_destination:category==='curriculum'?'Learning Center':category==='branding'?'Church Settings / Media':category==='leadership'?'Leadership records':category==='forms'?'Forms & workflows':category==='calendar'?'Calendar':'Kingdom Guide review queue'})
    }catch(error){
     console.error('SetupUploader metadata insert transport failed',{churchId,code:boundedCode(error)})
     if(!(await cleanupUploadedFile())){failCleanupUncertain();return}
