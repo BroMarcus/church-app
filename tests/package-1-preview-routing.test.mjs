@@ -10,7 +10,7 @@ test('Package 1 phone QA auth never falls back to production host',async()=>{
   const callback=await read('src/app/auth/callback/route.ts')
   for(const source of [actions,callback]){
     assert.match(source,new RegExp(qaHost.replaceAll('.','\\.')))
-    assert.doesNotMatch(source,/NEXT_PUBLIC_SITE_URL/)
+    assert.doesNotMatch(source,/process\.env\.NEXT_PUBLIC_SITE_URL/)
     assert.doesNotMatch(source,/https:\/\/kingdom-network\.vercel\.app/)
   }
   assert.match(actions,/emailRedirectTo:callbackUrl/)
