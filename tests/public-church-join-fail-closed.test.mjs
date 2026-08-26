@@ -32,6 +32,13 @@ test('public church join server action fails closed when client, status, or sign
   assert.match(actions,/public church signup transport unavailable[\s\S]*fail\('signup_failed'\)/)
 })
 
+test('public church signup requires a real auth user before reporting account creation',()=>{
+  assert.match(actions,/if\(!data\?\.user\)[\s\S]*auth_state_missing[\s\S]*fail\('signup_failed'\)/)
+  const missingUserIndex=actions.indexOf("if(!data?.user)")
+  const accountCreatedIndex=actions.indexOf("message_code=account_created")
+  assert.ok(missingUserIndex>=0&&accountCreatedIndex>missingUserIndex)
+})
+
 test('public church signup classifies stable auth codes instead of provider message text',()=>{
   assert.match(actions,/function joinSignupErrorCode\(error:\{code\?:unknown;status\?:unknown\}\)/)
   assert.match(actions,/over_email_send_rate_limit/)
@@ -77,13 +84,15 @@ test('public join diagnostics are bounded and do not log provider messages',()=>
   assert.doesNotMatch(page,/console\.error\([^\n]+message:/)
 })
 
-test('existing-account join fails closed on client, auth, rpc uncertainty, or empty result',()=>{
+test('existing-account join fails closed on client, auth, rpc uncertainty, empty result, or malformed success state',()=>{
   assert.match(actions,/existing-account church join client unavailable[\s\S]*fail\('join_failed'\)/)
   assert.match(actions,/existing-account church join auth transport unavailable[\s\S]*fail\('join_failed'\)/)
   assert.match(actions,/data:claims,error:claimsError/)
   assert.match(actions,/if\(claimsError\)[\s\S]*fail\('join_failed'\)/)
   assert.match(actions,/existing-account church join transport unavailable[\s\S]*fail\('join_failed'\)/)
   assert.match(actions,/if\(!row\)[\s\S]*empty_join_result[\s\S]*fail\('join_failed'\)/)
+  assert.match(actions,/if\(typeof row\.already_member!==['"]boolean['"]\)[\s\S]*malformed_join_result[\s\S]*fail\('join_failed'\)/)
+  assert.match(actions,/row\.already_member\?'already_joined':'joined_existing'/)
 })
 
 test('existing-account join uses the pending submit button to block repeat taps',()=>{
