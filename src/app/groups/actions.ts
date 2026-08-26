@@ -96,7 +96,7 @@ export async function submitGroupReport(formData:FormData){
   const {data:group,error:groupError}=await supabase.from('groups').select('church_id,leader_id,name').eq('id',groupId).single()
   if(groupError||!group?.church_id)redirect(`/groups/${groupId}?error=`+encodeURIComponent('Group not found or unavailable.'))
 
-  const namedGuests=Array.from({length:5},(_,i)=>{const n=i+1;return {first_name:text(formData,`guest_${n}_first_name`),last_name:text(formData,`guest_${n}_last_name`)||null,phone:text(formData,`guest_${n}_phone`)||null,email:text(formData,`guest_${n}_email`)||null}}).filter(g=>g.first_name)
+  const namedGuests=Array.from({length:5},(_,i)=>{const n=i+1;return {slot:n,first_name:text(formData,`guest_${n}_first_name`),last_name:text(formData,`guest_${n}_last_name`)||null,phone:text(formData,`guest_${n}_phone`)||null,email:text(formData,`guest_${n}_email`)||null}}).filter(g=>g.first_name)
   const baptismNames=names(text(formData,'baptism_names')),holyGhostNames=names(text(formData,'holy_ghost_names')),meetingDate=text(formData,'meeting_date')
   const meetingType=['regular','outreach','fellowship','special'].includes(text(formData,'meeting_type'))?text(formData,'meeting_type'):'regular'
   if(!/^\d{4}-\d{2}-\d{2}$/.test(meetingDate))redirect(`/groups/${groupId}?error=`+encodeURIComponent('Choose a valid meeting date.'))
@@ -119,13 +119,41 @@ export async function submitGroupReport(formData:FormData){
   let attendanceRecorded=0
   if(attendanceRows.length){const {error:attendanceError}=await supabase.from('group_report_attendance').insert(attendanceRows.map(r=>({church_id:group.church_id,group_id:groupId,group_report_id:report.id,user_id:r.user_id,present:r.status!=='missing',attendance_status:r.status,checked_in_at:r.checked_in_at})));if(attendanceError)console.error('group report attendance failed',{message:attendanceError.message});else attendanceRecorded=attendanceRows.length}
 
-  let guestsAdded=0,duplicateGuests=0
-  const followUpDue=new Date(Date.now()+24*60*60*1000).toISOString(),owner=group.leader_id||userId
-  for(const guest of namedGuests){const {error:guestError}=await supabase.from('outreach_contacts').insert({church_id:group.church_id,created_by:userId,assigned_to:owner,first_name:guest.first_name,last_name:guest.last_name,phone:guest.phone,email:guest.email,stage:'guest',bible_study_interest:false,messaging_consent:false,follow_up_due_at:followUpDue,notes:`Added from Friendship Group: ${group.name}${meetingDate?` • ${meetingDate}`:''}`});if(!guestError)guestsAdded++;else if(guestError.code==='23505')duplicateGuests++}
+  let guestsAdded=0,duplicateGuests=0,guestNeedsIdentity=0,guestSyncFailed=0
+  for(const guest of namedGuests){
+    const {data:guestResult,error:guestError}=await supabase.rpc('record_group_report_guest_outreach',{
+      p_group_report_id:report.id,
+      p_guest_slot:guest.slot,
+      p_first_name:guest.first_name,
+      p_last_name:guest.last_name,
+      p_phone:guest.phone,
+      p_email:guest.email,
+      p_language:'en'
+    })
+    if(guestError){console.error('group report Outreach sync failed',{message:guestError.message});guestSyncFailed++;continue}
+    const row=Array.isArray(guestResult)?guestResult[0]:guestResult
+    const result=String((row as any)?.result??'')
+    if(result==='connected')guestsAdded++
+    else if(result==='needs_review')duplicateGuests++
+    else if(result==='needs_identity')guestNeedsIdentity++
+    else guestSyncFailed++
+  }
 
   const milestoneRows=[...baptismNames.map(person_name=>({person_name,milestone_type:'baptism'})),...holyGhostNames.map(person_name=>({person_name,milestone_type:'holy_ghost'}))]
   if(milestoneRows.length)await supabase.from('reported_milestones').insert(milestoneRows.map(m=>({church_id:group.church_id,group_id:groupId,group_report_id:report.id,reported_by:userId,person_name:m.person_name,milestone_type:m.milestone_type,occurred_on:meetingDate||null,status:'pending'})))
 
   revalidatePath(`/groups/${groupId}`);revalidatePath('/journey');revalidatePath('/outreach');revalidatePath('/church/analytics')
-  const params=new URLSearchParams({reported:'1',attendance_recorded:String(attendanceRecorded)});if(guestsAdded)params.set('guests_added',String(guestsAdded));if(duplicateGuests)params.set('guest_duplicates',String(duplicateGuests));if(milestoneRows.length)params.set('milestones_queued',String(milestoneRows.length));redirect(`/groups/${groupId}?${params.toString()}`)
+  const params=new URLSearchParams({reported:'1',attendance_recorded:String(attendanceRecorded)})
+  if(guestsAdded)params.set('guests_added',String(guestsAdded))
+  if(duplicateGuests)params.set('guest_duplicates',String(duplicateGuests))
+  if(guestNeedsIdentity)params.set('guest_needs_identity',String(guestNeedsIdentity))
+  if(guestSyncFailed)params.set('guest_sync_failed',String(guestSyncFailed))
+  if(milestoneRows.length)params.set('milestones_queued',String(milestoneRows.length))
+  if(guestSyncFailed||guestNeedsIdentity){
+    const parts=[] as string[]
+    if(guestSyncFailed)parts.push(`${guestSyncFailed} named guest${guestSyncFailed===1?'':'s'} could not be synced to Outreach with certainty`)
+    if(guestNeedsIdentity)parts.push(`${guestNeedsIdentity} named guest${guestNeedsIdentity===1?' needs':'s need'} a phone or email before Kingdom Network can safely create or reuse a person`)
+    params.set('error',`Report saved. ${parts.join('. ')}.`)
+  }
+  redirect(`/groups/${groupId}?${params.toString()}`)
 }
