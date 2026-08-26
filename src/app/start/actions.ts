@@ -42,5 +42,10 @@ export async function completeOnboarding(formData:FormData){
     console.error('start onboarding save failed',{code:boundedCode(updateResult.error.code)})
     redirect(`/start?lang=${lang}&error_code=onboarding_save_failed`)
   }
+  const updatedUser=updateResult.data?.user
+  if(!updatedUser||updatedUser.id!==user.id||updatedUser.user_metadata?.onboarding_completed!==true||updatedUser.user_metadata?.preferred_language!==lang){
+    console.error('start onboarding save returned incomplete state',{code:'onboarding_state_unconfirmed'})
+    redirect(`/start?lang=${lang}&error_code=onboarding_save_failed`)
+  }
   redirect(`/${lang==='es'?'?lang=es':''}`)
 }
