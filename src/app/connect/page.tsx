@@ -24,6 +24,7 @@ export default async function ConnectSharePage({searchParams}:{searchParams:Prom
   if(!membership?.church_id)redirect('/')
   const churchId=membership.church_id
   const church:any=Array.isArray(membership.churches)?membership.churches[0]:membership.churches
+  const {data:manageOutreach}=await supabase.rpc('current_user_has_church_permission',{p_church_id:churchId,p_permission_key:'manage_outreach'})
 
   const [{data:groupMemberships},{data:links}]=await Promise.all([
     supabase.from('group_memberships').select('group_id,role').eq('user_id',userId),
@@ -34,7 +35,7 @@ export default async function ConnectSharePage({searchParams}:{searchParams:Prom
   let groups:any[]=[]
   if(groupIds.length){const r=await supabase.from('groups').select('id,name,meeting_day,meeting_time,location_label,language_code,active').in('id',groupIds).eq('active',true);groups=r.data??[]}
   const groupMap=new Map(groups.map((g:any)=>[g.id,g]))
-  const advanced=['pastor','church_admin'].includes(String(membership.role??''))
+  const advanced=['pastor','church_admin'].includes(String(membership.role??''))||Boolean(manageOutreach)
   let events:any[]=[]
   if(advanced){const r=await supabase.from('events').select('id,title,starts_at').eq('church_id',churchId).order('starts_at',{ascending:false}).limit(20);events=r.data??[]}
 
