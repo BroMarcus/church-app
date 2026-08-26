@@ -1,10 +1,8 @@
 # Kingdom Network Pilot Combined Release Snapshot
 
-Snapshot date: 2026-08-24
+Snapshot refreshed: 2026-08-26
 
-This file pins the exact draft PR heads that the combined-integration manifest was reviewed against. It is intentionally separate from the long-form integration policy so later PR drift is obvious and reviewable.
-
-Production deployment remains **HOLD**. These SHAs are integration inputs, not permission to merge or deploy individually.
+This file pins the exact draft PR authority inputs used for reconciliation and records the latest verified combined V1 pilot checkpoint. Production deployment remains **HOLD**. These SHAs are integration inputs, not permission to merge or deploy individually.
 
 ## Core pilot queue
 
@@ -21,33 +19,40 @@ Production deployment remains **HOLD**. These SHAs are integration inputs, not p
 | #52 | Pilot Readiness + exact-build bilingual Phone Proof | `feb88ce48a9e489f971415c934b820c4f7ec3281` | Readiness authority |
 | #53 | Private Care / Help | `15b3aaa5420926fdb8d1a0f33ada20dc6d03694a` | Isolated Private Care hardening |
 
-All ten core PRs were open, draft, and reported mergeable at this snapshot. Each listed authority batch had a successful Kingdom Network Build on the head recorded above; PR #31's previously stale description was separately verified against Build #825, which completed successfully on its exact recorded head.
+All ten authority inputs above were separately reviewed before the combined candidate was assembled. Their exact SHAs remain pinned so drift is visible rather than silently absorbed.
 
 ## Current combined V1 candidate checkpoint
 
 - Draft PR: #55 `Combined V1 pilot candidate — auth, onboarding, Guide, Builder, readiness`
 - Branch: `automation/combined-v1-pilot-candidate`
-- Latest fully verified combined implementation head before this release-record refresh: `66b5d593b28d3d1101756ba5697fb00d99881181`
-- Kingdom Network Build #1301: **SUCCESS** — dependency install, security/regression suite, lint, and full Next.js production build all passed on that exact implementation head.
-- PR #55 remained draft + mergeable and 237 commits ahead / 0 behind `main` at that checkpoint.
-- The release-record refresh itself is metadata/test-only and still requires its own exact-head Kingdom Network Build before READY status is restored.
-- Production deployment remains on HOLD.
+- Exact verified implementation head: `01232604d5bfe1faf244320903b75d20e0b288b8`
+- Kingdom Network Build #1413: **SUCCESS** — dependency install, security/regression suite, lint, and full Next.js production build all passed on that exact head.
+- PR #55 remained draft + mergeable and 349 commits ahead / 0 behind `main` at this checkpoint.
+- Production deployment remains on hold.
 
-### Auth success-state certainty extension
+### Current certainty and low-tech protections
 
-The combined candidate now refuses to treat an Auth response as successful merely because no explicit provider error was returned:
+The combined candidate refuses to treat incomplete or malformed backend responses as successful user outcomes:
 
 - password sign-in requires a real authenticated user and session before invitation redemption, church-return routing, onboarding inference, or Home;
 - signup requires an Auth user before showing `account created`; confirmation-required signup may still legitimately have no session;
+- public church-link signup now also requires an actual Auth user before reporting account creation;
 - the modern PKCE callback requires both user and session before treating confirmation/recovery as verified;
 - the token-hash verification path requires both user and session before password recovery or private-invitation redemption;
 - password update requires Auth to return the updated user before Kingdom Network shows completion or begins post-reset sign-out cleanup;
-- incomplete Auth success payloads fail closed into the existing bilingual retry paths and do not get mislabeled as expired links;
-- safe private-invite and `/join/*` context remains attached to retry/recovery paths;
-- diagnostics remain bounded and do not expose raw provider exception text;
-- focused regression coverage protects the full sign-in → signup → callback → token-hash verify → password-update certainty chain.
+- existing-account public church joining requires the RPC `already_member` value to be an actual boolean before choosing the already-joined vs newly-joined Start Here success state;
+- incomplete Auth or join success payloads fail closed into bilingual retry/help paths instead of inventing a success state;
+- safe private-invite and `/join/*` context remains attached to retry/recovery paths where appropriate;
+- diagnostics remain bounded and do not expose raw provider exception text.
 
-This closes a false-success class that could otherwise send a low-tech user into the wrong next step even though Auth had not produced a complete verified state.
+### Fresh Church Setup upload safety
+
+- uploads remain locked after a confirmed save until Setup Inbox refreshes, preventing slow-phone duplicate uploads;
+- metadata-write failure attempts storage cleanup before allowing retry, and uncertain cleanup tells the user not to upload the same file again yet;
+- filename extension is required even when the browser reports a MIME type;
+- when browser MIME is present it must match the approved extension (PDF/Word/PowerPoint/text/JPEG/PNG/WebP) instead of merely being independently allowlisted;
+- the normalized accepted MIME is used for storage metadata;
+- pilot testers are warned not to upload real member records, private pastoral notes, finance files, passwords, or access codes.
 
 ### Read-only runtime audit
 
@@ -67,26 +72,26 @@ These are deliberately not absorbed blindly into the core pilot reconciliation:
 | #45 | Friendship Group prayer hardening | `9186aa96f39cc2a8c9035c3e693ab8ad827a711b` | Integrate under Friendship Groups ownership/conflict plan |
 | #46 | V2 Step 1 foundation | `e728526fcadeeec7ae49888a6262dfe96090e7fe` | **Exclude from V1 combined pilot release** pending founder preview acceptance |
 
-Finance / Reporting / Multi-Church Licensing remains separately claimed. No combined-release worker may resolve Finance, role, RLS, or schema conflicts by choosing a side casually.
+Finance / Reporting / Multi-Church Licensing and Package C Leadership Hub / Unified Scheduling remain separately claimed. No combined-release worker may resolve Finance, role, RLS, schema, scheduling, or leadership conflicts by casually choosing a side.
 
 ## Drift rule
 
 Before building or approving the combined candidate:
 
-1. Re-fetch every intended PR head.
-2. If any SHA differs from this snapshot, stop treating this snapshot as current for that PR.
-3. Review the new diff and CI result before updating the pinned SHA.
+1. Re-fetch every intended authority PR head.
+2. If any SHA differs from this snapshot, stop treating the old snapshot as current for that PR.
+3. Review the new diff and CI result before updating a pinned SHA.
 4. Re-run the combined integration regression after any snapshot change.
 5. Never substitute a branch name alone for an exact commit SHA in pilot acceptance evidence.
 6. Any new commit on PR #55 creates a new exact head and requires a fresh Kingdom Network Build before READY status is restored.
 
 ## Combined-candidate gate
 
-The combined candidate must still satisfy the full manifest. At minimum:
+The combined candidate must still satisfy the full integration manifest. At minimum:
 
 - exact combined head passes dependency install, security/regression tests, lint, and the full Next.js production build;
 - no unresolved merge-conflict markers remain;
-- no unowned Finance/role/RLS/schema/Auth-config changes appear;
+- no unowned Finance/role/RLS/schema/Auth-config or Package C scheduling/leadership changes appear;
 - V2 code is absent from the V1 pilot candidate;
 - newest auth/Home/Guide/Readiness authorities survive reconciliation;
 - English and Spanish real-phone acceptance is performed against the exact deployed combined build;
@@ -97,10 +102,13 @@ The combined candidate must still satisfy the full manifest. At minimum:
 - **private invitation → existing account** is tested as one continuous path: direct sign-in applies the invitation to the same account, forgot-password recovery preserves the invitation through reset/sign-in, and unconfirmed-email resend/confirmation returns the same account to finish invitation redemption;
 - private-invite failure must fail closed without a half-finished membership and must not sign the member out of unrelated devices;
 - replaced/revoked/used invitation recovery clearly directs the tester to the newest valid invitation without exposing tokens or raw technical errors;
+- public church-link signup must not report `account created` from an incomplete Auth success payload;
+- existing-account church join must not report success from a malformed RPC result;
 - Fresh Church Setup produces an unpublished retry-safe draft rather than publishing automatically;
+- Setup Inbox rejects mismatched extension/MIME combinations before storage writes;
 - consequential actions remain protected from slow-phone double submission;
 - no release-stop condition from `PILOT_COMBINED_INTEGRATION_MANIFEST.md` remains open.
 
 ## Human acceptance note
 
-Automated CI and a clean runtime-audit window are necessary but not sufficient. The release remains blocked on real-phone English + Spanish proof against one exact deployed PR #55 build, including the combined private-invitation recovery chain above. Do not record PASS from separate individually tested pieces if the end-to-end invitation continuity was not actually exercised.
+Automated CI and a clean runtime-audit window are necessary but not sufficient. The release remains blocked on real-phone English + Spanish proof against one exact deployed PR #55 build, including public/private same-account joining, confirmation/password recovery, simplified Start Here, Kingdom Guide, Fresh Church Setup upload/review, and the combined private-invitation recovery chain above. Do not record PASS from separate individually tested pieces if the end-to-end continuity was not actually exercised.
