@@ -1,0 +1,1 @@
+See `docs/MADERA_NEW_LIFE_PILOT_MASTER_PLAN_V2.md` for the current tightened Madera pilot plan. The original master plan is preserved for history. V2 is authoritative for deadlines, package-level security gates, planning scope freeze, Base44/direct-code usage, the pilot-core package set, and implementation start target.
