@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
@@ -10,7 +10,8 @@ import { fileURLToPath } from 'node:url';
 
 const execFileAsync = promisify(execFile);
 const testDir = path.dirname(fileURLToPath(import.meta.url));
-const guardScript = path.resolve(testDir, '../scripts/verify-github-actions-pins.mjs');
+const repoRoot = path.resolve(testDir, '..');
+const guardScript = path.resolve(repoRoot, 'scripts/verify-github-actions-pins.mjs');
 const checkoutSha = '11d5960a326750d5838078e36cf38b85af677262';
 
 async function makeFixture(workflow) {
@@ -72,4 +73,12 @@ test('actions pin guard requires Docker actions to use immutable sha256 digests'
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test('build workflow does not persist checkout credentials into later steps', async () => {
+  const workflow = await readFile(path.join(repoRoot, '.github', 'workflows', 'build.yml'), 'utf8');
+  assert.match(
+    workflow,
+    /uses:\s*actions\/checkout@[0-9a-f]{40}[^\n]*\n\s*with:\s*\n\s*persist-credentials:\s*false/i,
+  );
 });
