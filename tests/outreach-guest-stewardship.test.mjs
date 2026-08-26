@@ -6,6 +6,7 @@ const read=(path)=>readFileSync(new URL(`../${path}`,import.meta.url),'utf8')
 const migration=read('supabase/migrations/20260826180000_outreach_source_links_and_history.sql')
 const reviewHardening=read('supabase/migrations/20260826180500_harden_outreach_connection_reviews.sql')
 const lifecycleHardening=read('supabase/migrations/20260826181000_harden_outreach_source_link_lifecycle.sql')
+const followupHardening=read('supabase/migrations/20260826181500_keep_outreach_followup_due_after_return.sql')
 const publicPage=read('src/app/connect/[token]/page.tsx')
 const sharePage=read('src/app/connect/page.tsx')
 const nav=read('src/components/mobile-nav.tsx')
@@ -69,6 +70,12 @@ test('inactive members cannot keep resolving or reactivating old connection link
   assert.match(lifecycleHardening,/private\.is_church_member\(v_link\.church_id\)/i)
   assert.match(lifecycleHardening,/cm\.church_id=l\.church_id and cm\.user_id=l\.created_by and cm\.status='active'/i)
   assert.match(lifecycleHardening,/source_type<>'friendship_group' or g\.id is not null/i)
+})
+
+test('return visits always leave a valid next follow-up window',()=>{
+  assert.match(followupHardening,/when follow_up_due_at is null or follow_up_due_at<=v_now then v_now\+interval '24 hours'/i)
+  assert.match(followupHardening,/else least\(follow_up_due_at,v_now\+interval '24 hours'\)/i)
+  assert.match(followupHardening,/last_contacted_at=case[\s\S]*visit','service_attendance'/i)
 })
 
 test('legacy ministry titles no longer create church-wide Outreach read access',()=>{
