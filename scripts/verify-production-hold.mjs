@@ -4,7 +4,9 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(scriptDir, '..');
+const repoRoot = process.env.KINGDOM_NETWORK_HOLD_ROOT
+  ? path.resolve(process.env.KINGDOM_NETWORK_HOLD_ROOT)
+  : path.resolve(scriptDir, '..');
 
 const failures = [];
 
