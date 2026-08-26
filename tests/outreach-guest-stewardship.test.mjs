@@ -7,6 +7,7 @@ const migration=read('supabase/migrations/20260826180000_outreach_source_links_a
 const reviewHardening=read('supabase/migrations/20260826180500_harden_outreach_connection_reviews.sql')
 const lifecycleHardening=read('supabase/migrations/20260826181000_harden_outreach_source_link_lifecycle.sql')
 const followupHardening=read('supabase/migrations/20260826181500_keep_outreach_followup_due_after_return.sql')
+const policyHardening=read('supabase/migrations/20260826182000_scope_outreach_write_policies.sql')
 const publicPage=read('src/app/connect/[token]/page.tsx')
 const sharePage=read('src/app/connect/page.tsx')
 const nav=read('src/components/mobile-nav.tsx')
@@ -78,8 +79,33 @@ test('return visits always leave a valid next follow-up window',()=>{
   assert.match(followupHardening,/last_contacted_at=case[\s\S]*visit','service_attendance'/i)
 })
 
+test('all direct Outreach read/write paths use explicit scoped authority',()=>{
+  for(const policy of ['outreach_read','outreach_insert','outreach_update','outreach_interactions_read','outreach_interactions_insert','outreach_interactions_delete']){
+    assert.match(policyHardening,new RegExp(`drop policy if exists ${policy}`,'i'))
+    assert.match(policyHardening,new RegExp(`create policy ${policy}`,'i'))
+  }
+  assert.match(policyHardening,/source_group_id is not null and private\.can_operate_group\(source_group_id\)/i)
+  assert.match(policyHardening,/has_church_permission\(church_id,'manage_outreach'\)/i)
+  assert.doesNotMatch(policyHardening,/ministry_leader|role==='minister'|\['group_leader','ministry_leader','minister'/i)
+})
+
+test('ordinary members cannot direct-insert a private Outreach record',()=>{
+  const insertSection=policyHardening.split('-- CONTACT INSERT')[1]?.split('-- CONTACT UPDATE')[0]??''
+  assert.match(insertSection,/private\.has_church_role\(church_id,array\['pastor','church_admin'\]\)/i)
+  assert.match(insertSection,/private\.has_church_permission\(church_id,'manage_outreach'\)/i)
+  assert.match(insertSection,/source_group_id is not null and private\.can_operate_group\(source_group_id\)/i)
+  assert.doesNotMatch(insertSection,/source_group_id is null\s+or/i)
+})
+
+test('normal Outreach owners cannot silently erase interaction history',()=>{
+  const deleteSection=policyHardening.split('-- INTERACTION DELETE')[1]??''
+  assert.match(deleteSection,/has_church_role\(church_id,array\['pastor','church_admin'\]\)/i)
+  assert.match(deleteSection,/has_church_permission\(church_id,'manage_outreach'\)/i)
+  assert.doesNotMatch(deleteSection,/recorded_by\s*=\s*auth\.uid/i)
+})
+
 test('legacy ministry titles no longer create church-wide Outreach read access',()=>{
-  const policySection=migration.split('-- Scope Outreach')[1]??''
+  const policySection=policyHardening
   assert.match(policySection,/source_group_id is not null and private\.can_operate_group\(source_group_id\)/i)
   assert.match(policySection,/has_church_permission\(church_id,'manage_outreach'\)/i)
   assert.doesNotMatch(policySection,/group_leader'::text, 'ministry_leader'::text, 'minister/i)
