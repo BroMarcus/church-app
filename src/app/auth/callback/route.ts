@@ -27,17 +27,19 @@ export async function GET(request:NextRequest){
   const mode=url.searchParams.get('mode')==='recovery'?'recovery':'signup'
   const fallback=mode==='recovery'?`/auth/update-password?lang=${lang}`:`/start?welcome=1${lang==='es'?'&lang=es':''}`
   const next=safeNext(url.searchParams.get('next'),fallback)
-  const loginError=(message:string)=>NextResponse.redirect(new URL(`/login?lang=${lang}&mode=signin&error=${encodeURIComponent(message)}`,siteUrl))
-
-  if(!code){
-    return loginError(lang==='es'?'Ese enlace de correo está incompleto. Solicita un correo nuevo y abre el enlace más reciente.':'That email link is incomplete. Request one fresh email and open the newest link.')
+  const joinNext=next.startsWith('/join/')?next:''
+  const loginError=(errorCode:string)=>{
+    const nextPart=joinNext?`&next=${encodeURIComponent(joinNext)}`:''
+    return NextResponse.redirect(new URL(`/login?lang=${lang}&mode=signin${nextPart}&error_code=${encodeURIComponent(errorCode)}`,siteUrl))
   }
+
+  if(!code)return loginError('callback_incomplete')
 
   const supabase=await createClient()
   const {error}=await supabase.auth.exchangeCodeForSession(code)
   if(error){
     console.error('auth callback session exchange failed',{mode,message:error.message})
-    return loginError(lang==='es'?'Ese enlace venció o ya fue usado. Solicita un correo nuevo y abre solamente el más reciente.':'That link expired or was already used. Request one fresh email and open only the newest link.')
+    return loginError('callback_expired')
   }
 
   return NextResponse.redirect(new URL(next,siteUrl))

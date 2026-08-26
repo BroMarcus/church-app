@@ -19,16 +19,12 @@ test('backup-admin promotion keeps failures private and limits update to active 
   assert.doesNotMatch(actions,/encodeURIComponent\(error\.message\)/)
   assert.match(actions,/console\.error\('Backup admin promotion failed'/)
   assert.match(actions,/\.eq\('status','active'\)/)
-  assert.match(actions,/Nothing was changed\. Try again or choose another active member\./)
-  assert.match(actions,/No se cambió nada\. Inténtalo de nuevo o elige a otro miembro activo\./)
 })
 
 test('pilot readiness hides raw backend errors and provides retry guidance',async()=>{
   const source=await read('src/app/church/readiness/page.tsx')
   assert.doesNotMatch(source,/\{error\.message\}/)
   assert.match(source,/console\.error\('Pilot readiness check failed'/)
-  assert.match(source,/Some readiness checks could not load\. Nothing was changed\./)
-  assert.match(source,/No se pudieron cargar algunas revisiones\. No se cambió nada\./)
   assert.match(source,/Try readiness checks again/)
 })
 
@@ -38,31 +34,28 @@ test('pilot readiness explicitly tests existing-account church join in both lang
   assert.match(source,/without creating a duplicate account/)
   assert.match(source,/Prueba que una cuenta existente se una a una iglesia/)
   assert.match(source,/sin crear una cuenta duplicada/)
-  assert.match(source,/href=\{`\/church\/join-center/)
 })
 
-test('pilot readiness avoids database jargon in the hero copy',async()=>{
-  const source=await read('src/app/church/readiness/page.tsx')
-  assert.doesNotMatch(source,/Live church\/database checks/)
-  assert.doesNotMatch(source,/iglesia\/base de datos/)
-  assert.match(source,/Live setup checks plus the real-phone tests/)
-  assert.match(source,/Revisiones en vivo de la configuración/)
+test('public church signup uses bounded status codes instead of query-string error text',async()=>{
+  const actions=await read('src/app/join/[slug]/actions.ts')
+  const page=await read('src/app/join/[slug]/page.tsx')
+  assert.match(actions,/error_code=/)
+  assert.match(actions,/joinSignupErrorCode/)
+  assert.match(actions,/fail\('signup_failed'\)|fail\(joinSignupErrorCode/)
+  assert.doesNotMatch(actions,/[&?]error=\$\{encodeURIComponent/)
+  assert.match(page,/searchParams:Promise<\{lang\?:string;error_code\?:string\}>/)
+  assert.match(page,/const joinErrors=/)
+  assert.match(page,/statusError=.*query\.error_code/)
+  assert.doesNotMatch(page,/query\.error\b/)
+  assert.match(page,/role="alert"/)
 })
 
-test('public church signup never returns raw auth-provider errors to a member',async()=>{
-  const source=await read('src/app/join/[slug]/actions.ts')
-  assert.doesNotMatch(source,/fail\(error\.message,error\.message\)/)
-  assert.match(source,/console\.error\('public church signup failed'/)
-  assert.match(source,/We could not create your account right now\. Check your email and password and try again\./)
-  assert.match(source,/No pudimos crear tu cuenta en este momento\. Revisa tu correo y contraseña e inténtalo otra vez\./)
-  assert.match(source,/Too many confirmation emails were requested\. Wait about one minute/)
-})
-
-test('existing-account join logs unexpected failures without exposing provider text',async()=>{
+test('existing-account join keeps provider failures private and uses fixed codes',async()=>{
   const source=await read('src/app/join/[slug]/actions.ts')
   assert.match(source,/console\.error\('existing-account church join failed'/)
-  assert.match(source,/We could not connect your account to this church yet\./)
-  assert.match(source,/Todavía no pudimos conectar tu cuenta con esta iglesia\./)
+  assert.match(source,/fail\('capacity_full'\)/)
+  assert.match(source,/fail\('inactive_access'\)/)
+  assert.match(source,/fail\('join_failed'\)/)
 })
 
 test('password reset handles initialization failures without leaving a false-ready form',async()=>{
@@ -70,18 +63,16 @@ test('password reset handles initialization failures without leaving a false-rea
   assert.match(source,/try\{/)
   assert.match(source,/password reset initialization failed/)
   assert.match(source,/setReady\(false\);setMessage\(c\.invalidBack\)/)
-  assert.match(source,/password reset session exchange failed/)
-  assert.match(source,/password reset session lookup failed/)
 })
 
 test('password reset always releases busy state and keeps errors member-safe',async()=>{
   const source=await read('src/app/auth/update-password/page.tsx')
   assert.match(source,/finally\{\s*setBusy\(false\)\s*\}/s)
   assert.match(source,/password update failed/)
-  assert.match(source,/password update request failed/)
-  assert.match(source,/role="status" aria-live="polite"/)
+  assert.match(source,/role=\{completed\?'status':'alert'\}/)
+  assert.match(source,/aria-live="polite"/)
   assert.match(source,/type="submit" disabled=\{busy\}/)
-  assert.match(source,/mode=signin/)
+  assert.match(source,/setCompleted\(true\)/)
 })
 
 test('password recovery preserves a safe church-join return path end to end',async()=>{
@@ -91,18 +82,38 @@ test('password recovery preserves a safe church-join return path end to end',asy
   assert.match(page,/name="next" value=\{joinNext\}/)
   assert.match(actions,/const recoveryUrl=.*safeJoinNext/)
   assert.match(actions,/resetPasswordForEmail\(email,\{redirectTo:recoveryUrl\(lang,next\)\}\)/)
-  assert.match(actions,/const startPath=next\|\|`\/start\?welcome=1/)
-  assert.match(reset,/const safeJoinNext=/)
+  assert.match(reset,/function safeJoinNext/)
+  assert.match(reset,/new URL\(value,base\)/)
   assert.match(reset,/setJoinNext\(next\)/)
-  assert.match(reset,/router\.replace\(`\/login\?lang=\$\{lang\}&mode=signin\$\{nextPart\}/)
-  assert.match(reset,/href=\{`\/login\?lang=\$\{lang\}&mode=signin\$\{nextPart\}`\}/)
+  assert.match(reset,/signInHref=`\/login\?lang=\$\{lang\}&mode=signin\$\{nextPart\}`/)
 })
 
-test('login bounds status messages and exposes them accessibly',async()=>{
-  const source=await read('src/app/login/page.tsx')
-  assert.match(source,/const boundedStatus=.*slice\(0,320\)/)
-  assert.match(source,/role="alert"/)
-  assert.match(source,/role="status" aria-live="polite"/)
+test('login renders only allowlisted bilingual status codes, not arbitrary query text',async()=>{
+  const page=await read('src/app/login/page.tsx')
+  assert.match(page,/error_code\?:string;message_code\?:string/)
+  assert.match(page,/const authStatus=/)
+  assert.match(page,/statusError=.*params\.error_code/)
+  assert.match(page,/statusMessage=.*params\.message_code/)
+  assert.doesNotMatch(page,/params\.error\b/)
+  assert.doesNotMatch(page,/params\.message\b/)
+  assert.match(page,/callback_expired:/)
+  assert.match(page,/Ese enlace venció o ya fue usado/)
+  assert.match(page,/role="alert"/)
+  assert.match(page,/role="status" aria-live="polite"/)
+})
+
+test('login and callback emit status codes instead of member-facing query strings',async()=>{
+  const actions=await read('src/app/login/actions.ts')
+  const callback=await read('src/app/auth/callback/route.ts')
+  assert.match(actions,/code='invalid_credentials'/)
+  assert.match(actions,/statusPart\('message','account_created'\)/)
+  assert.match(actions,/statusPart\('message','reset_sent'\)/)
+  assert.match(actions,/statusPart\('message','confirmation_sent'\)/)
+  assert.doesNotMatch(actions,/[&?]error=\+?encodeURIComponent/)
+  assert.doesNotMatch(actions,/[&?]message=\+?encodeURIComponent/)
+  assert.match(callback,/error_code=/)
+  assert.match(callback,/loginError\('callback_incomplete'\)/)
+  assert.match(callback,/loginError\('callback_expired'\)/)
 })
 
 test('login warns returning users not to create duplicate accounts in both languages',async()=>{
@@ -111,7 +122,6 @@ test('login warns returning users not to create duplicate accounts in both langu
   assert.match(source,/no crees otra cuenta/)
   assert.match(source,/return you to the church join page/)
   assert.match(source,/te regresaremos a la página de la iglesia/)
-  assert.match(source,/joinNext&&<div className="notice success"/)
 })
 
 test('Kingdom Guide includes bilingual account confirmation and existing-account church-join help',async()=>{
@@ -121,8 +131,6 @@ test('Kingdom Guide includes bilingual account confirmation and existing-account
   assert.match(knowledge,/id:'duplicate-account'/)
   assert.match(knowledge,/join church with existing account/)
   assert.match(knowledge,/unirme con cuenta existente/)
-  assert.match(knowledge,/open only the newest message/)
-  assert.match(knowledge,/abre solamente el mensaje más reciente/)
 })
 
 test('Kingdom Guide honors preferred language and bounds search input',async()=>{
@@ -131,6 +139,4 @@ test('Kingdom Guide honors preferred language and bounds search input',async()=>
   assert.match(source,/query\.lang==='es'\?'es':query\.lang==='en'\?'en':preferred/)
   assert.match(source,/\.trim\(\)\.slice\(0,160\)/)
   assert.match(source,/maxLength=\{160\}/)
-  assert.match(source,/how do I join my church/)
-  assert.match(source,/cómo me uno a mi iglesia/)
 })

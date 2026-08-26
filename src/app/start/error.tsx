@@ -1,12 +1,17 @@
 'use client'
 
-export default function StartError({reset}:{reset:()=>void}){
-  return <main style={{maxWidth:920,margin:'0 auto',padding:'28px 18px 80px'}}>
-    <div role="alert" style={{border:'1px solid #fecaca',borderRadius:18,padding:24,background:'#fff'}}>
-      <div style={{fontSize:12,fontWeight:800,letterSpacing:'.08em',textTransform:'uppercase'}}>Start Here / Empieza Aquí</div>
-      <h1 style={{margin:'10px 0 8px'}}>Your first steps could not load.</h1>
-      <p style={{margin:'0 0 16px',color:'#6b7280'}}>Your account and progress were not changed. / Tu cuenta y tu progreso no fueron modificados.</p>
-      <button type="button" onClick={()=>reset()} style={{minHeight:44,padding:'10px 16px',borderRadius:10,border:'1px solid #d1d5db',background:'#fff',fontWeight:700,cursor:'pointer'}}>Try again / Intentar de nuevo</button>
-    </div>
-  </main>
+import {useEffect} from 'react'
+import {useSearchParams} from 'next/navigation'
+
+const copy={
+  en:{title:'Your first steps could not load.',body:'Your account and progress were not changed. Check your connection and try again.',retry:'Try again',signin:'Go to sign in'},
+  es:{title:'No pudimos cargar tus primeros pasos.',body:'No se cambió tu cuenta ni tu progreso. Revisa tu conexión e inténtalo otra vez.',retry:'Intentar otra vez',signin:'Ir a Iniciar sesión'}
+} as const
+
+export default function StartError({error,reset}:{error:Error&{digest?:string};reset:()=>void}){
+  const params=useSearchParams()
+  const lang=params.get('lang')==='es'?'es':'en'
+  const t=copy[lang]
+  useEffect(()=>{console.error('Start Here page failed',{message:error.message,digest:error.digest})},[error])
+  return <main className="login-wrap"><div className="login card" role="alert" style={{maxWidth:620}}><div className="pill">START HERE • EMPIEZA AQUÍ</div><h1>{t.title}</h1><p className="muted">{t.body}</p><div style={{display:'grid',gap:10,marginTop:18}}><button className="btn" type="button" onClick={reset}>{t.retry}</button><a className="ghost" href={`/login?lang=${lang}&mode=signin`} style={{textAlign:'center'}}>{t.signin}</a></div></div></main>
 }
