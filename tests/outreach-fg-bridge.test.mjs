@@ -10,7 +10,7 @@ const groupActions=read('src/app/groups/actions.ts')
 test('Friendship Group visit bridge reuses the public duplicate-safe Outreach resolver',()=>{
   assert.match(bridge,/record_friendship_group_outreach_visit/i)
   assert.match(bridge,/from public\.submit_outreach_connection\(/i)
-  assert.match(bridge,/private\.can_operate_group\(v_link\.source_group_id\)/i)
+  assert.match(bridge,/private\.can_operate_group\(v_source_group_id\)/i)
   assert.match(bridge,/l\.source_type='friendship_group'/i)
 })
 
@@ -27,6 +27,7 @@ test('current group report guests use stable report-slot idempotency keys',()=>{
   assert.match(reportContract,/record_group_report_guest_outreach/i)
   assert.match(reportContract,/md5\(v_report\.id::text\|\|':guest:'\|\|p_guest_slot::text\)::uuid/i)
   assert.match(reportContract,/record_friendship_group_outreach_visit/i)
+  assert.match(reportContract,/1::smallint/i)
 })
 
 test('name alone remains report data rather than weak identity evidence',()=>{
