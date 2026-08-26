@@ -9,7 +9,6 @@ on:
 
 permissions:
   contents: read
-  statuses: write
 
 concurrency:
   group: kingdom-network-build-${{ github.ref }}
@@ -19,6 +18,13 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      action_pins: ${{ steps.action_pins.outcome }}
+      production_hold: ${{ steps.production_hold.outcome }}
+      install: ${{ steps.install.outcome }}
+      tests: ${{ steps.tests.outcome }}
+      lint: ${{ steps.lint.outcome }}
+      build: ${{ steps.build.outcome }}
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -57,17 +63,42 @@ jobs:
         if: steps.install.outcome == 'success'
         continue-on-error: true
         run: npm run build
-      - name: Publish release-gate statuses
-        if: always() && github.event_name == 'push'
+      - name: Enforce release gate
+        if: always()
         env:
-          GH_TOKEN: ${{ github.token }}
           ACTION_PINS: ${{ steps.action_pins.outcome }}
           PRODUCTION_HOLD: ${{ steps.production_hold.outcome }}
           INSTALL: ${{ steps.install.outcome }}
           TESTS: ${{ steps.tests.outcome }}
           LINT: ${{ steps.lint.outcome }}
           BUILD: ${{ steps.build.outcome }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ "$ACTION_PINS" = success ] && [ "$PRODUCTION_HOLD" = success ] && [ "$INSTALL" = success ] && [ "$TESTS" = success ] && [ "$LINT" = success ] && [ "$BUILD" = success ]; then
+            echo 'Kingdom Network release gate passed.'
+            exit 0
+          fi
+          echo "Kingdom Network release gate failed: pins=${ACTION_PINS}, hold=${PRODUCTION_HOLD}, install=${INSTALL}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
+          exit 1
+
+  publish-statuses:
+    if: always() && github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      statuses: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ACTION_PINS: ${{ needs.build.outputs.action_pins }}
+      PRODUCTION_HOLD: ${{ needs.build.outputs.production_hold }}
+      INSTALL: ${{ needs.build.outputs.install }}
+      TESTS: ${{ needs.build.outputs.tests }}
+      LINT: ${{ needs.build.outputs.lint }}
+      BUILD: ${{ needs.build.outputs.build }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Publish release-gate statuses
         run: |
           publish() {
             context="$1"
@@ -101,19 +132,3 @@ jobs:
             -f context='kingdom-network/release-gate' \
             -f description="$description" \
             -f target_url="$RUN_URL"
-      - name: Enforce release gate
-        if: always()
-        env:
-          ACTION_PINS: ${{ steps.action_pins.outcome }}
-          PRODUCTION_HOLD: ${{ steps.production_hold.outcome }}
-          INSTALL: ${{ steps.install.outcome }}
-          TESTS: ${{ steps.tests.outcome }}
-          LINT: ${{ steps.lint.outcome }}
-          BUILD: ${{ steps.build.outcome }}
-        run: |
-          if [ "$ACTION_PINS" = success ] && [ "$PRODUCTION_HOLD" = success ] && [ "$INSTALL" = success ] && [ "$TESTS" = success ] && [ "$LINT" = success ] && [ "$BUILD" = success ]; then
-            echo 'Kingdom Network release gate passed.'
-            exit 0
-          fi
-          echo "Kingdom Network release gate failed: pins=${ACTION_PINS}, hold=${PRODUCTION_HOLD}, install=${INSTALL}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
-          exit 1
