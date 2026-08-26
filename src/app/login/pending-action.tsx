@@ -1,24 +1,31 @@
 'use client'
 
-import {useEffect,useState} from 'react'
+import {useEffect,useRef,useState} from 'react'
 import {useFormStatus} from 'react-dom'
 
 export function PendingAction({label,pendingLabel,cooldownLabel,cooldownKey,cooldownSeconds=60,action}:{label:string;pendingLabel:string;cooldownLabel:string;cooldownKey:string;cooldownSeconds?:number;action:(formData:FormData)=>void|Promise<void>}){
   const status=useFormStatus()
   const storageKey=`kingdom-network:auth-cooldown:${cooldownKey}`
   const [remaining,setRemaining]=useState(0)
+  const fallbackUntilRef=useRef(0)
   const successCode=cooldownKey==='password-reset'?'reset_sent':cooldownKey==='confirmation-resend'?'confirmation_sent':''
 
   useEffect(()=>{
     const sync=()=>{
+      const now=Date.now()
       try{
         const until=Number(window.localStorage.getItem(storageKey)||0)
-        const seconds=Math.max(0,Math.ceil((until-Date.now())/1000))
+        if(until>fallbackUntilRef.current)fallbackUntilRef.current=until
+        const seconds=Math.max(0,Math.ceil((until-now)/1000))
         setRemaining(seconds)
         if(seconds===0&&until)window.localStorage.removeItem(storageKey)
+        if(seconds===0&&fallbackUntilRef.current<=now)fallbackUntilRef.current=0
       }catch{
-        // Storage can be unavailable in restricted/private browser modes. Recovery must still work.
-        setRemaining(0)
+        // Storage can be unavailable in restricted/private browser modes. Keep an in-memory
+        // cooldown for this page so a successful send still resists accidental repeat taps.
+        const seconds=Math.max(0,Math.ceil((fallbackUntilRef.current-now)/1000))
+        setRemaining(seconds)
+        if(seconds===0)fallbackUntilRef.current=0
       }
     }
     sync()
@@ -32,16 +39,19 @@ export function PendingAction({label,pendingLabel,cooldownLabel,cooldownKey,cool
     if(url.searchParams.get('message_code')!==successCode)return
     const now=Date.now()
     const until=now+cooldownSeconds*1000
+    fallbackUntilRef.current=until
     try{
       const existing=Number(window.localStorage.getItem(storageKey)||0)
       if(existing>now){
+        fallbackUntilRef.current=existing
         setRemaining(Math.max(0,Math.ceil((existing-now)/1000)))
       }else{
         window.localStorage.setItem(storageKey,String(until))
         setRemaining(cooldownSeconds)
       }
     }catch{
-      // Storage is optional. Keep this page safe; server-side rate limits remain the authority.
+      // Storage is optional. The in-memory fallback keeps this page guarded; server-side
+      // rate limits remain the authority if the page is closed or reloaded.
       setRemaining(cooldownSeconds)
     }
     // Consume the one-time success marker without a navigation. Otherwise a later refresh of the
