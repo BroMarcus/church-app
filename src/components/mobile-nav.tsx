@@ -36,7 +36,8 @@ export function MobileNav({access}:{access:MobileNavAccess}){
   if(access.canLeadGroups||access.canManageTeams)leadership.push(['/rosters','Leader Rosters',ClipboardList])
   if(access.canManageLearning)leadership.push(['/learning/admin/course-builder','Class Builder',GraduationCap])
   if(access.canManageLearning||access.canManageCalendar)leadership.push(['/content','Content Studio',FileText])
-  if(access.canManageOutreach&&!disabled.has('outreach')){leadership.push(['/outreach','Outreach',Megaphone,'outreach']);leadership.push(['/outreach/reviews','Connection Review',UserPlus,'outreach'])}
+  if(access.canManageOutreach&&!disabled.has('outreach'))leadership.push(['/outreach','Outreach',Megaphone,'outreach'])
+  if(access.canManageOutreach&&!disabled.has('outreach'))leadership.push(['/outreach/reviews','Connection Review',UserPlus,'outreach'])
   if(access.canManageChurch){leadership.push(['/church/inbox','Work Inbox',ClipboardList]);leadership.push(['/church/features','Church Features',Settings2])}
   const churchItems=church.filter(available);if(access.hasForms)churchItems.push(['/forms','Forms',ClipboardList])
   const sections:Section[]=[{label:'Me',items:personal.filter(available)},{label:'Church',items:churchItems},...(leadership.length?[{label:'Leadership',items:leadership.filter(available)}]:[]),{label:'Settings',items:settings}]
