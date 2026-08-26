@@ -36,7 +36,7 @@ export default async function ConnectSharePage({searchParams}:{searchParams:Prom
   const groupMap=new Map(groups.map((g:any)=>[g.id,g]))
   const advanced=['pastor','church_admin'].includes(String(membership.role??''))
   let events:any[]=[]
-  if(advanced){const r=await supabase.from('events').select('id,title,starts_at').eq('church_id',churchId).gte('starts_at',new Date(Date.now()-24*60*60*1000).toISOString()).order('starts_at').limit(20);events=r.data??[]}
+  if(advanced){const r=await supabase.from('events').select('id,title,starts_at').eq('church_id',churchId).order('starts_at',{ascending:false}).limit(20);events=r.data??[]}
 
   return <main className="connect-shell">
     <div className="connect-top"><div><Link href="/" className="connect-brand">Kingdom <span>Network</span></Link><div className="connect-muted">{church?.name??(es?'Su iglesia':'Your church')} • {es?'Compartir y conectar':'Share & Connect'}</div></div><div className="connect-actions"><Link className="connect-btn secondary" href={es?'/connect?lang=en':'/connect?lang=es'}>{es?'English':'Español'}</Link><Link className="connect-btn secondary" href="/">← {es?'Inicio':'Home'}</Link></div></div>
