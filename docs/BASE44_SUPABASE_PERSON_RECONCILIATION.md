@@ -4,6 +4,26 @@ Prepared: 2026-08-26
 Status: **REVIEW READY — NO LIVE DATA CHANGED**  
 Canonical authority: **Next.js + Supabase**
 
+## Founder review lock
+
+Marcus explicitly requires personal review before any consequential Base44 → Supabase reconciliation is written into canonical records.
+
+The following may **not** be auto-resolved, auto-imported, or silently accepted:
+
+- Baptism status/date/details
+- Holy Ghost status/date
+- First Steps completion/history
+- Effective Soul Winning completion/history
+- Bible-study qualification
+- Timothys / leadership training
+- Any other ministry/training completion
+- Leadership qualification or authority
+- Any conflicting consequential spiritual/ministry fact
+
+For these fields, the system may prepare a comparison/review candidate, but **Marcus must personally review and explicitly approve the specific reconciliation before a canonical write occurs**.
+
+No automatic conflict resolution is authorized.
+
 ## Purpose
 
 Before Base44 is treated as a reference implementation rather than a Madera data authority, confirm that real Madera person information is not quietly abandoned.
@@ -48,28 +68,29 @@ Decision: **CARRYOVER CANDIDATE**, but only after field-by-field comparison and 
 
 At least one ordinary profile field was found with different values between the two systems.
 
-Decision: **MANUAL REVIEW REQUIRED.** Neither value wins automatically. Prefer the most recently verified/user-confirmed canonical fact.
+Decision: **MANUAL REVIEW REQUIRED.** Neither value wins automatically. Prefer the most recently verified/user-confirmed canonical fact after review.
 
-### D. Spiritual milestones — never auto-import as verified
+### D. Spiritual milestones — founder review required
 
 Base44 contains baptism / Holy Ghost values for real records where canonical Supabase verified milestone fields are unset or differ in verification state.
 
 Decision:
 
 - do not write directly into canonical verified `member_milestones` merely because Base44 says `yes` or contains a date;
-- if useful, treat the Base44 value as a **reported / review-needed candidate**;
-- Pastor/Admin or the church's approved verification workflow confirms the official value;
+- Base44 value may be shown only as a **reported / review-needed candidate**;
+- Marcus personally reviews and explicitly approves the specific reconciliation before a canonical write;
 - preserve self-report vs official verification distinction.
 
-### E. Training / discipleship completion — verify against canonical evidence
+### E. Training / discipleship completion — founder review required
 
 Base44 contains training/completion values for real records where canonical Supabase Learning/milestone state is absent, `not_started`, or otherwise different.
 
 Decision:
 
-- do not silently mark First Steps / Effective Soul Winning / Bible-study qualification complete;
+- do not silently mark First Steps / Effective Soul Winning / Bible-study qualification / Timothys or other training complete;
 - check canonical Learning enrollment/completion evidence first;
-- if the completion occurred outside the canonical Learning engine or predates it, leadership may record a reviewed external/manual equivalency under the Package 4/5 rules;
+- if completion occurred outside the canonical Learning engine or predates it, prepare a historical/manual-equivalency review candidate;
+- Marcus personally reviews and explicitly approves the specific reconciliation before a canonical write;
 - keep course completion and church-verified equivalency distinguishable.
 
 ### F. Group / ministry / role relationships — reconcile against current canonical assignments
@@ -80,7 +101,8 @@ Decision:
 
 - canonical Supabase memberships/assignments win for current access and current group membership;
 - Base44 title/role values never grant technical authority;
-- historical value may be preserved only if it represents a real past relationship worth retaining.
+- historical value may be preserved only if it represents a real past relationship worth retaining;
+- any leadership-qualification/authority conflict falls under the Founder Review Lock above.
 
 ### G. Demo record
 
@@ -92,9 +114,9 @@ Decision: **DO NOT MIGRATE.** Retain only as Base44 test/reference data until th
 
 1. Re-query the two real Base44 Person records and their matched canonical Supabase records.
 2. Produce a field-level diff without exposing sensitive data unnecessarily.
-3. Auto-propose only non-sensitive, non-conflicting profile carryover.
-4. Route conflicts to the member/admin for confirmation.
-5. Route baptism/Holy Ghost/training/leadership facts through the appropriate verification workflow.
+3. Auto-propose only non-sensitive, non-conflicting profile carryover; do not write conflicting or consequential facts automatically.
+4. Route ordinary profile conflicts to human confirmation.
+5. Route baptism/Holy Ghost/training/leadership facts to Marcus for personal review and explicit approval.
 6. Record any approved canonical writes in the normal audit trail.
 7. Confirm the canonical record now contains every approved useful fact.
 8. Only then may the Base44 copy be considered dispensable; no deletion is authorized by this document.
