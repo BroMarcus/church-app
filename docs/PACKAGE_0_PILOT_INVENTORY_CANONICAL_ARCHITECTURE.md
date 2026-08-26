@@ -40,7 +40,7 @@ Within `/church`, existing route areas include analytics, audit, coordination, f
 
 ### Existing security/data-integrity work to preserve
 
-Current migrations show prior hardening around:
+Current migrations and live database inspection show prior hardening around:
 - private member-detail isolation
 - restricted SECURITY DEFINER execution
 - tenant-scoped storage paths
@@ -50,7 +50,9 @@ Current migrations show prior hardening around:
 - member/group/prayer/calendar foundations
 - group-leader member-status controls
 - group-scoped lesson authoring
-- removal of broken legacy Friendship Group lesson behavior
+- safe group join approval and capacity enforcement
+- exact-address privacy
+- reported milestone verification
 
 These are evidence that the current system already has meaningful security and domain foundations. Package 0 must map and preserve them rather than invent replacement permission systems.
 
@@ -98,11 +100,11 @@ These are provisional classifications until the relevant canonical contracts are
 
 ## Checkpoint 1 — Identity and authorization findings
 
-Status: CONFIRMED FROM CURRENT `main` + approved architecture docs. No schema/RLS writes made.
+Status: CONFIRMED FROM CURRENT `main`, approved architecture docs, and read-only live database inspection. No schema/RLS writes made.
 
 ### Current canonical member/account identity
 
-The current application does **not** use a standalone universal `Person` table as the authoritative member identity. The working member identity is the Supabase Auth user UUID, reused consistently across the current member stack:
+The current application does **not** use a standalone universal `Person` table as the authoritative account-backed member identity. The working member identity is the Supabase Auth user UUID, reused consistently across the current member stack:
 
 - Supabase Auth owns credentials and authentication identity.
 - `profiles.id` uses that same user UUID for member-facing name/profile/privacy information.
@@ -111,7 +113,7 @@ The current application does **not** use a standalone universal `Person` table a
 - `member_milestones(church_id,user_id,...)` stores church-scoped verified Journey/milestone facts.
 - Learning, Friendship Group membership/attendance, serving, prayer, Journey, and leadership member-control surfaces already key their member records to this same user UUID.
 
-For the Madera pilot, **do not introduce a second account-backed Person table merely to match newer planning language**. Reuse this established identity path unless Package 2 proves that non-auth household/dependent records require a separate bounded person/dependent abstraction.
+For the Madera pilot, **do not introduce a second account-backed Person table merely to match newer planning language**. Reuse this established identity path unless Package 2 proves a separate non-auth dependent/person abstraction is necessary.
 
 ### Pre-account Outreach identity and claim bridge
 
@@ -136,17 +138,38 @@ This is the current bridge between pre-account evangelism and account-backed mem
 
 A person being a `guest` in relationship status must never imply elevated or reduced technical authority beyond the explicit access model. Likewise a referral/source must not become group membership or privileged access.
 
-### Household / guardian gap
+### Household foundation exists in the live schema, but is unused and account-only
 
-No current `household` or `guardian` implementation was found in the repository. Household/family is an approved roadmap gap (KN-028), not an existing system to reuse.
+A repo code search did not show a household UI, but read-only inspection of the live Supabase schema confirmed existing `households` and `household_members` tables plus RLS helpers/policies.
 
-Package 0 will **not** invent that schema. Package 2 must make a bounded decision for spouse/child/dependent records with these constraints:
+Current facts:
 
-- do not use Outreach contacts as fake child/spouse member records;
-- do not create fake Auth accounts for children/dependents;
-- preserve guardian/privacy boundaries;
-- adults may later claim their own account-backed identity;
-- any new non-auth person/dependent entity must be justified by actual household/onboarding needs and designed for safe future church isolation.
+- `households` is church-scoped.
+- `household_members` is church-scoped and currently links `household_id` to an existing `user_id` plus `relationship_role` and `primary_contact`.
+- household read access is limited to a member of that household or an account with `manage_members`.
+- household writes are limited to `manage_members`.
+- adding a household member requires that user to already have an active membership in the same church.
+- live pilot usage is currently empty: 0 household rows and 0 household-member rows at this checkpoint.
+- there is no current app UI using these tables.
+
+Package 0 decision: **KEEP the household schema foundation, but do not pretend it solves the approved onboarding requirement yet.** It supports relationships among existing accounts, but it cannot represent a spouse/child/dependent who has no account.
+
+Package 2 must decide the smallest safe extension or companion model for non-auth dependents, while:
+
+- reusing the existing household tables instead of creating a parallel household system;
+- not using Outreach contacts as fake child/spouse member records;
+- not creating fake Auth accounts for children/dependents;
+- preserving guardian/privacy boundaries;
+- allowing adults to claim their own account-backed identity later;
+- keeping every household/dependent relationship church-scoped.
+
+### Legacy duplicate milestone fields exist
+
+`member_private_details` still contains older `baptized`, `baptism_date`, `holy_ghost_received`, and `holy_ghost_date` columns, while the current Journey/member-management system uses `member_milestones` for verified spiritual records.
+
+Read-only production inspection found no current values in those legacy private-detail spiritual columns, and current profile/Journey/group code writes/reads `member_milestones` instead. One current import function still uses `member_private_details.email` for duplicate-email checking, but not those spiritual milestone fields.
+
+Package 0 classification: the duplicate spiritual columns are **LEGACY / DO NOT WRITE in new pilot packages**. Do not remove them during Package 0; later implementation can formally deprecate/remove them only after a code/RPC/import compatibility check.
 
 ### Authorization is currently hybrid — target is already approved
 
@@ -182,9 +205,87 @@ Package 3 should reuse this pattern for FG report cross-system actions.
 ### Checkpoint 1 bounded implementation risks
 
 1. Legacy job roles and stackable permissions coexist. Each pilot package must identify which current route/RPC/RLS checks it relies on and avoid assuming KN-006 migration is already complete.
-2. There is no general non-auth Person/household entity today. Package 2 must decide the smallest safe household/dependent model without destabilizing the established account-backed member stack.
+2. Existing household tables handle only active account-backed members. Package 2 still needs a safe non-auth dependent/child path without creating a duplicate household system.
 3. Outreach matching by email/phone is useful duplicate prevention but must not become unsafe auto-claim logic when identifiers are ambiguous. Account ownership/verification remains required.
 4. Existing member-control UI still has some direct Pastor/Admin route checks even while underlying management actions can use `manage_members`; Package 4 should reconcile experience with the authoritative capability model rather than adding another access rule.
+5. Legacy spiritual fields remain in `member_private_details`; new work must treat `member_milestones` as canonical and avoid dual writes.
+
+## Checkpoint 2 — Friendship Group data and workflow findings
+
+Status: CONFIRMED FROM CURRENT `main` + read-only live database inspection. No group implementation was changed.
+
+### What to KEEP
+
+The existing Friendship Group foundation is substantial and should be extended rather than replaced:
+
+- church-scoped `groups` with leader, meeting day/time/frequency, capacity, location label, accepting-members flag, and active state;
+- private exact meeting address/access notes in `group_private_details`;
+- church-member roster in `group_memberships` with member / assistant / leader roles;
+- one-active-Friendship-Group enforcement;
+- member join requests with pending/approved/declined/cancelled lifecycle;
+- database-triggered join approval that inserts the actual roster membership only after manager authorization, active-member validation, accepting-members validation, and capacity validation;
+- self check-in with church timezone / meeting-window validation;
+- assistant operating permission that can submit reports without receiving full roster-management authority;
+- report history and roster attendance history;
+- group-shared prayer wall with explicit member sharing choice;
+- lesson assignments linked to report completion;
+- pending reported-milestone verification rather than silent leader overwrite;
+- RLS helper separation between `can_manage_group` and `can_operate_group`;
+- exact meeting address visible only to joined members, group leadership, Pastor/Admin, or explicit `manage_groups` authority.
+
+### Current report cross-system behavior
+
+`submitGroupReport` currently:
+
+1. resolves the group and church;
+2. builds roster attendance from self check-ins plus leader/assistant correction;
+3. saves the main `group_reports` row;
+4. inserts `group_report_attendance` rows;
+5. creates named first-time guests in `outreach_contacts` with 24-hour follow-up assigned to the group leader/reporting leader;
+6. creates pending `reported_milestones` from baptism/Holy Ghost names;
+7. snapshots group-shared prayer-wall requests into the report text;
+8. revalidates Group, Journey, Outreach, and Church Health surfaces.
+
+This already reflects the desired “enter once, update several authorized systems” direction, but the implementation is incomplete.
+
+### What to REPAIR / CONNECT in Package 3
+
+1. **Atomicity / reliable orchestration** — the report row is saved before attendance, guest, and milestone writes. Later writes can fail independently while the report still appears successful. Package 3 should move consequential cross-system submission into one reliable server-side transaction/RPC or an auditable report-action queue with retry state.
+2. **Structured FG guest source** — report-created Outreach guests currently omit `source_group_id`, `source_type='friendship_group'`, structured source label, and source occurrence metadata. Because they are pre-account guests, the existing public-join source trigger does not fill those fields. Package 3 must preserve structured FG attribution, not only a text note.
+3. **Duplicate guest handling** — a duplicate insert is currently counted/skipped. It does not safely match the existing guest, add a return-visit interaction, or advance 1st → 2nd → 3rd visit progression. Package 3 should use the same duplicate-safe Outreach resolution contract instead of dropping repeated guests.
+4. **Return-visit progression** — the paper/report model distinguishes first/return guest ministry meaning, but current report automation only creates first-time guest records and aggregate counts. Return visits should become Outreach/visit history, not new people.
+5. **Bible studies** — current report stores only `active_bible_studies` as an aggregate number. It does not identify the person/study or update a canonical Bible-study/follow-up record. Package 3 must connect named Bible-study activity to Outreach/Journey where appropriate while retaining summary reporting.
+6. **Milestone identity** — report-entered baptism/Holy Ghost names create pending verification rows but are not necessarily linked to `member_user_id`. Package 3 should resolve a known roster/member safely when selected, otherwise leave it explicitly unmatched for admin review. Never infer identity from a name alone.
+7. **Urgent matters / pastoral routing** — current `issues_notes` / `prayer_needs` remain report fields. They do not yet create a permission-scoped pastoral-care action. Package 3 should propose/route urgent or private items through the protected care workflow with explicit privacy and confirmation rules.
+8. **Missed-attendance care** — attendance can record `missing`, but there is no current function creating a leader check-in suggestion after repeated absence. Package 3 should add bounded, non-spammy care suggestions based on configurable repeated absence logic.
+9. **Report accountability** — no current missing-report reminder/escalation function was found. Package 3 should support leader reminder and overseer visibility after a configurable grace period.
+10. **Report completeness vs real paper form** — the digital report already covers core metrics but does not yet represent all approved New Life concepts such as richer guest categories/visit progression, multiplication prospects/readiness, praise-sharing choice, and other operational sections. Extend the current report rather than creating a second reporting system.
+11. **Action confirmation** — the current form commits cross-system writes immediately. The target Package 3 flow should show a clear “This report will update…” action summary before sensitive/consequential actions execute, especially care, milestone, public praise, and follow-up creation.
+
+### Current real-use signal
+
+Read-only production counts at this checkpoint show infrastructure is present but weekly reporting is not yet proven in real use:
+
+- 2 groups, both active Friendship Groups;
+- 5 group memberships;
+- 1 group join request;
+- 0 group reports;
+- 0 group-report attendance rows;
+- 0 Outreach contacts currently carrying `source_group_id`;
+- 1 reported milestone.
+
+This reinforces the pilot strategy: **do not build a second FG engine; repair and prove the one that already exists with real Madera use.**
+
+### Checkpoint 2 permission conclusion
+
+The current permission split is a good base:
+
+- Leader / explicit `manage_groups` / Pastor/Admin: manage group membership/settings.
+- Assistant: can operate the group and submit reports, but cannot approve membership or change protected settings by default.
+- Joined member: can see exact private address and group-shared prayer content for their own group.
+- Non-member browsing a group: should see general group information only, never the exact home address.
+
+Package 3 should preserve this base and add capability decisions only where the approved package requires them; it should not flatten assistant and leader into identical access.
 
 ## Canonical contracts to settle before exit
 
@@ -194,23 +295,25 @@ Current Madera-pilot rule:
 
 - account-backed church members use the established Auth UUID across `profiles`, private details, membership, milestones, learning, groups, Journey, and other member records;
 - Outreach remains the pre-account guest/prospect record and links to the account-backed identity through `member_user_id` when safely claimed;
-- no new universal Person table is introduced during Package 0;
-- household/dependent support is a Package 2 bounded architecture decision because the current repo has no household model.
+- no new universal account-backed Person table is introduced during Package 0;
+- existing `households` / `household_members` are retained as the household foundation;
+- Package 2 must solve only the missing non-auth dependent/child case, not replace the existing household schema.
 
 Still to resolve before Package 2 implementation:
 - exact archived/returning-member restoration rules;
 - ambiguous duplicate/claim review workflow;
-- smallest safe non-auth household/dependent representation.
+- smallest safe non-auth dependent representation that complements existing households.
 
 ### B. Church / tenant ownership
 
 Working rule: every church-owned record must resolve to one church/tenant, directly or through a safely scoped parent relationship. Madera-first does not justify global/unscoped member or ministry records.
 
 Confirmed so far:
-- `church_memberships`, Outreach, member milestones, groups, reports, care/prayer, role assignments, and major operational records use church-scoped ownership;
+- `church_memberships`, Outreach, member milestones, groups, reports, care/prayer, households, role assignments, and major operational records use church-scoped ownership;
 - local church remains the primary private-data boundary;
 - exact Friendship Group home addresses, Outreach private notes/prayer, private member details, care, documents, and local audit data must not leak upward to district/network scope;
-- public join resolves a specific enabled church and the browser cannot choose arbitrary elevated access.
+- public join resolves a specific enabled church and the browser cannot choose arbitrary elevated access;
+- group join approval validates group/church and active church membership at the database layer.
 
 Still to inspect:
 - inherited tenant ownership in Learning and Church Health source queries;
@@ -228,18 +331,18 @@ Package rules:
 - sensitive care and finance permissions remain separate from generic `manage_members`;
 - Group Leader/assistant access remains group-scoped unless another explicit capability broadens it.
 
-### D. Cross-system event ownership
+### D. Cross-system event ownership — checkpoint status: CONTRACT NOW CONCRETE
 
 Pilot-core systems must exchange facts through canonical records/events rather than copying fields into parallel tables.
 
-Target integration contract:
-- guest capture -> Outreach contact + source/history + follow-up;
+Current/target integration contract:
+- guest capture -> Outreach contact + structured source/history + follow-up;
 - onboarding/claim -> safely link existing Outreach history to the account-backed member identity where verified;
-- FG attendance/report -> canonical attendance/history + guest/evangelism + Bible-study/milestone/care actions with proper confirmation/verification;
+- FG attendance/report -> canonical attendance/history + duplicate-safe guest/visit activity + Bible-study activity + pending milestone verification + privacy-safe care/follow-up actions;
 - learning completion -> canonical Journey/member progress;
 - Church Health -> derived/read model from underlying records, not manual duplicate totals.
 
-Consequential or sensitive writes must preserve verification and permission boundaries.
+Consequential or sensitive writes must preserve verification and permission boundaries, and multi-system report submission must become reliably atomic/retryable rather than best-effort.
 
 ## Known coordination constraints
 
@@ -252,7 +355,7 @@ Consequential or sensitive writes must preserve verification and permission boun
 
 1. ~~Canonical identity/member/account structures and current join/outreach handoff.~~ CHECKPOINT COMPLETE.
 2. ~~Role/capability/RLS authority map.~~ TARGET + transition risks mapped; detailed per-package use remains implementation work.
-3. Friendship Group data and permission relationships.
+3. ~~Friendship Group data and permission relationships.~~ CHECKPOINT COMPLETE.
 4. Learning -> member/Journey relationships.
 5. Church Health source-data map.
 6. Support-scope classification for care/calendar/serve/forms/office/finance visibility.
