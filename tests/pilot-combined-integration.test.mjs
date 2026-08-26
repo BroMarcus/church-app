@@ -75,19 +75,29 @@ test('combined release snapshot requires end-to-end private-invite recovery proo
 });
 
 test('combined release snapshot records exact-head CI and read-only runtime audit boundaries', () => {
-  assert.match(snapshot, /Kingdom Network Build #1301: \*\*SUCCESS\*\*/);
+  assert.match(snapshot, /Kingdom Network Build #1413: \*\*SUCCESS\*\*/);
   assert.match(snapshot, /latest 24-hour window: \*\*no runtime errors found\*\*/i);
   assert.match(snapshot, /does \*\*not\*\* replace exact-build phone acceptance/i);
   assert.match(snapshot, /Any new commit on PR #55 creates a new exact head and requires a fresh Kingdom Network Build/i);
 });
 
-test('combined release snapshot requires complete auth success state before consequential continuation', () => {
+test('combined release snapshot requires complete auth and public-join success state before consequential continuation', () => {
   assert.match(snapshot, /password sign-in requires a real authenticated user and session/i);
   assert.match(snapshot, /signup requires an Auth user before showing `account created`/i);
+  assert.match(snapshot, /public church-link signup now also requires an actual Auth user/i);
   assert.match(snapshot, /modern PKCE callback requires both user and session/i);
   assert.match(snapshot, /token-hash verification path requires both user and session/i);
   assert.match(snapshot, /password update requires Auth to return the updated user/i);
+  assert.match(snapshot, /existing-account public church joining requires the RPC `already_member` value to be an actual boolean/i);
   assert.match(snapshot, /Auth success paths must not continue unless the required user\/session state is actually present/i);
+});
+
+test('combined release snapshot protects Setup Inbox file-type and duplicate-upload safety', () => {
+  assert.match(snapshot, /filename extension is required even when the browser reports a MIME type/i);
+  assert.match(snapshot, /browser MIME is present it must match the approved extension/i);
+  assert.match(snapshot, /normalized accepted MIME is used for storage metadata/i);
+  assert.match(snapshot, /rejects mismatched extension\/MIME combinations before storage writes/i);
+  assert.match(snapshot, /uploads remain locked after a confirmed save/i);
 });
 
 test('critical integration files contain no unresolved merge-conflict markers', () => {
