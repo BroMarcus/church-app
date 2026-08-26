@@ -5,9 +5,17 @@ import test from 'node:test';
 
 const source = fs.readFileSync(path.join(process.cwd(), 'src/app/church/setup-inbox/setup-uploader.tsx'), 'utf8');
 
-test('Fresh Church Setup requires an approved filename extension even when browser MIME is present', () => {
-  assert.match(source, /!allowedExtensions\.has\(extension\)\|\|\(file\.type&&!allowedTypes\.has\(file\.type\)\)/);
-  assert.doesNotMatch(source, /\(!file\.type&&!allowedExtensions\.has\(extension\)\)/);
+test('Fresh Church Setup requires an approved filename extension and matching browser MIME when present', () => {
+  assert.match(source, /const allowedMimesByExtension=new Map/);
+  assert.match(source, /\['\.pdf',new Set\(\['application\/pdf'\]\)\]/);
+  assert.match(source, /\['\.docx',new Set\(\['application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document'\]\)\]/);
+  assert.match(source, /\['\.pptx',new Set\(\['application\/vnd\.openxmlformats-officedocument\.presentationml\.presentation'\]\)\]/);
+  assert.match(source, /\['\.jpg',new Set\(\['image\/jpeg'\]\)\]/);
+  assert.match(source, /const allowedMimes=allowedMimesByExtension\.get\(extension\)/);
+  assert.match(source, /const normalizedMime=file\.type\.trim\(\)\.toLowerCase\(\)/);
+  assert.match(source, /if\(!allowedMimes\|\|\(normalizedMime&&!allowedMimes\.has\(normalizedMime\)\)\)/);
+  assert.ok(source.includes('That file type is not allowed or does not match its extension.'));
+  assert.ok(source.includes('Ese tipo de archivo no está permitido o no coincide con su extensión.'));
 });
 
 test('Fresh Church Setup keeps browser client and path initialization inside safe upload recovery', () => {
@@ -68,6 +76,12 @@ test('Fresh Church Setup does not turn a post-commit refresh problem into a fals
   assert.match(source, /The file was saved, but this page did not refresh\. Do not upload it again\./);
   assert.match(source, /El archivo sí se guardó, pero esta página no se actualizó\. No vuelvas a subirlo\./);
   assert.doesNotMatch(source, /if\(metadataCommitted\)\{[^}]*fail\(\)/);
+});
+
+test('Fresh Church Setup stores the normalized accepted MIME rather than an unvalidated browser value', () => {
+  assert.match(source, /contentType:normalizedMime\|\|undefined/);
+  assert.match(source, /content_type:normalizedMime\|\|null/);
+  assert.doesNotMatch(source, /content_type:file\.type\|\|null/);
 });
 
 test('Fresh Church Setup warns pilot testers not to upload sensitive real-world records', () => {
