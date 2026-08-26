@@ -28,6 +28,10 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
+      - name: Production HOLD guard
+        id: production_hold
+        continue-on-error: true
+        run: node scripts/verify-production-hold.mjs
       - name: Install dependencies
         id: install
         continue-on-error: true
@@ -51,6 +55,7 @@ jobs:
         if: always() && github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
+          PRODUCTION_HOLD: ${{ steps.production_hold.outcome }}
           INSTALL: ${{ steps.install.outcome }}
           TESTS: ${{ steps.tests.outcome }}
           LINT: ${{ steps.lint.outcome }}
@@ -69,16 +74,17 @@ jobs:
               -f description="${context}: ${outcome}" \
               -f target_url="$RUN_URL"
           }
+          publish production-hold "$PRODUCTION_HOLD"
           publish install "$INSTALL"
           publish security-tests "$TESTS"
           publish lint "$LINT"
           publish build "$BUILD"
-          if [ "$INSTALL" = success ] && [ "$TESTS" = success ] && [ "$LINT" = success ] && [ "$BUILD" = success ]; then
+          if [ "$PRODUCTION_HOLD" = success ] && [ "$INSTALL" = success ] && [ "$TESTS" = success ] && [ "$LINT" = success ] && [ "$BUILD" = success ]; then
             overall=success
-            description='install, security tests, lint, and build passed'
+            description='production hold, install, security tests, lint, and build passed'
           else
             overall=failure
-            description="install=${INSTALL}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
+            description="hold=${PRODUCTION_HOLD}, install=${INSTALL}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
           fi
           gh api --method POST \
             -H "Accept: application/vnd.github+json" \
@@ -87,4 +93,18 @@ jobs:
             -f context='kingdom-network/release-gate' \
             -f description="$description" \
             -f target_url="$RUN_URL"
-          [ "$overall" = success ]
+      - name: Enforce release gate
+        if: always()
+        env:
+          PRODUCTION_HOLD: ${{ steps.production_hold.outcome }}
+          INSTALL: ${{ steps.install.outcome }}
+          TESTS: ${{ steps.tests.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+        run: |
+          if [ "$PRODUCTION_HOLD" = success ] && [ "$INSTALL" = success ] && [ "$TESTS" = success ] && [ "$LINT" = success ] && [ "$BUILD" = success ]; then
+            echo 'Kingdom Network release gate passed.'
+            exit 0
+          fi
+          echo "Kingdom Network release gate failed: hold=${PRODUCTION_HOLD}, install=${INSTALL}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
+          exit 1
