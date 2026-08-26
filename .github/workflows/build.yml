@@ -21,13 +21,17 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
+      - name: GitHub Actions pin guard
+        id: action_pins
+        continue-on-error: true
+        run: node scripts/verify-github-actions-pins.mjs
       - name: Production HOLD guard
         id: production_hold
         continue-on-error: true
@@ -55,6 +59,7 @@ jobs:
         if: always() && github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
+          ACTION_PINS: ${{ steps.action_pins.outcome }}
           PRODUCTION_HOLD: ${{ steps.production_hold.outcome }}
           INSTALL: ${{ steps.install.outcome }}
           TESTS: ${{ steps.tests.outcome }}
@@ -74,17 +79,18 @@ jobs:
               -f description="${context}: ${outcome}" \
               -f target_url="$RUN_URL"
           }
+          publish action-pins "$ACTION_PINS"
           publish production-hold "$PRODUCTION_HOLD"
           publish install "$INSTALL"
           publish security-tests "$TESTS"
           publish lint "$LINT"
           publish build "$BUILD"
-          if [ "$PRODUCTION_HOLD" = success ] && [ "$INSTALL" = success ] && [ "$TESTS" = success ] && [ "$LINT" = success ] && [ "$BUILD" = success ]; then
+          if [ "$ACTION_PINS" = success ] && [ "$PRODUCTION_HOLD" = success ] && [ "$INSTALL" = success ] && [ "$TESTS" = success ] && [ "$LINT" = success ] && [ "$BUILD" = success ]; then
             overall=success
-            description='production hold, install, security tests, lint, and build passed'
+            description='action pins, production hold, install, security tests, lint, and build passed'
           else
             overall=failure
-            description="hold=${PRODUCTION_HOLD}, install=${INSTALL}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
+            description="pins=${ACTION_PINS}, hold=${PRODUCTION_HOLD}, install=${INSTALL}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
           fi
           gh api --method POST \
             -H "Accept: application/vnd.github+json" \
@@ -96,15 +102,16 @@ jobs:
       - name: Enforce release gate
         if: always()
         env:
+          ACTION_PINS: ${{ steps.action_pins.outcome }}
           PRODUCTION_HOLD: ${{ steps.production_hold.outcome }}
           INSTALL: ${{ steps.install.outcome }}
           TESTS: ${{ steps.tests.outcome }}
           LINT: ${{ steps.lint.outcome }}
           BUILD: ${{ steps.build.outcome }}
         run: |
-          if [ "$PRODUCTION_HOLD" = success ] && [ "$INSTALL" = success ] && [ "$TESTS" = success ] && [ "$LINT" = success ] && [ "$BUILD" = success ]; then
+          if [ "$ACTION_PINS" = success ] && [ "$PRODUCTION_HOLD" = success ] && [ "$INSTALL" = success ] && [ "$TESTS" = success ] && [ "$LINT" = success ] && [ "$BUILD" = success ]; then
             echo 'Kingdom Network release gate passed.'
             exit 0
           fi
-          echo "Kingdom Network release gate failed: hold=${PRODUCTION_HOLD}, install=${INSTALL}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
+          echo "Kingdom Network release gate failed: pins=${ACTION_PINS}, hold=${PRODUCTION_HOLD}, install=${INSTALL}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
           exit 1
