@@ -137,8 +137,8 @@ select set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000003'
 insert into kn_p1_ctx(k,v)
 select 'return_result',result from public.record_friendship_group_outreach_visit(
   (select v from kn_p1_ctx where k='group_a_token'),
-  '50000000-0000-4000-8000-000000000002',
-  'Guest','One','559-555-0101','guest.one@example.test','en',2,current_date
+  '50000000-0000-4000-8000-000000000002'::uuid,
+  'Guest','One','559-555-0101','guest.one@example.test','en',2::smallint,current_date
 );
 reset role;
 do $$
@@ -263,14 +263,14 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000003',true);
 insert into kn_p1_ctx(k,v)
 select 'report_no_identity',result from public.record_group_report_guest_outreach(
-  '60000000-0000-4000-8000-000000000001',1,'Name','Only',null,null,'en'
+  '60000000-0000-4000-8000-000000000001',1::smallint,'Name','Only',null,null,'en'
 );
 insert into kn_p1_ctx(k,v)
 select 'report_guest_result',result from public.record_group_report_guest_outreach(
-  '60000000-0000-4000-8000-000000000001',2,'Report','Guest','559-555-0123','report.guest@example.test','en'
+  '60000000-0000-4000-8000-000000000001',2::smallint,'Report','Guest','559-555-0123','report.guest@example.test','en'
 );
 select * from public.record_group_report_guest_outreach(
-  '60000000-0000-4000-8000-000000000001',2,'Report','Guest','559-555-0123','report.guest@example.test','en'
+  '60000000-0000-4000-8000-000000000001',2::smallint,'Report','Guest','559-555-0123','report.guest@example.test','en'
 );
 reset role;
 
