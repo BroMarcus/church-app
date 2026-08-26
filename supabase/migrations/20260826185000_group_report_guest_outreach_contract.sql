@@ -77,7 +77,7 @@ begin
     p_phone,
     p_email,
     p_language,
-    1,
+    1::smallint,
     v_report.meeting_date
   ) x;
 
