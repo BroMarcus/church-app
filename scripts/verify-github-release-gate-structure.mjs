@@ -113,14 +113,23 @@ for (const file of workflowFiles) {
     }
   }
 
+  if (!/^\s{4}needs:\s*build\s*$/m.test(publishJob)) {
+    fail('publish-statuses must depend directly on the build job');
+  }
+  if (!/^\s{4}if:\s*always\(\)\s*&&\s*github\.event_name\s*==\s*['"]push['"]\s*$/m.test(publishJob)) {
+    fail('publish-statuses must remain push-only');
+  }
+
   for (const [id, envName] of requiredTrackedSteps) {
     const idPattern = new RegExp(`^\\s{8}id:\\s*${id}\\s*$`, 'm');
     if (!idPattern.test(buildJob)) fail(`missing tracked release step id '${id}'`);
 
-    const outcomeToken = `steps.${id}.outcome`;
-    const outcomeUses = source.split(outcomeToken).length - 1;
-    if (outcomeUses < 2) {
-      fail(`tracked step '${id}' must expose its outcome and feed the final enforcement step`);
+    const buildOutputPattern = new RegExp(
+      `^\\s{6}${id}:\\s*\\$\\{\\{\\s*steps\\.${id}\\.outcome\\s*\\}\\}\\s*$`,
+      'm',
+    );
+    if (!buildOutputPattern.test(buildJob)) {
+      fail(`build job must expose output '${id}' from steps.${id}.outcome`);
     }
 
     const envPattern = new RegExp(`^\\s{10}${envName}:\\s*\\$\\{\\{\\s*steps\\.${id}\\.outcome\\s*\\}\\}\\s*$`, 'm');
@@ -132,6 +141,18 @@ for (const file of workflowFiles) {
     if (!comparisonPattern.test(enforceBlock || '')) {
       fail(`Enforce release gate must require ${envName}=success`);
     }
+
+    const publishEnvPattern = new RegExp(
+      `^\\s{6}${envName}:\\s*\\$\\{\\{\\s*needs\\.build\\.outputs\\.${id}\\s*\\}\\}\\s*$`,
+      'm',
+    );
+    if (!publishEnvPattern.test(publishJob)) {
+      fail(`publish-statuses must receive ${envName} from needs.build.outputs.${id}`);
+    }
+
+    if (!comparisonPattern.test(publishJob)) {
+      fail(`publish-statuses overall result must require ${envName}=success`);
+    }
   }
 
   if (/actions\/checkout@/i.test(publishJob) || /\bnpm\s+(?:ci|install|i|test|run)\b/.test(publishJob)) {
@@ -142,5 +163,5 @@ for (const file of workflowFiles) {
 if (!foundReleaseWorkflow) fail('could not find workflow named Kingdom Network Build');
 
 if (!process.exitCode) {
-  console.log('Kingdom Network release-gate structure is fail-closed, deterministic, and time-bounded.');
+  console.log('Kingdom Network release-gate structure is fail-closed, deterministic, time-bounded, and status reporting is tied to verified build outputs.');
 }
