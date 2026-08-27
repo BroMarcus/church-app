@@ -80,7 +80,7 @@ test('dependency source guard rejects repository-local npm configuration overrid
   try {
     await writeFile(path.join(root, '.npmrc'), 'registry=https://packages.example.invalid/\n');
     await assert.rejects(runGuard(root), (error) => {
-      assert.match(error.stderr, /repository-local \.npmrc is not allowed/i);
+      assert.match(error.stderr, /\.npmrc is not allowed/i);
       return true;
     });
   } finally {
@@ -93,7 +93,21 @@ test('dependency source guard rejects even empty repository-local npm config so 
   try {
     await writeFile(path.join(root, '.npmrc'), '');
     await assert.rejects(runGuard(root), (error) => {
-      assert.match(error.stderr, /repository-local \.npmrc is not allowed/i);
+      assert.match(error.stderr, /\.npmrc is not allowed/i);
+      return true;
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('dependency source guard rejects npm-shrinkwrap because it can override the reviewed package-lock', async () => {
+  const root = await fixture();
+  try {
+    const lock = JSON.parse(await readFile(path.join(root, 'package-lock.json'), 'utf8'));
+    await writeFile(path.join(root, 'npm-shrinkwrap.json'), JSON.stringify(lock, null, 2));
+    await assert.rejects(runGuard(root), (error) => {
+      assert.match(error.stderr, /npm-shrinkwrap\.json is not allowed/i);
       return true;
     });
   } finally {
