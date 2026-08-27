@@ -85,6 +85,56 @@ jobs:
         if: steps.install.outcome == 'success'
         continue-on-error: true
         run: npm run build
+      - name: Assert action_pins outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.action_pins.outcome }}
+        run: test "$OUTCOME" = success
+      - name: Assert workflow_permissions outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.workflow_permissions.outcome }}
+        run: test "$OUTCOME" = success
+      - name: Assert workflow_triggers outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.workflow_triggers.outcome }}
+        run: test "$OUTCOME" = success
+      - name: Assert release_structure outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.release_structure.outcome }}
+        run: test "$OUTCOME" = success
+      - name: Assert production_hold outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.production_hold.outcome }}
+        run: test "$OUTCOME" = success
+      - name: Assert dependency_sources outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.dependency_sources.outcome }}
+        run: test "$OUTCOME" = success
+      - name: Assert install outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.install.outcome }}
+        run: test "$OUTCOME" = success
+      - name: Assert tests outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.tests.outcome }}
+        run: test "$OUTCOME" = success
+      - name: Assert lint outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.lint.outcome }}
+        run: test "$OUTCOME" = success
+      - name: Assert build outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.build.outcome }}
+        run: test "$OUTCOME" = success
       - name: Enforce release gate
         id: release_gate
         if: always()
