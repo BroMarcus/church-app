@@ -37,7 +37,7 @@ test('release workflow keeps a canonical PR-visible gate, trusted runners, deter
   assert.match(workflow, /run:\s*node scripts\/verify-dependency-sources\.mjs\s*$/m);
 });
 
-test('every intentionally fail-open release step feeds the final fail-closed gate and publisher', async () => {
+test('every intentionally fail-open release step feeds the final fail-closed gate, visible assertion, and publisher', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
   const publishJob = workflow.slice(workflow.indexOf('\n  publish-statuses:'));
 
@@ -64,6 +64,16 @@ test('every intentionally fail-open release step feeds the final fail-closed gat
 
     const successComparison = new RegExp(`\\[ \\"\\$${envName}\\" = success \\]`);
     assert.match(workflow, successComparison);
+
+    const assertionBlock = new RegExp(
+      `- name:\\s*Assert ${id} outcome\\n` +
+        `\\s*if:\\s*always\\(\\)\\n` +
+        `\\s*env:\\n` +
+        `\\s*OUTCOME:\\s*\\$\\{\\{\\s*steps\\.${id}\\.outcome\\s*\\}\\}\\n` +
+        `\\s*run:\\s*test "\\$OUTCOME" = success`,
+      'm',
+    );
+    assert.match(workflow, assertionBlock);
   }
 
   assert.match(workflow, /- name:\s*Enforce release gate\n\s*id:\s*release_gate\n\s*if:\s*always\(\)/);
@@ -79,13 +89,17 @@ test('every intentionally fail-open release step feeds the final fail-closed gat
   assert.match(publishJob, /context='kingdom-network\/release-gate'/);
 });
 
-test('release structure guard protects canonical check naming, final-gate provenance, runner trust, and publisher isolation', async () => {
+test('release structure guard protects canonical check naming, visible stage failures, final provenance, runner trust, and publisher isolation', async () => {
   const guard = await readFile(guardPath, 'utf8');
   assert.match(guard, /canonical kingdom-network\/release-gate PR check name/);
   assert.match(guard, /approved GitHub-hosted ubuntu-latest runner class/);
   assert.match(guard, /self-hosted, expression-selected, or runner-matrix execution/);
   assert.match(guard, /untracked continue-on-error step/);
   assert.match(guard, /DEPENDENCY_SOURCES/);
+  assert.match(guard, /missing visible failure assertion for tracked step/);
+  assert.match(guard, /must read the exact steps\./);
+  assert.match(guard, /must fail visibly unless OUTCOME=success/);
+  assert.match(guard, /may never continue on error/);
   assert.match(guard, /Enforce release gate may never continue on error/);
   assert.match(guard, /Enforce release gate must use id 'release_gate'/);
   assert.match(guard, /build job must expose release_gate from steps\.release_gate\.outcome/);
@@ -98,6 +112,7 @@ test('release structure guard protects canonical check naming, final-gate proven
   assert.match(guard, /publish-statuses must not checkout code or execute npm install\/test\/build commands/);
   assert.match(guard, /timeout-minutes between 1 and 20/);
   assert.match(guard, /npm ci --ignore-scripts --no-audit --no-fund/);
+  assert.match(guard, /stage failures are individually visible/);
   assert.match(guard, /PR-visible under the canonical required-check name/);
   assert.match(guard, /exact final enforcement outcome/);
 });
