@@ -11,6 +11,7 @@ const requiredTrackedSteps = [
   ['release_structure', 'RELEASE_STRUCTURE'],
   ['production_hold', 'PRODUCTION_HOLD'],
   ['dependency_sources', 'DEPENDENCY_SOURCES'],
+  ['runtime_provenance', 'RUNTIME_PROVENANCE'],
   ['install', 'INSTALL'],
   ['vulnerability_audit', 'VULNERABILITY_AUDIT'],
   ['tests', 'TESTS'],
@@ -76,11 +77,11 @@ for (const file of workflowFiles) {
   if (!/^\s{4}name:\s*kingdom-network\/release-gate\s*$/m.test(buildJob)) {
     fail('build job must expose the canonical kingdom-network/release-gate PR check name');
   }
-  if (!/^\s{4}runs-on:\s*ubuntu-latest\s*$/m.test(buildJob)) {
-    fail('build job must remain on the approved GitHub-hosted ubuntu-latest runner class');
+  if (!/^\s{4}runs-on:\s*ubuntu-24\.04\s*$/m.test(buildJob)) {
+    fail('build job must remain on the approved GitHub-hosted ubuntu-24.04 runner image');
   }
-  if (!/^\s{4}runs-on:\s*ubuntu-latest\s*$/m.test(publishJob)) {
-    fail('publish-statuses must remain on the approved GitHub-hosted ubuntu-latest runner class');
+  if (!/^\s{4}runs-on:\s*ubuntu-24\.04\s*$/m.test(publishJob)) {
+    fail('publish-statuses must remain on the approved GitHub-hosted ubuntu-24.04 runner image');
   }
   if (/\bself-hosted\b|runs-on:\s*\$\{\{|runs-on:\s*\[/i.test(`${buildJob}\n${publishJob}`)) {
     fail('release jobs may not use self-hosted, expression-selected, or runner-matrix execution');
@@ -96,8 +97,8 @@ for (const file of workflowFiles) {
     fail('publish-statuses job must have timeout-minutes between 1 and 5');
   }
 
-  if (!/node-version:\s*["']?22["']?\s*$/m.test(buildJob)) {
-    fail('setup-node must pin the CI runtime to Node 22');
+  if (!/node-version:\s*["']?22\.23\.2["']?\s*$/m.test(buildJob)) {
+    fail('setup-node must pin the CI runtime to exact Node 22.23.2');
   }
   if (!/^\s{4}env:\s*$/m.test(buildJob)) {
     fail('build job must define explicit npm provenance environment');
@@ -116,6 +117,23 @@ for (const file of workflowFiles) {
   }
 
   const blocks = stepBlocks(buildJob);
+  const runtimeBlock = blocks.find((block) => /^\s{6}- name:\s*Runtime provenance guard\s*$/m.test(block));
+  if (!runtimeBlock) {
+    fail('missing Runtime provenance guard step');
+  } else {
+    if (!/^\s{8}id:\s*runtime_provenance\s*$/m.test(runtimeBlock)) {
+      fail("Runtime provenance guard must use id 'runtime_provenance'");
+    }
+    if (!/^\s{8}run:\s*node scripts\/verify-runtime-provenance\.mjs\s*$/m.test(runtimeBlock)) {
+      fail('Runtime provenance guard must execute scripts/verify-runtime-provenance.mjs');
+    }
+  }
+
+  const installBlock = blocks.find((block) => /^\s{6}- name:\s*Install dependencies\s*$/m.test(block));
+  if (!installBlock || blocks.indexOf(runtimeBlock) > blocks.indexOf(installBlock)) {
+    fail('Runtime provenance guard must run before dependency installation');
+  }
+
   const auditBlock = blocks.find((block) => /^\s{6}- name:\s*Production dependency vulnerability audit\s*$/m.test(block));
   if (!auditBlock) {
     fail('missing Production dependency vulnerability audit step');
@@ -238,5 +256,5 @@ for (const file of workflowFiles) {
 if (!foundReleaseWorkflow) fail('could not find workflow named Kingdom Network Build');
 
 if (!process.exitCode) {
-  console.log('Kingdom Network release-gate structure is fail-closed, production dependency vulnerability scanning is tracked and visible, npm registry/user config are pinned, stage failures are individually visible, PR-visible under the canonical required-check name, GitHub-hosted, deterministic, lifecycle-script-free during install, time-bounded, and the canonical release status is tied to the exact final enforcement outcome.');
+  console.log('Kingdom Network release-gate structure is fail-closed, the GitHub-hosted Ubuntu runner and Node/npm toolchain are exact-version pinned, production dependency vulnerability scanning is tracked and visible, npm registry/user config are pinned, stage failures are individually visible, PR-visible under the canonical required-check name, deterministic, lifecycle-script-free during install, time-bounded, and the canonical release status is tied to the exact final enforcement outcome.');
 }
