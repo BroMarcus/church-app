@@ -27,6 +27,7 @@ jobs:
       production_hold: ${{ steps.production_hold.outcome }}
       dependency_sources: ${{ steps.dependency_sources.outcome }}
       install: ${{ steps.install.outcome }}
+      vulnerability_audit: ${{ steps.vulnerability_audit.outcome }}
       tests: ${{ steps.tests.outcome }}
       lint: ${{ steps.lint.outcome }}
       build: ${{ steps.build.outcome }}
@@ -71,7 +72,9 @@ jobs:
         continue-on-error: true
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Production dependency vulnerability audit
+        id: vulnerability_audit
         if: steps.install.outcome == 'success'
+        continue-on-error: true
         run: npm audit --omit=dev --audit-level=high --no-fund
       - name: Security regression tests
         id: tests
@@ -123,6 +126,11 @@ jobs:
         env:
           OUTCOME: ${{ steps.install.outcome }}
         run: test "$OUTCOME" = success
+      - name: Assert vulnerability_audit outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.vulnerability_audit.outcome }}
+        run: test "$OUTCOME" = success
       - name: Assert tests outcome
         if: always()
         env:
@@ -149,15 +157,16 @@ jobs:
           PRODUCTION_HOLD: ${{ steps.production_hold.outcome }}
           DEPENDENCY_SOURCES: ${{ steps.dependency_sources.outcome }}
           INSTALL: ${{ steps.install.outcome }}
+          VULNERABILITY_AUDIT: ${{ steps.vulnerability_audit.outcome }}
           TESTS: ${{ steps.tests.outcome }}
           LINT: ${{ steps.lint.outcome }}
           BUILD: ${{ steps.build.outcome }}
         run: |
-          if [ "$ACTION_PINS" = success ] && [ "$WORKFLOW_PERMISSIONS" = success ] && [ "$WORKFLOW_TRIGGERS" = success ] && [ "$RELEASE_STRUCTURE" = success ] && [ "$PRODUCTION_HOLD" = success ] && [ "$DEPENDENCY_SOURCES" = success ] && [ "$INSTALL" = success ] && [ "$TESTS" = success ] && [ "$LINT" = success ] && [ "$BUILD" = success ]; then
+          if [ "$ACTION_PINS" = success ] && [ "$WORKFLOW_PERMISSIONS" = success ] && [ "$WORKFLOW_TRIGGERS" = success ] && [ "$RELEASE_STRUCTURE" = success ] && [ "$PRODUCTION_HOLD" = success ] && [ "$DEPENDENCY_SOURCES" = success ] && [ "$INSTALL" = success ] && [ "$VULNERABILITY_AUDIT" = success ] && [ "$TESTS" = success ] && [ "$LINT" = success ] && [ "$BUILD" = success ]; then
             echo 'Kingdom Network release gate passed.'
             exit 0
           fi
-          echo "Kingdom Network release gate failed: pins=${ACTION_PINS}, permissions=${WORKFLOW_PERMISSIONS}, triggers=${WORKFLOW_TRIGGERS}, structure=${RELEASE_STRUCTURE}, hold=${PRODUCTION_HOLD}, dependencies=${DEPENDENCY_SOURCES}, install=${INSTALL}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
+          echo "Kingdom Network release gate failed: pins=${ACTION_PINS}, permissions=${WORKFLOW_PERMISSIONS}, triggers=${WORKFLOW_TRIGGERS}, structure=${RELEASE_STRUCTURE}, hold=${PRODUCTION_HOLD}, dependencies=${DEPENDENCY_SOURCES}, install=${INSTALL}, audit=${VULNERABILITY_AUDIT}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
           exit 1
 
   publish-statuses:
@@ -177,6 +186,7 @@ jobs:
       PRODUCTION_HOLD: ${{ needs.build.outputs.production_hold }}
       DEPENDENCY_SOURCES: ${{ needs.build.outputs.dependency_sources }}
       INSTALL: ${{ needs.build.outputs.install }}
+      VULNERABILITY_AUDIT: ${{ needs.build.outputs.vulnerability_audit }}
       TESTS: ${{ needs.build.outputs.tests }}
       LINT: ${{ needs.build.outputs.lint }}
       BUILD: ${{ needs.build.outputs.build }}
@@ -205,6 +215,7 @@ jobs:
           publish production-hold "$PRODUCTION_HOLD"
           publish dependency-sources "$DEPENDENCY_SOURCES"
           publish install "$INSTALL"
+          publish dependency-audit "$VULNERABILITY_AUDIT"
           publish security-tests "$TESTS"
           publish lint "$LINT"
           publish build "$BUILD"
@@ -213,7 +224,7 @@ jobs:
             description='final fail-closed release gate passed'
           else
             overall=failure
-            description="final release gate=${RELEASE_GATE}; pins=${ACTION_PINS}, permissions=${WORKFLOW_PERMISSIONS}, triggers=${WORKFLOW_TRIGGERS}, structure=${RELEASE_STRUCTURE}, hold=${PRODUCTION_HOLD}, dependencies=${DEPENDENCY_SOURCES}, install=${INSTALL}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
+            description="final release gate=${RELEASE_GATE}; pins=${ACTION_PINS}, permissions=${WORKFLOW_PERMISSIONS}, triggers=${WORKFLOW_TRIGGERS}, structure=${RELEASE_STRUCTURE}, hold=${PRODUCTION_HOLD}, dependencies=${DEPENDENCY_SOURCES}, install=${INSTALL}, audit=${VULNERABILITY_AUDIT}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
           fi
           gh api --method POST \
             -H "Accept: application/vnd.github+json" \
