@@ -85,8 +85,8 @@ for (const file of workflowFiles) {
   if (!/node-version:\s*["']?22["']?\s*$/m.test(buildJob)) {
     fail('setup-node must pin the CI runtime to Node 22');
   }
-  if (!/^\s{8}run:\s*npm ci --no-audit --no-fund\s*$/m.test(buildJob)) {
-    fail('dependency installation must use deterministic npm ci --no-audit --no-fund');
+  if (!/^\s{8}run:\s*npm ci --ignore-scripts --no-audit --no-fund\s*$/m.test(buildJob)) {
+    fail('dependency installation must use deterministic npm ci --ignore-scripts --no-audit --no-fund');
   }
   if (/^\s{8}run:\s*npm (?:install|i)(?:\s|$)/m.test(buildJob)) {
     fail('npm install/npm i is not allowed in the release build job');
@@ -164,5 +164,5 @@ for (const file of workflowFiles) {
 if (!foundReleaseWorkflow) fail('could not find workflow named Kingdom Network Build');
 
 if (!process.exitCode) {
-  console.log('Kingdom Network release-gate structure is fail-closed, deterministic, time-bounded, and status reporting is tied to verified build outputs.');
+  console.log('Kingdom Network release-gate structure is fail-closed, deterministic, lifecycle-script-free during install, time-bounded, and status reporting is tied to verified build outputs.');
 }
