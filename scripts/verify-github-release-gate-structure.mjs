@@ -99,6 +99,15 @@ for (const file of workflowFiles) {
   if (!/node-version:\s*["']?22["']?\s*$/m.test(buildJob)) {
     fail('setup-node must pin the CI runtime to Node 22');
   }
+  if (!/^\s{4}env:\s*$/m.test(buildJob)) {
+    fail('build job must define explicit npm provenance environment');
+  }
+  if (!/^\s{6}NPM_CONFIG_REGISTRY:\s*https:\/\/registry\.npmjs\.org\/\s*$/m.test(buildJob)) {
+    fail('build job must pin NPM_CONFIG_REGISTRY to https://registry.npmjs.org/');
+  }
+  if (!/^\s{6}NPM_CONFIG_USERCONFIG:\s*\/dev\/null\s*$/m.test(buildJob)) {
+    fail('build job must ignore user-level npm config with NPM_CONFIG_USERCONFIG=/dev/null');
+  }
   if (!/^\s{8}run:\s*npm ci --ignore-scripts --no-audit --no-fund\s*$/m.test(buildJob)) {
     fail('dependency installation must use deterministic npm ci --ignore-scripts --no-audit --no-fund');
   }
@@ -229,5 +238,5 @@ for (const file of workflowFiles) {
 if (!foundReleaseWorkflow) fail('could not find workflow named Kingdom Network Build');
 
 if (!process.exitCode) {
-  console.log('Kingdom Network release-gate structure is fail-closed, production dependency vulnerability scanning is tracked and visible, stage failures are individually visible, PR-visible under the canonical required-check name, GitHub-hosted, deterministic, lifecycle-script-free during install, time-bounded, and the canonical release status is tied to the exact final enforcement outcome.');
+  console.log('Kingdom Network release-gate structure is fail-closed, production dependency vulnerability scanning is tracked and visible, npm registry/user config are pinned, stage failures are individually visible, PR-visible under the canonical required-check name, GitHub-hosted, deterministic, lifecycle-script-free during install, time-bounded, and the canonical release status is tied to the exact final enforcement outcome.');
 }
