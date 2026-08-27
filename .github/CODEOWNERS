@@ -9,7 +9,11 @@
 /package-lock.json @BroMarcus
 /scripts/verify-*.mjs @BroMarcus
 /tests/github-*.test.mjs @BroMarcus
+/tests/codeowners-sensitive-paths.test.mjs @BroMarcus
 /supabase/ @BroMarcus
-/middleware.ts @BroMarcus
+/proxy.ts @BroMarcus
 /src/lib/supabase/ @BroMarcus
-/app/auth/ @BroMarcus
+/src/app/auth/ @BroMarcus
+/src/app/account/ @BroMarcus
+/src/app/guide/ @BroMarcus
+/src/app/church/ @BroMarcus
