@@ -23,7 +23,7 @@ const tracked = [
   ['build', 'BUILD'],
 ];
 
-test('release workflow keeps a canonical PR-visible gate, trusted runners, deterministic runtime, bounded jobs, and tracked production dependency audit', async () => {
+test('release workflow keeps a canonical PR-visible gate, trusted runners, deterministic runtime, pinned npm provenance, bounded jobs, and tracked production dependency audit', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
   const runnerLines = workflow.match(/^\s{4}runs-on:\s*ubuntu-latest\s*$/gm) || [];
   assert.equal(runnerLines.length, 2, 'build and status publisher must use the approved GitHub-hosted runner class');
@@ -31,6 +31,8 @@ test('release workflow keeps a canonical PR-visible gate, trusted runners, deter
   assert.doesNotMatch(workflow, /\bself-hosted\b|runs-on:\s*\$\{\{|runs-on:\s*\[/i);
   assert.match(workflow, /cancel-in-progress:\s*true/);
   assert.match(workflow, /node-version:\s*22\s*$/m);
+  assert.match(workflow, /^\s{6}NPM_CONFIG_REGISTRY:\s*https:\/\/registry\.npmjs\.org\/\s*$/m);
+  assert.match(workflow, /^\s{6}NPM_CONFIG_USERCONFIG:\s*\/dev\/null\s*$/m);
   assert.match(workflow, /timeout-minutes:\s*15/);
   assert.match(workflow, /publish-statuses:[\s\S]*?timeout-minutes:\s*5/);
   assert.match(workflow, /run:\s*npm ci --ignore-scripts --no-audit --no-fund\s*$/m);
@@ -95,11 +97,14 @@ test('every intentionally fail-open release step feeds the final fail-closed gat
   assert.match(publishJob, /context='kingdom-network\/release-gate'/);
 });
 
-test('release structure guard protects canonical check naming, dependency audit visibility, final provenance, runner trust, and publisher isolation', async () => {
+test('release structure guard protects canonical check naming, dependency audit visibility, npm provenance, final provenance, runner trust, and publisher isolation', async () => {
   const guard = await readFile(guardPath, 'utf8');
   assert.match(guard, /canonical kingdom-network\/release-gate PR check name/);
   assert.match(guard, /approved GitHub-hosted ubuntu-latest runner class/);
   assert.match(guard, /self-hosted, expression-selected, or runner-matrix execution/);
+  assert.match(guard, /NPM_CONFIG_REGISTRY/);
+  assert.match(guard, /registry\.npmjs\.org/);
+  assert.match(guard, /NPM_CONFIG_USERCONFIG/);
   assert.match(guard, /untracked continue-on-error step/);
   assert.match(guard, /DEPENDENCY_SOURCES/);
   assert.match(guard, /VULNERABILITY_AUDIT/);
@@ -122,6 +127,7 @@ test('release structure guard protects canonical check naming, dependency audit 
   assert.match(guard, /timeout-minutes between 1 and 20/);
   assert.match(guard, /npm ci --ignore-scripts --no-audit --no-fund/);
   assert.match(guard, /production dependency vulnerability scanning is tracked and visible/);
+  assert.match(guard, /npm registry\/user config are pinned/);
   assert.match(guard, /stage failures are individually visible/);
   assert.match(guard, /PR-visible under the canonical required-check name/);
   assert.match(guard, /exact final enforcement outcome/);
