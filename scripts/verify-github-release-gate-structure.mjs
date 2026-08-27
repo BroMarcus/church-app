@@ -163,6 +163,29 @@ for (const file of workflowFiles) {
       fail(`Enforce release gate must require ${envName}=success`);
     }
 
+    const assertionNamePattern = new RegExp(`^\\s{6}- name:\\s*Assert ${id} outcome\\s*$`, 'm');
+    const assertionBlock = blocks.find((block) => assertionNamePattern.test(block));
+    if (!assertionBlock) {
+      fail(`missing visible failure assertion for tracked step '${id}'`);
+    } else {
+      if (!/^\s{8}if:\s*always\(\)\s*$/m.test(assertionBlock)) {
+        fail(`Assert ${id} outcome must run with if: always()`);
+      }
+      const assertionEnvPattern = new RegExp(
+        `^\\s{10}OUTCOME:\\s*\\$\\{\\{\\s*steps\\.${id}\\.outcome\\s*\\}\\}\\s*$`,
+        'm',
+      );
+      if (!assertionEnvPattern.test(assertionBlock)) {
+        fail(`Assert ${id} outcome must read the exact steps.${id}.outcome value`);
+      }
+      if (!/^\s{8}run:\s*test\s+"\$OUTCOME"\s*=\s*success\s*$/m.test(assertionBlock)) {
+        fail(`Assert ${id} outcome must fail visibly unless OUTCOME=success`);
+      }
+      if (/^\s{8}continue-on-error:\s*true\s*$/m.test(assertionBlock)) {
+        fail(`Assert ${id} outcome may never continue on error`);
+      }
+    }
+
     const publishEnvPattern = new RegExp(
       `^\\s{6}${envName}:\\s*\\$\\{\\{\\s*needs\\.build\\.outputs\\.${id}\\s*\\}\\}\\s*$`,
       'm',
@@ -190,5 +213,5 @@ for (const file of workflowFiles) {
 if (!foundReleaseWorkflow) fail('could not find workflow named Kingdom Network Build');
 
 if (!process.exitCode) {
-  console.log('Kingdom Network release-gate structure is fail-closed, PR-visible under the canonical required-check name, GitHub-hosted, deterministic, lifecycle-script-free during install, time-bounded, and the canonical release status is tied to the exact final enforcement outcome.');
+  console.log('Kingdom Network release-gate structure is fail-closed, stage failures are individually visible, PR-visible under the canonical required-check name, GitHub-hosted, deterministic, lifecycle-script-free during install, time-bounded, and the canonical release status is tied to the exact final enforcement outcome.');
 }
