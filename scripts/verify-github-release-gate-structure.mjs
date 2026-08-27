@@ -72,6 +72,9 @@ for (const file of workflowFiles) {
   if (!buildJob) fail('missing build job');
   if (!publishJob) fail('missing isolated publish-statuses job');
 
+  if (!/^\s{4}name:\s*kingdom-network\/release-gate\s*$/m.test(buildJob)) {
+    fail('build job must expose the canonical kingdom-network/release-gate PR check name');
+  }
   if (!/^\s{4}runs-on:\s*ubuntu-latest\s*$/m.test(buildJob)) {
     fail('build job must remain on the approved GitHub-hosted ubuntu-latest runner class');
   }
@@ -187,5 +190,5 @@ for (const file of workflowFiles) {
 if (!foundReleaseWorkflow) fail('could not find workflow named Kingdom Network Build');
 
 if (!process.exitCode) {
-  console.log('Kingdom Network release-gate structure is fail-closed, GitHub-hosted, deterministic, lifecycle-script-free during install, time-bounded, and the canonical release status is tied to the exact final enforcement outcome.');
+  console.log('Kingdom Network release-gate structure is fail-closed, PR-visible under the canonical required-check name, GitHub-hosted, deterministic, lifecycle-script-free during install, time-bounded, and the canonical release status is tied to the exact final enforcement outcome.');
 }
