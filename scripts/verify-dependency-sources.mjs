@@ -5,6 +5,7 @@ import process from 'node:process';
 const root = path.resolve(process.env.KINGDOM_NETWORK_DEPENDENCY_ROOT || process.cwd());
 const packagePath = path.join(root, 'package.json');
 const lockPath = path.join(root, 'package-lock.json');
+const npmrcPath = path.join(root, '.npmrc');
 const failures = [];
 const dependencySections = ['dependencies', 'devDependencies', 'optionalDependencies'];
 const forbiddenDirectSource = /^(?:git(?:\+[^:]+)?:|github:|https?:|file:|link:|workspace:|npm:)/i;
@@ -30,6 +31,18 @@ function safeDirectSpec(name, spec, section) {
   }
   if (trimmed === '*' || trimmed === 'x' || trimmed === 'X') {
     fail(`${section}.${name} uses an unbounded version '${trimmed}'`);
+  }
+}
+
+// Keep install behavior controlled by the reviewed CI command line. A repository-local
+// .npmrc can silently redirect the registry, introduce auth, proxies, or weaken npm
+// safety settings before the dependency provenance guard has a chance to help.
+try {
+  await readFile(npmrcPath, 'utf8');
+  fail('repository-local .npmrc is not allowed while Production HOLD is active');
+} catch (error) {
+  if (error?.code !== 'ENOENT') {
+    fail(`cannot safely inspect repository-local .npmrc (${error?.code || error?.name || 'unknown_error'})`);
   }
 }
 
@@ -115,11 +128,11 @@ if (failures.length) {
   console.error('Dependency source provenance guard failed:');
   for (const failure of failures) console.error(`- ${failure}`);
   console.error(
-    'Production HOLD requires npm dependencies to stay lockfile-pinned to integrity-checked registry.npmjs.org tarballs; Git/URL/local/alias sources and mutable dist-tags are not allowed.',
+    'Production HOLD requires npm install behavior to stay CI-controlled and dependencies to stay lockfile-pinned to integrity-checked registry.npmjs.org tarballs; repository .npmrc overrides, Git/URL/local/alias sources, and mutable dist-tags are not allowed.',
   );
   process.exit(1);
 }
 
 console.log(
-  'Dependency source provenance guard passed: direct specs are bounded registry ranges and lockfile packages use integrity-checked registry.npmjs.org tarballs.',
+  'Dependency source provenance guard passed: install behavior is CI-controlled, direct specs are bounded registry ranges, and lockfile packages use integrity-checked registry.npmjs.org tarballs.',
 );
