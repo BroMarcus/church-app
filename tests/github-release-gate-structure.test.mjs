@@ -31,21 +31,48 @@ test('release workflow keeps deterministic runtime and bounded jobs', async () =
   assert.doesNotMatch(workflow, /run:\s*npm (?:install|i)(?:\s|$)/m);
 });
 
-test('every intentionally fail-open release step feeds the final fail-closed gate', async () => {
+test('every intentionally fail-open release step feeds the final fail-closed gate and publisher', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
+  const publishJob = workflow.slice(workflow.indexOf('\n  publish-statuses:'));
+
+  assert.match(publishJob, /^\n  publish-statuses:[\s\S]*?^    needs:\s*build\s*$/m);
+  assert.match(
+    publishJob,
+    /^    if:\s*always\(\)\s*&&\s*github\.event_name\s*==\s*['"]push['"]\s*$/m,
+  );
+
   for (const [id, envName] of tracked) {
     assert.match(workflow, new RegExp(`id:\\s*${id}\\b`));
-    assert.match(workflow, new RegExp(`${id}:[^\\n]*steps\\.${id}\\.outcome`));
-    assert.match(workflow, new RegExp(`${envName}:[^\\n]*steps\\.${id}\\.outcome`));
-    assert.match(workflow, new RegExp(`\\[ \\"\\$${envName}\\" = success \\]`));
+    assert.match(
+      workflow,
+      new RegExp(`^\\s{6}${id}:\\s*\\$\\{\\{\\s*steps\\.${id}\\.outcome\\s*\\}\\}\\s*$`, 'm'),
+    );
+    assert.match(
+      workflow,
+      new RegExp(`^\\s{10}${envName}:\\s*\\$\\{\\{\\s*steps\\.${id}\\.outcome\\s*\\}\\}\\s*$`, 'm'),
+    );
+    assert.match(
+      publishJob,
+      new RegExp(`^\\s{6}${envName}:\\s*\\$\\{\\{\\s*needs\\.build\\.outputs\\.${id}\\s*\\}\\}\\s*$`, 'm'),
+    );
+
+    const successComparison = new RegExp(`\\[ \\"\\$${envName}\\" = success \\]`);
+    assert.match(workflow, successComparison);
+    assert.match(publishJob, successComparison);
   }
+
   assert.match(workflow, /- name:\s*Enforce release gate\n\s*if:\s*always\(\)/);
 });
 
-test('release structure guard protects untracked continue-on-error and publisher isolation', async () => {
+test('release structure guard protects untracked failures, output provenance, and publisher isolation', async () => {
   const guard = await readFile(guardPath, 'utf8');
   assert.match(guard, /untracked continue-on-error step/);
   assert.match(guard, /Enforce release gate may never continue on error/);
+  assert.match(guard, /build job must expose output/);
+  assert.match(guard, /publish-statuses must depend directly on the build job/);
+  assert.match(guard, /publish-statuses must remain push-only/);
+  assert.match(guard, /publish-statuses must receive/);
+  assert.match(guard, /publish-statuses overall result must require/);
   assert.match(guard, /publish-statuses must not checkout code or execute npm install\/test\/build commands/);
   assert.match(guard, /timeout-minutes between 1 and 20/);
   assert.match(guard, /dependency installation must use deterministic npm ci/);
