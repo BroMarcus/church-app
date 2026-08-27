@@ -15,6 +15,7 @@ const tracked = [
   ['workflow_triggers', 'WORKFLOW_TRIGGERS'],
   ['release_structure', 'RELEASE_STRUCTURE'],
   ['production_hold', 'PRODUCTION_HOLD'],
+  ['dependency_sources', 'DEPENDENCY_SOURCES'],
   ['install', 'INSTALL'],
   ['tests', 'TESTS'],
   ['lint', 'LINT'],
@@ -29,6 +30,7 @@ test('release workflow keeps deterministic runtime and bounded jobs', async () =
   assert.match(workflow, /publish-statuses:[\s\S]*?timeout-minutes:\s*5/);
   assert.match(workflow, /run:\s*npm ci --no-audit --no-fund\s*$/m);
   assert.doesNotMatch(workflow, /run:\s*npm (?:install|i)(?:\s|$)/m);
+  assert.match(workflow, /run:\s*node scripts\/verify-dependency-sources\.mjs\s*$/m);
 });
 
 test('every intentionally fail-open release step feeds the final fail-closed gate and publisher', async () => {
@@ -67,6 +69,7 @@ test('every intentionally fail-open release step feeds the final fail-closed gat
 test('release structure guard protects untracked failures, output provenance, and publisher isolation', async () => {
   const guard = await readFile(guardPath, 'utf8');
   assert.match(guard, /untracked continue-on-error step/);
+  assert.match(guard, /DEPENDENCY_SOURCES/);
   assert.match(guard, /Enforce release gate may never continue on error/);
   assert.match(guard, /build job must expose output/);
   assert.match(guard, /publish-statuses must depend directly on the build job/);
