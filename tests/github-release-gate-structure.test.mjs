@@ -28,7 +28,7 @@ test('release workflow keeps deterministic runtime and bounded jobs', async () =
   assert.match(workflow, /node-version:\s*22\s*$/m);
   assert.match(workflow, /timeout-minutes:\s*15/);
   assert.match(workflow, /publish-statuses:[\s\S]*?timeout-minutes:\s*5/);
-  assert.match(workflow, /run:\s*npm ci --no-audit --no-fund\s*$/m);
+  assert.match(workflow, /run:\s*npm ci --ignore-scripts --no-audit --no-fund\s*$/m);
   assert.doesNotMatch(workflow, /run:\s*npm (?:install|i)(?:\s|$)/m);
   assert.match(workflow, /run:\s*node scripts\/verify-dependency-sources\.mjs\s*$/m);
 });
@@ -78,5 +78,6 @@ test('release structure guard protects untracked failures, output provenance, an
   assert.match(guard, /publish-statuses overall result must require/);
   assert.match(guard, /publish-statuses must not checkout code or execute npm install\/test\/build commands/);
   assert.match(guard, /timeout-minutes between 1 and 20/);
-  assert.match(guard, /dependency installation must use deterministic npm ci/);
+  assert.match(guard, /npm ci --ignore-scripts --no-audit --no-fund/);
+  assert.match(guard, /lifecycle-script-free during install/);
 });
