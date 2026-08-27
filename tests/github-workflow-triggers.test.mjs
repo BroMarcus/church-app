@@ -27,6 +27,18 @@ async function runGuard(root) {
   });
 }
 
+async function expectGuardFailure(workflow, pattern) {
+  const root = await fixture(workflow);
+  try {
+    await assert.rejects(runGuard(root), (error) => {
+      assert.match(error.stderr, pattern);
+      return true;
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
 const safePullRequestWorkflow = `name: Test\non:\n  pull_request:\n    branches: [main]\npermissions:\n  contents: read\njobs:\n  build:\n    runs-on: ubuntu-latest\n`;
 
 test('workflow trigger guard allows read-only pull_request CI', async () => {
@@ -40,45 +52,83 @@ test('workflow trigger guard allows read-only pull_request CI', async () => {
 });
 
 for (const trigger of ['pull_request_target', 'workflow_run', 'repository_dispatch']) {
-  test(`workflow trigger guard rejects ${trigger}`, async () => {
-    const root = await fixture(`name: Test\non:\n  ${trigger}:\npermissions:\n  contents: read\n`);
-    try {
-      await assert.rejects(runGuard(root), (error) => {
-        assert.match(error.stderr, new RegExp(trigger, 'i'));
-        return true;
-      });
-    } finally {
-      await rm(root, { recursive: true, force: true });
-    }
+  test(`workflow trigger guard rejects block trigger ${trigger}`, async () => {
+    await expectGuardFailure(
+      `name: Test\non:\n  ${trigger}:\npermissions:\n  contents: read\n`,
+      new RegExp(trigger, 'i'),
+    );
+  });
+
+  test(`workflow trigger guard rejects inline trigger ${trigger}`, async () => {
+    await expectGuardFailure(
+      `name: Test\non: [${trigger}, workflow_dispatch]\npermissions:\n  contents: read\n`,
+      new RegExp(trigger, 'i'),
+    );
+  });
+
+  test(`workflow trigger guard rejects scalar trigger ${trigger}`, async () => {
+    await expectGuardFailure(
+      `name: Test\non: ${trigger}\npermissions:\n  contents: read\n`,
+      new RegExp(trigger, 'i'),
+    );
   });
 }
 
-test('workflow trigger guard rejects secrets in pull_request CI', async () => {
-  const root = await fixture(`${safePullRequestWorkflow}    steps:\n      - run: echo \"${'${{ secrets.DEPLOY_TOKEN }}'}\"\n`);
-  try {
-    await assert.rejects(runGuard(root), (error) => {
-      assert.match(error.stderr, /references secrets/i);
-      return true;
-    });
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
+test('workflow trigger guard recognizes inline pull_request and still enforces read-only permissions', async () => {
+  await expectGuardFailure(
+    'name: Test\non: [pull_request, workflow_dispatch]\njobs:\n  build:\n    runs-on: ubuntu-latest\n',
+    /top-level permissions with contents: read/i,
+  );
+});
+
+test('workflow trigger guard recognizes flow-map pull_request syntax', async () => {
+  await expectGuardFailure(
+    'name: Test\non: { pull_request: { branches: [main] }, workflow_dispatch: {} }\njobs:\n  build:\n    runs-on: ubuntu-latest\n',
+    /top-level permissions with contents: read/i,
+  );
+});
+
+test('workflow trigger guard rejects dot-style secrets in pull_request CI', async () => {
+  await expectGuardFailure(
+    `${safePullRequestWorkflow}    steps:\n      - run: echo \"${'${{ secrets.DEPLOY_TOKEN }}'}\"\n`,
+    /references secrets/i,
+  );
+});
+
+test('workflow trigger guard rejects bracket-style secrets in pull_request CI', async () => {
+  await expectGuardFailure(
+    `${safePullRequestWorkflow}    steps:\n      - run: echo \"${"${{ secrets['DEPLOY_TOKEN'] }}"}\"\n`,
+    /references secrets/i,
+  );
+});
+
+test('workflow trigger guard rejects GitHub Environment bindings in pull_request CI', async () => {
+  await expectGuardFailure(
+    `${safePullRequestWorkflow}    environment: production\n    steps:\n      - run: npm test\n`,
+    /GitHub Environment/i,
+  );
 });
 
 test('workflow trigger guard requires explicit top-level contents read for pull_request CI', async () => {
-  const root = await fixture('name: Test\non:\n  pull_request:\njobs:\n  build:\n    runs-on: ubuntu-latest\n');
-  try {
-    await assert.rejects(runGuard(root), (error) => {
-      assert.match(error.stderr, /top-level permissions with contents: read/i);
-      return true;
-    });
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
+  await expectGuardFailure(
+    'name: Test\non:\n  pull_request:\njobs:\n  build:\n    runs-on: ubuntu-latest\n',
+    /top-level permissions with contents: read/i,
+  );
 });
 
 test('workflow trigger guard permits workflow_dispatch without pull-request secrets', async () => {
   const root = await fixture('name: Test\non:\n  workflow_dispatch:\npermissions:\n  contents: read\n');
+  try {
+    await runGuard(root);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('workflow trigger guard ignores trigger names that appear only in comments', async () => {
+  const root = await fixture(
+    'name: Test\n# on: [pull_request_target]\non:\n  workflow_dispatch:\npermissions:\n  contents: read\n',
+  );
   try {
     await runGuard(root);
   } finally {
