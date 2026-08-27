@@ -72,6 +72,16 @@ for (const file of workflowFiles) {
   if (!buildJob) fail('missing build job');
   if (!publishJob) fail('missing isolated publish-statuses job');
 
+  if (!/^\s{4}runs-on:\s*ubuntu-latest\s*$/m.test(buildJob)) {
+    fail('build job must remain on the approved GitHub-hosted ubuntu-latest runner class');
+  }
+  if (!/^\s{4}runs-on:\s*ubuntu-latest\s*$/m.test(publishJob)) {
+    fail('publish-statuses must remain on the approved GitHub-hosted ubuntu-latest runner class');
+  }
+  if (/\bself-hosted\b|runs-on:\s*\$\{\{|runs-on:\s*\[/i.test(`${buildJob}\n${publishJob}`)) {
+    fail('release jobs may not use self-hosted, expression-selected, or runner-matrix execution');
+  }
+
   const buildTimeout = Number(buildJob.match(/^\s{4}timeout-minutes:\s*(\d+)\s*$/m)?.[1]);
   if (!Number.isFinite(buildTimeout) || buildTimeout < 1 || buildTimeout > 20) {
     fail('build job must have timeout-minutes between 1 and 20');
@@ -164,5 +174,5 @@ for (const file of workflowFiles) {
 if (!foundReleaseWorkflow) fail('could not find workflow named Kingdom Network Build');
 
 if (!process.exitCode) {
-  console.log('Kingdom Network release-gate structure is fail-closed, deterministic, lifecycle-script-free during install, time-bounded, and status reporting is tied to verified build outputs.');
+  console.log('Kingdom Network release-gate structure is fail-closed, GitHub-hosted, deterministic, lifecycle-script-free during install, time-bounded, and status reporting is tied to verified build outputs.');
 }
