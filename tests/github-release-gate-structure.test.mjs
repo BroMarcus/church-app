@@ -22,10 +22,11 @@ const tracked = [
   ['build', 'BUILD'],
 ];
 
-test('release workflow keeps trusted runners, deterministic runtime, and bounded jobs', async () => {
+test('release workflow keeps a canonical PR-visible gate, trusted runners, deterministic runtime, and bounded jobs', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
   const runnerLines = workflow.match(/^\s{4}runs-on:\s*ubuntu-latest\s*$/gm) || [];
   assert.equal(runnerLines.length, 2, 'build and status publisher must use the approved GitHub-hosted runner class');
+  assert.match(workflow, /^\s{4}name:\s*kingdom-network\/release-gate\s*$/m);
   assert.doesNotMatch(workflow, /\bself-hosted\b|runs-on:\s*\$\{\{|runs-on:\s*\[/i);
   assert.match(workflow, /cancel-in-progress:\s*true/);
   assert.match(workflow, /node-version:\s*22\s*$/m);
@@ -78,8 +79,9 @@ test('every intentionally fail-open release step feeds the final fail-closed gat
   assert.match(publishJob, /context='kingdom-network\/release-gate'/);
 });
 
-test('release structure guard protects runner trust, final-gate provenance, untracked failures, and publisher isolation', async () => {
+test('release structure guard protects canonical check naming, final-gate provenance, runner trust, and publisher isolation', async () => {
   const guard = await readFile(guardPath, 'utf8');
+  assert.match(guard, /canonical kingdom-network\/release-gate PR check name/);
   assert.match(guard, /approved GitHub-hosted ubuntu-latest runner class/);
   assert.match(guard, /self-hosted, expression-selected, or runner-matrix execution/);
   assert.match(guard, /untracked continue-on-error step/);
@@ -96,5 +98,6 @@ test('release structure guard protects runner trust, final-gate provenance, untr
   assert.match(guard, /publish-statuses must not checkout code or execute npm install\/test\/build commands/);
   assert.match(guard, /timeout-minutes between 1 and 20/);
   assert.match(guard, /npm ci --ignore-scripts --no-audit --no-fund/);
+  assert.match(guard, /PR-visible under the canonical required-check name/);
   assert.match(guard, /exact final enforcement outcome/);
 });
