@@ -16,6 +16,7 @@ const tracked = [
   ['release_structure', 'RELEASE_STRUCTURE'],
   ['production_hold', 'PRODUCTION_HOLD'],
   ['dependency_sources', 'DEPENDENCY_SOURCES'],
+  ['runtime_provenance', 'RUNTIME_PROVENANCE'],
   ['install', 'INSTALL'],
   ['vulnerability_audit', 'VULNERABILITY_AUDIT'],
   ['tests', 'TESTS'],
@@ -23,14 +24,14 @@ const tracked = [
   ['build', 'BUILD'],
 ];
 
-test('release workflow keeps a canonical PR-visible gate, trusted runners, deterministic runtime, pinned npm provenance, bounded jobs, and tracked production dependency audit', async () => {
+test('release workflow keeps a canonical PR-visible gate, exact GitHub runner/runtime, deterministic npm provenance, bounded jobs, and tracked production dependency audit', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
-  const runnerLines = workflow.match(/^\s{4}runs-on:\s*ubuntu-latest\s*$/gm) || [];
-  assert.equal(runnerLines.length, 2, 'build and status publisher must use the approved GitHub-hosted runner class');
+  const runnerLines = workflow.match(/^\s{4}runs-on:\s*ubuntu-24\.04\s*$/gm) || [];
+  assert.equal(runnerLines.length, 2, 'build and status publisher must use the exact approved GitHub-hosted runner image');
   assert.match(workflow, /^\s{4}name:\s*kingdom-network\/release-gate\s*$/m);
   assert.doesNotMatch(workflow, /\bself-hosted\b|runs-on:\s*\$\{\{|runs-on:\s*\[/i);
   assert.match(workflow, /cancel-in-progress:\s*true/);
-  assert.match(workflow, /node-version:\s*22\s*$/m);
+  assert.match(workflow, /node-version:\s*22\.23\.2\s*$/m);
   assert.match(workflow, /^\s{6}NPM_CONFIG_REGISTRY:\s*https:\/\/registry\.npmjs\.org\/\s*$/m);
   assert.match(workflow, /^\s{6}NPM_CONFIG_USERCONFIG:\s*\/dev\/null\s*$/m);
   assert.match(workflow, /timeout-minutes:\s*15/);
@@ -38,6 +39,14 @@ test('release workflow keeps a canonical PR-visible gate, trusted runners, deter
   assert.match(workflow, /run:\s*npm ci --ignore-scripts --no-audit --no-fund\s*$/m);
   assert.doesNotMatch(workflow, /run:\s*npm (?:install|i)(?:\s|$)/m);
   assert.match(workflow, /run:\s*node scripts\/verify-dependency-sources\.mjs\s*$/m);
+  assert.match(
+    workflow,
+    /- name:\s*Runtime provenance guard\n\s*id:\s*runtime_provenance\n\s*continue-on-error:\s*true\n\s*run:\s*node scripts\/verify-runtime-provenance\.mjs/,
+  );
+  assert.ok(
+    workflow.indexOf('Runtime provenance guard') < workflow.indexOf('Install dependencies'),
+    'runtime provenance must be checked before dependency installation',
+  );
   assert.match(
     workflow,
     /- name:\s*Production dependency vulnerability audit\n\s*id:\s*vulnerability_audit\n\s*if:\s*steps\.install\.outcome\s*==\s*['"]success['"]\n\s*continue-on-error:\s*true\n\s*run:\s*npm audit --omit=dev --audit-level=high --no-fund/,
@@ -93,20 +102,26 @@ test('every intentionally fail-open release step feeds the final fail-closed gat
     /^\s{6}RELEASE_GATE:\s*\$\{\{\s*needs\.build\.outputs\.release_gate\s*\}\}\s*$/m,
   );
   assert.match(publishJob, /if \[ "\$RELEASE_GATE" = success \]; then/);
+  assert.match(publishJob, /publish runtime-provenance "\$RUNTIME_PROVENANCE"/);
   assert.match(publishJob, /publish dependency-audit "\$VULNERABILITY_AUDIT"/);
   assert.match(publishJob, /context='kingdom-network\/release-gate'/);
 });
 
-test('release structure guard protects canonical check naming, dependency audit visibility, npm provenance, final provenance, runner trust, and publisher isolation', async () => {
+test('release structure guard protects exact runtime provenance, dependency audit visibility, final provenance, runner trust, and publisher isolation', async () => {
   const guard = await readFile(guardPath, 'utf8');
   assert.match(guard, /canonical kingdom-network\/release-gate PR check name/);
-  assert.match(guard, /approved GitHub-hosted ubuntu-latest runner class/);
+  assert.match(guard, /approved GitHub-hosted ubuntu-24\.04 runner image/);
+  assert.match(guard, /exact Node 22\.23\.2/);
+  assert.match(guard, /Runtime provenance guard/);
+  assert.match(guard, /verify-runtime-provenance\.mjs/);
+  assert.match(guard, /must run before dependency installation/);
   assert.match(guard, /self-hosted, expression-selected, or runner-matrix execution/);
   assert.match(guard, /NPM_CONFIG_REGISTRY/);
   assert.match(guard, /registry\.npmjs\.org/);
   assert.match(guard, /NPM_CONFIG_USERCONFIG/);
   assert.match(guard, /untracked continue-on-error step/);
   assert.match(guard, /DEPENDENCY_SOURCES/);
+  assert.match(guard, /RUNTIME_PROVENANCE/);
   assert.match(guard, /VULNERABILITY_AUDIT/);
   assert.match(guard, /Production dependency vulnerability audit must use id 'vulnerability_audit'/);
   assert.match(guard, /must block high\/critical production dependency advisories/);
@@ -126,6 +141,7 @@ test('release structure guard protects canonical check naming, dependency audit 
   assert.match(guard, /publish-statuses must not checkout code or execute npm install\/test\/build commands/);
   assert.match(guard, /timeout-minutes between 1 and 20/);
   assert.match(guard, /npm ci --ignore-scripts --no-audit --no-fund/);
+  assert.match(guard, /GitHub-hosted Ubuntu runner and Node\/npm toolchain are exact-version pinned/);
   assert.match(guard, /production dependency vulnerability scanning is tracked and visible/);
   assert.match(guard, /npm registry\/user config are pinned/);
   assert.match(guard, /stage failures are individually visible/);
