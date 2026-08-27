@@ -109,6 +109,32 @@ test('workflow trigger guard rejects GitHub Environment bindings in pull_request
   );
 });
 
+test('workflow trigger guard rejects pull-request title interpolated directly into a shell command', async () => {
+  await expectGuardFailure(
+    `${safePullRequestWorkflow}    steps:\n      - run: echo \"${'${{ github.event.pull_request.title }}'}\"\n`,
+    /untrusted pull-request metadata directly into a shell run step/i,
+  );
+});
+
+test('workflow trigger guard rejects pull-request head branch interpolated in a multiline shell command', async () => {
+  await expectGuardFailure(
+    `${safePullRequestWorkflow}    steps:\n      - run: |\n          echo \"testing ${'${{ github.head_ref }}'}\"\n          npm test\n`,
+    /untrusted pull-request metadata directly into a shell run step/i,
+  );
+});
+
+test('workflow trigger guard permits untrusted PR text when passed through env instead of expression interpolation in run', async () => {
+  const root = await fixture(
+    `${safePullRequestWorkflow}    steps:\n      - env:\n          PR_TITLE: ${'${{ github.event.pull_request.title }}'}\n        run: printf '%s\\n' \"$PR_TITLE\"\n`,
+  );
+  try {
+    const result = await runGuard(root);
+    assert.match(result.stdout, /direct untrusted PR-metadata shell interpolation were found/i);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('workflow trigger guard requires explicit top-level contents read for pull_request CI', async () => {
   await expectGuardFailure(
     'name: Test\non:\n  pull_request:\njobs:\n  build:\n    runs-on: ubuntu-latest\n',
