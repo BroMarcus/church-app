@@ -63,26 +63,38 @@ test('every intentionally fail-open release step feeds the final fail-closed gat
 
     const successComparison = new RegExp(`\\[ \\"\\$${envName}\\" = success \\]`);
     assert.match(workflow, successComparison);
-    assert.match(publishJob, successComparison);
   }
 
-  assert.match(workflow, /- name:\s*Enforce release gate\n\s*if:\s*always\(\)/);
+  assert.match(workflow, /- name:\s*Enforce release gate\n\s*id:\s*release_gate\n\s*if:\s*always\(\)/);
+  assert.match(
+    workflow,
+    /^\s{6}release_gate:\s*\$\{\{\s*steps\.release_gate\.outcome\s*\}\}\s*$/m,
+  );
+  assert.match(
+    publishJob,
+    /^\s{6}RELEASE_GATE:\s*\$\{\{\s*needs\.build\.outputs\.release_gate\s*\}\}\s*$/m,
+  );
+  assert.match(publishJob, /if \[ "\$RELEASE_GATE" = success \]; then/);
+  assert.match(publishJob, /context='kingdom-network\/release-gate'/);
 });
 
-test('release structure guard protects runner trust, untracked failures, output provenance, and publisher isolation', async () => {
+test('release structure guard protects runner trust, final-gate provenance, untracked failures, and publisher isolation', async () => {
   const guard = await readFile(guardPath, 'utf8');
   assert.match(guard, /approved GitHub-hosted ubuntu-latest runner class/);
   assert.match(guard, /self-hosted, expression-selected, or runner-matrix execution/);
   assert.match(guard, /untracked continue-on-error step/);
   assert.match(guard, /DEPENDENCY_SOURCES/);
   assert.match(guard, /Enforce release gate may never continue on error/);
+  assert.match(guard, /Enforce release gate must use id 'release_gate'/);
+  assert.match(guard, /build job must expose release_gate from steps\.release_gate\.outcome/);
   assert.match(guard, /build job must expose output/);
   assert.match(guard, /publish-statuses must depend directly on the build job/);
   assert.match(guard, /publish-statuses must remain push-only/);
-  assert.match(guard, /publish-statuses must receive/);
-  assert.match(guard, /publish-statuses overall result must require/);
+  assert.match(guard, /publish-statuses must receive RELEASE_GATE from needs\.build\.outputs\.release_gate/);
+  assert.match(guard, /publish-statuses overall result must come from the exact final RELEASE_GATE outcome/);
+  assert.match(guard, /canonical kingdom-network\/release-gate context/);
   assert.match(guard, /publish-statuses must not checkout code or execute npm install\/test\/build commands/);
   assert.match(guard, /timeout-minutes between 1 and 20/);
   assert.match(guard, /npm ci --ignore-scripts --no-audit --no-fund/);
-  assert.match(guard, /lifecycle-script-free during install/);
+  assert.match(guard, /exact final enforcement outcome/);
 });
