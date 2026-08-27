@@ -116,12 +116,19 @@ for (const file of workflowFiles) {
   if (!enforceBlock) {
     fail('missing Enforce release gate step');
   } else {
+    if (!/^\s{8}id:\s*release_gate\s*$/m.test(enforceBlock)) {
+      fail("Enforce release gate must use id 'release_gate' so its exact outcome can be published");
+    }
     if (!/^\s{8}if:\s*always\(\)\s*$/m.test(enforceBlock)) {
       fail('Enforce release gate must run with if: always()');
     }
     if (/^\s{8}continue-on-error:\s*true\s*$/m.test(enforceBlock)) {
       fail('Enforce release gate may never continue on error');
     }
+  }
+
+  if (!/^\s{6}release_gate:\s*\$\{\{\s*steps\.release_gate\.outcome\s*\}\}\s*$/m.test(buildJob)) {
+    fail('build job must expose release_gate from steps.release_gate.outcome');
   }
 
   if (!/^\s{4}needs:\s*build\s*$/m.test(publishJob)) {
@@ -160,10 +167,16 @@ for (const file of workflowFiles) {
     if (!publishEnvPattern.test(publishJob)) {
       fail(`publish-statuses must receive ${envName} from needs.build.outputs.${id}`);
     }
+  }
 
-    if (!comparisonPattern.test(publishJob)) {
-      fail(`publish-statuses overall result must require ${envName}=success`);
-    }
+  if (!/^\s{6}RELEASE_GATE:\s*\$\{\{\s*needs\.build\.outputs\.release_gate\s*\}\}\s*$/m.test(publishJob)) {
+    fail('publish-statuses must receive RELEASE_GATE from needs.build.outputs.release_gate');
+  }
+  if (!/if \[ "\$RELEASE_GATE" = success \]; then/.test(publishJob)) {
+    fail('publish-statuses overall result must come from the exact final RELEASE_GATE outcome');
+  }
+  if (!/context='kingdom-network\/release-gate'/.test(publishJob)) {
+    fail('publish-statuses must publish the canonical kingdom-network/release-gate context');
   }
 
   if (/actions\/checkout@/i.test(publishJob) || /\bnpm\s+(?:ci|install|i|test|run)\b/.test(publishJob)) {
@@ -174,5 +187,5 @@ for (const file of workflowFiles) {
 if (!foundReleaseWorkflow) fail('could not find workflow named Kingdom Network Build');
 
 if (!process.exitCode) {
-  console.log('Kingdom Network release-gate structure is fail-closed, GitHub-hosted, deterministic, lifecycle-script-free during install, time-bounded, and status reporting is tied to verified build outputs.');
+  console.log('Kingdom Network release-gate structure is fail-closed, GitHub-hosted, deterministic, lifecycle-script-free during install, time-bounded, and the canonical release status is tied to the exact final enforcement outcome.');
 }
