@@ -31,14 +31,14 @@ test('workflow permission guard allows read-only workflows', async () => {
   const root = await fixture('permissions:\n  contents: read\njobs:\n  build:\n    runs-on: ubuntu-latest\n');
   try {
     const result = await runGuard(root);
-    assert.match(result.stdout, /no unexpected write permissions found/i);
+    assert.match(result.stdout, /build\/PR jobs are read-only/i);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
 });
 
-test('workflow permission guard allows narrowly scoped status publishing', async () => {
-  const root = await fixture('permissions:\n  contents: read\njobs:\n  publish-statuses:\n    permissions:\n      contents: read\n      statuses: write\n');
+test('workflow permission guard allows status publishing only in dedicated push-only job', async () => {
+  const root = await fixture(`permissions:\n  contents: read\njobs:\n  build:\n    runs-on: ubuntu-latest\n  publish-statuses:\n    if: always() && github.event_name == 'push'\n    runs-on: ubuntu-latest\n    permissions:\n      contents: read\n      statuses: write\n`);
   try {
     await runGuard(root);
   } finally {
@@ -64,6 +64,42 @@ test('workflow permission guard rejects unexpected write scopes', async () => {
     await assert.rejects(runGuard(root), (error) => {
       assert.match(error.stderr, /contents: write/i);
       assert.match(error.stderr, /pull-requests: write/i);
+      return true;
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('workflow permission guard rejects statuses write in ordinary build job', async () => {
+  const root = await fixture(`permissions:\n  contents: read\njobs:\n  build:\n    runs-on: ubuntu-latest\n    permissions:\n      contents: read\n      statuses: write\n`);
+  try {
+    await assert.rejects(runGuard(root), (error) => {
+      assert.match(error.stderr, /dedicated push-only publish-statuses job/i);
+      return true;
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('workflow permission guard rejects status publisher without push-only condition', async () => {
+  const root = await fixture(`permissions:\n  contents: read\njobs:\n  publish-statuses:\n    runs-on: ubuntu-latest\n    permissions:\n      contents: read\n      statuses: write\n`);
+  try {
+    await assert.rejects(runGuard(root), (error) => {
+      assert.match(error.stderr, /dedicated push-only publish-statuses job/i);
+      return true;
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('workflow permission guard rejects duplicate statuses write grants', async () => {
+  const root = await fixture(`permissions:\n  contents: read\njobs:\n  publish-statuses:\n    if: always() && github.event_name == 'push'\n    runs-on: ubuntu-latest\n    permissions:\n      contents: read\n      statuses: write\n  second-publisher:\n    runs-on: ubuntu-latest\n    permissions:\n      statuses: write\n`);
+  try {
+    await assert.rejects(runGuard(root), (error) => {
+      assert.match(error.stderr, /statuses: write more than once/i);
       return true;
     });
   } finally {
