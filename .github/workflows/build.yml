@@ -17,7 +17,7 @@ concurrency:
 jobs:
   build:
     name: kingdom-network/release-gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
@@ -29,6 +29,7 @@ jobs:
       release_structure: ${{ steps.release_structure.outcome }}
       production_hold: ${{ steps.production_hold.outcome }}
       dependency_sources: ${{ steps.dependency_sources.outcome }}
+      runtime_provenance: ${{ steps.runtime_provenance.outcome }}
       install: ${{ steps.install.outcome }}
       vulnerability_audit: ${{ steps.vulnerability_audit.outcome }}
       tests: ${{ steps.tests.outcome }}
@@ -43,7 +44,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version: 22.23.2
           cache: npm
           cache-dependency-path: package-lock.json
       - name: GitHub Actions pin guard
@@ -70,6 +71,10 @@ jobs:
         id: dependency_sources
         continue-on-error: true
         run: node scripts/verify-dependency-sources.mjs
+      - name: Runtime provenance guard
+        id: runtime_provenance
+        continue-on-error: true
+        run: node scripts/verify-runtime-provenance.mjs
       - name: Install dependencies
         id: install
         continue-on-error: true
@@ -124,6 +129,11 @@ jobs:
         env:
           OUTCOME: ${{ steps.dependency_sources.outcome }}
         run: test "$OUTCOME" = success
+      - name: Assert runtime_provenance outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.runtime_provenance.outcome }}
+        run: test "$OUTCOME" = success
       - name: Assert install outcome
         if: always()
         env:
@@ -159,23 +169,24 @@ jobs:
           RELEASE_STRUCTURE: ${{ steps.release_structure.outcome }}
           PRODUCTION_HOLD: ${{ steps.production_hold.outcome }}
           DEPENDENCY_SOURCES: ${{ steps.dependency_sources.outcome }}
+          RUNTIME_PROVENANCE: ${{ steps.runtime_provenance.outcome }}
           INSTALL: ${{ steps.install.outcome }}
           VULNERABILITY_AUDIT: ${{ steps.vulnerability_audit.outcome }}
           TESTS: ${{ steps.tests.outcome }}
           LINT: ${{ steps.lint.outcome }}
           BUILD: ${{ steps.build.outcome }}
         run: |
-          if [ "$ACTION_PINS" = success ] && [ "$WORKFLOW_PERMISSIONS" = success ] && [ "$WORKFLOW_TRIGGERS" = success ] && [ "$RELEASE_STRUCTURE" = success ] && [ "$PRODUCTION_HOLD" = success ] && [ "$DEPENDENCY_SOURCES" = success ] && [ "$INSTALL" = success ] && [ "$VULNERABILITY_AUDIT" = success ] && [ "$TESTS" = success ] && [ "$LINT" = success ] && [ "$BUILD" = success ]; then
+          if [ "$ACTION_PINS" = success ] && [ "$WORKFLOW_PERMISSIONS" = success ] && [ "$WORKFLOW_TRIGGERS" = success ] && [ "$RELEASE_STRUCTURE" = success ] && [ "$PRODUCTION_HOLD" = success ] && [ "$DEPENDENCY_SOURCES" = success ] && [ "$RUNTIME_PROVENANCE" = success ] && [ "$INSTALL" = success ] && [ "$VULNERABILITY_AUDIT" = success ] && [ "$TESTS" = success ] && [ "$LINT" = success ] && [ "$BUILD" = success ]; then
             echo 'Kingdom Network release gate passed.'
             exit 0
           fi
-          echo "Kingdom Network release gate failed: pins=${ACTION_PINS}, permissions=${WORKFLOW_PERMISSIONS}, triggers=${WORKFLOW_TRIGGERS}, structure=${RELEASE_STRUCTURE}, hold=${PRODUCTION_HOLD}, dependencies=${DEPENDENCY_SOURCES}, install=${INSTALL}, audit=${VULNERABILITY_AUDIT}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
+          echo "Kingdom Network release gate failed: pins=${ACTION_PINS}, permissions=${WORKFLOW_PERMISSIONS}, triggers=${WORKFLOW_TRIGGERS}, structure=${RELEASE_STRUCTURE}, hold=${PRODUCTION_HOLD}, dependencies=${DEPENDENCY_SOURCES}, runtime=${RUNTIME_PROVENANCE}, install=${INSTALL}, audit=${VULNERABILITY_AUDIT}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
           exit 1
 
   publish-statuses:
     if: always() && github.event_name == 'push'
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read
@@ -188,6 +199,7 @@ jobs:
       RELEASE_STRUCTURE: ${{ needs.build.outputs.release_structure }}
       PRODUCTION_HOLD: ${{ needs.build.outputs.production_hold }}
       DEPENDENCY_SOURCES: ${{ needs.build.outputs.dependency_sources }}
+      RUNTIME_PROVENANCE: ${{ needs.build.outputs.runtime_provenance }}
       INSTALL: ${{ needs.build.outputs.install }}
       VULNERABILITY_AUDIT: ${{ needs.build.outputs.vulnerability_audit }}
       TESTS: ${{ needs.build.outputs.tests }}
@@ -217,6 +229,7 @@ jobs:
           publish release-structure "$RELEASE_STRUCTURE"
           publish production-hold "$PRODUCTION_HOLD"
           publish dependency-sources "$DEPENDENCY_SOURCES"
+          publish runtime-provenance "$RUNTIME_PROVENANCE"
           publish install "$INSTALL"
           publish dependency-audit "$VULNERABILITY_AUDIT"
           publish security-tests "$TESTS"
@@ -227,7 +240,7 @@ jobs:
             description='final fail-closed release gate passed'
           else
             overall=failure
-            description="final release gate=${RELEASE_GATE}; pins=${ACTION_PINS}, permissions=${WORKFLOW_PERMISSIONS}, triggers=${WORKFLOW_TRIGGERS}, structure=${RELEASE_STRUCTURE}, hold=${PRODUCTION_HOLD}, dependencies=${DEPENDENCY_SOURCES}, install=${INSTALL}, audit=${VULNERABILITY_AUDIT}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
+            description="final release gate=${RELEASE_GATE}; pins=${ACTION_PINS}, permissions=${WORKFLOW_PERMISSIONS}, triggers=${WORKFLOW_TRIGGERS}, structure=${RELEASE_STRUCTURE}, hold=${PRODUCTION_HOLD}, dependencies=${DEPENDENCY_SOURCES}, runtime=${RUNTIME_PROVENANCE}, install=${INSTALL}, audit=${VULNERABILITY_AUDIT}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
           fi
           gh api --method POST \
             -H "Accept: application/vnd.github+json" \
