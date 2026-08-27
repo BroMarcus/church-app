@@ -16,6 +16,7 @@ concurrency:
 
 jobs:
   build:
+    name: kingdom-network/release-gate
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
