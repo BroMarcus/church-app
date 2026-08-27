@@ -126,7 +126,7 @@ function untrustedPrShellInterpolations(content) {
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
-    const runMatch = line.match(/^(\s*)run\s*:\s*(.*)$/i);
+    const runMatch = line.match(/^(\s*)(?:-\s*)?run\s*:\s*(.*)$/i);
     if (!runMatch) continue;
 
     const runIndent = runMatch[1].length;
