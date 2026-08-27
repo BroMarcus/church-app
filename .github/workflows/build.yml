@@ -19,6 +19,9 @@ jobs:
     name: kingdom-network/release-gate
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
+      NPM_CONFIG_USERCONFIG: /dev/null
     outputs:
       action_pins: ${{ steps.action_pins.outcome }}
       workflow_permissions: ${{ steps.workflow_permissions.outcome }}
