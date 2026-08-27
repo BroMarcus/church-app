@@ -1,0 +1,52 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const testDir = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(testDir, '..');
+const workflowPath = path.join(repoRoot, '.github', 'workflows', 'build.yml');
+const guardPath = path.join(repoRoot, 'scripts', 'verify-github-release-gate-structure.mjs');
+
+const tracked = [
+  ['action_pins', 'ACTION_PINS'],
+  ['workflow_permissions', 'WORKFLOW_PERMISSIONS'],
+  ['workflow_triggers', 'WORKFLOW_TRIGGERS'],
+  ['release_structure', 'RELEASE_STRUCTURE'],
+  ['production_hold', 'PRODUCTION_HOLD'],
+  ['install', 'INSTALL'],
+  ['tests', 'TESTS'],
+  ['lint', 'LINT'],
+  ['build', 'BUILD'],
+];
+
+test('release workflow keeps deterministic runtime and bounded jobs', async () => {
+  const workflow = await readFile(workflowPath, 'utf8');
+  assert.match(workflow, /cancel-in-progress:\s*true/);
+  assert.match(workflow, /node-version:\s*22\s*$/m);
+  assert.match(workflow, /timeout-minutes:\s*15/);
+  assert.match(workflow, /publish-statuses:[\s\S]*?timeout-minutes:\s*5/);
+  assert.match(workflow, /run:\s*npm ci --no-audit --no-fund\s*$/m);
+  assert.doesNotMatch(workflow, /run:\s*npm (?:install|i)(?:\s|$)/m);
+});
+
+test('every intentionally fail-open release step feeds the final fail-closed gate', async () => {
+  const workflow = await readFile(workflowPath, 'utf8');
+  for (const [id, envName] of tracked) {
+    assert.match(workflow, new RegExp(`id:\\s*${id}\\b`));
+    assert.match(workflow, new RegExp(`${id}:[^\\n]*steps\\.${id}\\.outcome`));
+    assert.match(workflow, new RegExp(`${envName}:[^\\n]*steps\\.${id}\\.outcome`));
+    assert.match(workflow, new RegExp(`\\[ \\"\\$${envName}\\" = success \\]`));
+  }
+  assert.match(workflow, /- name:\s*Enforce release gate\n\s*if:\s*always\(\)/);
+});
+
+test('release structure guard protects untracked continue-on-error and publisher isolation', async () => {
+  const guard = await readFile(guardPath, 'utf8');
+  assert.match(guard, /untracked continue-on-error step/);
+  assert.match(guard, /Enforce release gate may never continue on error/);
+  assert.match(guard, /publish-statuses must not checkout code or execute npm install\/test\/build commands/);
+  assert.match(guard, /timeout-minutes between 1 and 20/);
+  assert.match(guard, /dependency installation must use deterministic npm ci/);
+});
