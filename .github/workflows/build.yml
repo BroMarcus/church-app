@@ -67,7 +67,7 @@ jobs:
       - name: Install dependencies
         id: install
         continue-on-error: true
-        run: npm ci --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Security regression tests
         id: tests
         if: steps.install.outcome == 'success'
