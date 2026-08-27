@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
@@ -75,6 +75,32 @@ for (const spec of [
   });
 }
 
+test('dependency source guard rejects repository-local npm configuration overrides', async () => {
+  const root = await fixture();
+  try {
+    await writeFile(path.join(root, '.npmrc'), 'registry=https://packages.example.invalid/\n');
+    await assert.rejects(runGuard(root), (error) => {
+      assert.match(error.stderr, /repository-local \.npmrc is not allowed/i);
+      return true;
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('dependency source guard rejects even empty repository-local npm config so install behavior cannot drift later', async () => {
+  const root = await fixture();
+  try {
+    await writeFile(path.join(root, '.npmrc'), '');
+    await assert.rejects(runGuard(root), (error) => {
+      assert.match(error.stderr, /repository-local \.npmrc is not allowed/i);
+      return true;
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('dependency source guard rejects non-npm registry tarball source', async () => {
   const root = await fixture({ resolved: 'https://example.com/example-1.2.3.tgz' });
   try {
@@ -103,7 +129,7 @@ test('dependency source guard rejects package-lock drift from package.json', asy
   const root = await fixture();
   try {
     const lockPath = path.join(root, 'package-lock.json');
-    const lock = JSON.parse(await (await import('node:fs/promises')).readFile(lockPath, 'utf8'));
+    const lock = JSON.parse(await readFile(lockPath, 'utf8'));
     lock.packages[''].dependencies.example = '^9.9.9';
     await writeFile(lockPath, JSON.stringify(lock, null, 2));
     await assert.rejects(runGuard(root), (error) => {
