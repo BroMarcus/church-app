@@ -10,6 +10,7 @@ const requiredTrackedSteps = [
   ['workflow_triggers', 'WORKFLOW_TRIGGERS'],
   ['release_structure', 'RELEASE_STRUCTURE'],
   ['production_hold', 'PRODUCTION_HOLD'],
+  ['dependency_sources', 'DEPENDENCY_SOURCES'],
   ['install', 'INSTALL'],
   ['tests', 'TESTS'],
   ['lint', 'LINT'],
