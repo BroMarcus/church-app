@@ -12,6 +12,7 @@ const requiredTrackedSteps = [
   ['production_hold', 'PRODUCTION_HOLD'],
   ['dependency_sources', 'DEPENDENCY_SOURCES'],
   ['install', 'INSTALL'],
+  ['vulnerability_audit', 'VULNERABILITY_AUDIT'],
   ['tests', 'TESTS'],
   ['lint', 'LINT'],
   ['build', 'BUILD'],
@@ -106,6 +107,21 @@ for (const file of workflowFiles) {
   }
 
   const blocks = stepBlocks(buildJob);
+  const auditBlock = blocks.find((block) => /^\s{6}- name:\s*Production dependency vulnerability audit\s*$/m.test(block));
+  if (!auditBlock) {
+    fail('missing Production dependency vulnerability audit step');
+  } else {
+    if (!/^\s{8}id:\s*vulnerability_audit\s*$/m.test(auditBlock)) {
+      fail("Production dependency vulnerability audit must use id 'vulnerability_audit'");
+    }
+    if (!/^\s{8}if:\s*steps\.install\.outcome\s*==\s*['"]success['"]\s*$/m.test(auditBlock)) {
+      fail('Production dependency vulnerability audit must run only after a successful install');
+    }
+    if (!/^\s{8}run:\s*npm audit --omit=dev --audit-level=high --no-fund\s*$/m.test(auditBlock)) {
+      fail('Production dependency vulnerability audit must block high/critical production dependency advisories');
+    }
+  }
+
   const allowedContinueIds = new Set(requiredTrackedSteps.map(([id]) => id));
   for (const block of blocks) {
     if (!/^\s{8}continue-on-error:\s*true\s*$/m.test(block)) continue;
@@ -213,5 +229,5 @@ for (const file of workflowFiles) {
 if (!foundReleaseWorkflow) fail('could not find workflow named Kingdom Network Build');
 
 if (!process.exitCode) {
-  console.log('Kingdom Network release-gate structure is fail-closed, stage failures are individually visible, PR-visible under the canonical required-check name, GitHub-hosted, deterministic, lifecycle-script-free during install, time-bounded, and the canonical release status is tied to the exact final enforcement outcome.');
+  console.log('Kingdom Network release-gate structure is fail-closed, production dependency vulnerability scanning is tracked and visible, stage failures are individually visible, PR-visible under the canonical required-check name, GitHub-hosted, deterministic, lifecycle-script-free during install, time-bounded, and the canonical release status is tied to the exact final enforcement outcome.');
 }
