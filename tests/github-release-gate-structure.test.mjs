@@ -22,8 +22,11 @@ const tracked = [
   ['build', 'BUILD'],
 ];
 
-test('release workflow keeps deterministic runtime and bounded jobs', async () => {
+test('release workflow keeps trusted runners, deterministic runtime, and bounded jobs', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
+  const runnerLines = workflow.match(/^\s{4}runs-on:\s*ubuntu-latest\s*$/gm) || [];
+  assert.equal(runnerLines.length, 2, 'build and status publisher must use the approved GitHub-hosted runner class');
+  assert.doesNotMatch(workflow, /\bself-hosted\b|runs-on:\s*\$\{\{|runs-on:\s*\[/i);
   assert.match(workflow, /cancel-in-progress:\s*true/);
   assert.match(workflow, /node-version:\s*22\s*$/m);
   assert.match(workflow, /timeout-minutes:\s*15/);
@@ -66,8 +69,10 @@ test('every intentionally fail-open release step feeds the final fail-closed gat
   assert.match(workflow, /- name:\s*Enforce release gate\n\s*if:\s*always\(\)/);
 });
 
-test('release structure guard protects untracked failures, output provenance, and publisher isolation', async () => {
+test('release structure guard protects runner trust, untracked failures, output provenance, and publisher isolation', async () => {
   const guard = await readFile(guardPath, 'utf8');
+  assert.match(guard, /approved GitHub-hosted ubuntu-latest runner class/);
+  assert.match(guard, /self-hosted, expression-selected, or runner-matrix execution/);
   assert.match(guard, /untracked continue-on-error step/);
   assert.match(guard, /DEPENDENCY_SOURCES/);
   assert.match(guard, /Enforce release gate may never continue on error/);
