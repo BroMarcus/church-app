@@ -5,7 +5,6 @@ import process from 'node:process';
 const root = path.resolve(process.env.KINGDOM_NETWORK_DEPENDENCY_ROOT || process.cwd());
 const packagePath = path.join(root, 'package.json');
 const lockPath = path.join(root, 'package-lock.json');
-const npmrcPath = path.join(root, '.npmrc');
 const failures = [];
 const dependencySections = ['dependencies', 'devDependencies', 'optionalDependencies'];
 const forbiddenDirectSource = /^(?:git(?:\+[^:]+)?:|github:|https?:|file:|link:|workspace:|npm:)/i;
@@ -14,6 +13,18 @@ const registryOrigin = 'https://registry.npmjs.org';
 
 function fail(message) {
   failures.push(message);
+}
+
+async function forbidRepositoryInstallOverride(fileName, reason) {
+  const filePath = path.join(root, fileName);
+  try {
+    await readFile(filePath, 'utf8');
+    fail(`${fileName} is not allowed while Production HOLD is active (${reason})`);
+  } catch (error) {
+    if (error?.code !== 'ENOENT') {
+      fail(`cannot safely inspect ${fileName} (${error?.code || error?.name || 'unknown_error'})`);
+    }
+  }
 }
 
 function safeDirectSpec(name, spec, section) {
@@ -34,17 +45,14 @@ function safeDirectSpec(name, spec, section) {
   }
 }
 
-// Keep install behavior controlled by the reviewed CI command line. A repository-local
-// .npmrc can silently redirect the registry, introduce auth, proxies, or weaken npm
-// safety settings before the dependency provenance guard has a chance to help.
-try {
-  await readFile(npmrcPath, 'utf8');
-  fail('repository-local .npmrc is not allowed while Production HOLD is active');
-} catch (error) {
-  if (error?.code !== 'ENOENT') {
-    fail(`cannot safely inspect repository-local .npmrc (${error?.code || error?.name || 'unknown_error'})`);
-  }
-}
+// Keep install behavior controlled by the reviewed CI command line and the one reviewed
+// package-lock.json. Repository-local npm config can redirect registries/auth/proxies, and
+// npm-shrinkwrap.json takes precedence over package-lock.json during npm installs.
+await forbidRepositoryInstallOverride('.npmrc', 'repository-local npm configuration can change install behavior');
+await forbidRepositoryInstallOverride(
+  'npm-shrinkwrap.json',
+  'npm shrinkwrap can override the package-lock.json that this release gate verifies',
+);
 
 let manifest;
 let lock;
@@ -128,11 +136,11 @@ if (failures.length) {
   console.error('Dependency source provenance guard failed:');
   for (const failure of failures) console.error(`- ${failure}`);
   console.error(
-    'Production HOLD requires npm install behavior to stay CI-controlled and dependencies to stay lockfile-pinned to integrity-checked registry.npmjs.org tarballs; repository .npmrc overrides, Git/URL/local/alias sources, and mutable dist-tags are not allowed.',
+    'Production HOLD requires npm install behavior to stay CI-controlled and package-lock.json to remain the only install lock source; dependencies must stay lockfile-pinned to integrity-checked registry.npmjs.org tarballs, and repository config/shrinkwrap, Git/URL/local/alias sources, and mutable dist-tags are not allowed.',
   );
   process.exit(1);
 }
 
 console.log(
-  'Dependency source provenance guard passed: install behavior is CI-controlled, direct specs are bounded registry ranges, and lockfile packages use integrity-checked registry.npmjs.org tarballs.',
+  'Dependency source provenance guard passed: install behavior is CI-controlled, package-lock.json is authoritative, direct specs are bounded registry ranges, and lockfile packages use integrity-checked registry.npmjs.org tarballs.',
 );
