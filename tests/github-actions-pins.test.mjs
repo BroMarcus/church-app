@@ -13,6 +13,7 @@ const testDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(testDir, '..');
 const guardScript = path.resolve(repoRoot, 'scripts/verify-github-actions-pins.mjs');
 const checkoutSha = '11d5960a326750d5838078e36cf38b85af677262';
+const setupNodeSha = '49933ea5288caeca8642d1e84afbd3f7d6820020';
 
 async function makeFixture(workflow) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'kingdom-network-actions-pins-'));
@@ -27,17 +28,17 @@ async function runGuard(root) {
   });
 }
 
-test('actions pin guard accepts full commit SHAs and local actions', async () => {
-  const root = await makeFixture(`steps:\n  - uses: actions/checkout@${checkoutSha}\n  - uses: ./\.github/actions/local\n`);
+test('actions pin guard accepts approved full commit SHAs and local actions', async () => {
+  const root = await makeFixture(`steps:\n  - uses: actions/checkout@${checkoutSha}\n  - uses: actions/setup-node@${setupNodeSha}\n  - uses: ./\.github/actions/local\n`);
   try {
     const result = await runGuard(root);
-    assert.match(result.stdout, /every external action is pinned/);
+    assert.match(result.stdout, /both approved and pinned/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
 });
 
-test('actions pin guard rejects mutable version tags', async () => {
+test('actions pin guard rejects mutable version tags even for approved actions', async () => {
   const root = await makeFixture('steps:\n  - uses: actions/checkout@v4\n');
   try {
     await assert.rejects(runGuard(root), (error) => {
@@ -50,12 +51,12 @@ test('actions pin guard rejects mutable version tags', async () => {
   }
 });
 
-test('actions pin guard rejects branch references and missing refs', async () => {
-  const root = await makeFixture('steps:\n  - uses: owner/action@main\n  - uses: owner/other-action\n');
+test('actions pin guard rejects unapproved external action repositories even when SHA-pinned', async () => {
+  const root = await makeFixture(`steps:\n  - uses: third-party/safe-looking-action@${checkoutSha}\n`);
   try {
     await assert.rejects(runGuard(root), (error) => {
-      assert.match(error.stderr, /owner\/action@main/);
-      assert.match(error.stderr, /owner\/other-action/);
+      assert.match(error.stderr, /external action repository is not approved/);
+      assert.match(error.stderr, /third-party\/safe-looking-action/);
       return true;
     });
   } finally {
@@ -63,11 +64,25 @@ test('actions pin guard rejects branch references and missing refs', async () =>
   }
 });
 
-test('actions pin guard requires Docker actions to use immutable sha256 digests', async () => {
-  const root = await makeFixture('steps:\n  - uses: docker://alpine:latest\n');
+test('actions pin guard rejects branch references and missing refs', async () => {
+  const root = await makeFixture('steps:\n  - uses: actions/checkout@main\n  - uses: actions/setup-node\n');
   try {
     await assert.rejects(runGuard(root), (error) => {
-      assert.match(error.stderr, /sha256 digest/);
+      assert.match(error.stderr, /actions\/checkout@main/);
+      assert.match(error.stderr, /actions\/setup-node/);
+      return true;
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('actions pin guard rejects external Docker actions even with an immutable digest', async () => {
+  const digest = 'a'.repeat(64);
+  const root = await makeFixture(`steps:\n  - uses: docker://alpine@sha256:${digest}\n`);
+  try {
+    await assert.rejects(runGuard(root), (error) => {
+      assert.match(error.stderr, /external Docker actions are not approved/);
       return true;
     });
   } finally {
