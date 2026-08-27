@@ -22,6 +22,7 @@ jobs:
       action_pins: ${{ steps.action_pins.outcome }}
       workflow_permissions: ${{ steps.workflow_permissions.outcome }}
       workflow_triggers: ${{ steps.workflow_triggers.outcome }}
+      release_structure: ${{ steps.release_structure.outcome }}
       production_hold: ${{ steps.production_hold.outcome }}
       install: ${{ steps.install.outcome }}
       tests: ${{ steps.tests.outcome }}
@@ -50,6 +51,10 @@ jobs:
         id: workflow_triggers
         continue-on-error: true
         run: node scripts/verify-github-workflow-triggers.mjs
+      - name: GitHub release-gate structure guard
+        id: release_structure
+        continue-on-error: true
+        run: node scripts/verify-github-release-gate-structure.mjs
       - name: Production HOLD guard
         id: production_hold
         continue-on-error: true
@@ -79,17 +84,18 @@ jobs:
           ACTION_PINS: ${{ steps.action_pins.outcome }}
           WORKFLOW_PERMISSIONS: ${{ steps.workflow_permissions.outcome }}
           WORKFLOW_TRIGGERS: ${{ steps.workflow_triggers.outcome }}
+          RELEASE_STRUCTURE: ${{ steps.release_structure.outcome }}
           PRODUCTION_HOLD: ${{ steps.production_hold.outcome }}
           INSTALL: ${{ steps.install.outcome }}
           TESTS: ${{ steps.tests.outcome }}
           LINT: ${{ steps.lint.outcome }}
           BUILD: ${{ steps.build.outcome }}
         run: |
-          if [ "$ACTION_PINS" = success ] && [ "$WORKFLOW_PERMISSIONS" = success ] && [ "$WORKFLOW_TRIGGERS" = success ] && [ "$PRODUCTION_HOLD" = success ] && [ "$INSTALL" = success ] && [ "$TESTS" = success ] && [ "$LINT" = success ] && [ "$BUILD" = success ]; then
+          if [ "$ACTION_PINS" = success ] && [ "$WORKFLOW_PERMISSIONS" = success ] && [ "$WORKFLOW_TRIGGERS" = success ] && [ "$RELEASE_STRUCTURE" = success ] && [ "$PRODUCTION_HOLD" = success ] && [ "$INSTALL" = success ] && [ "$TESTS" = success ] && [ "$LINT" = success ] && [ "$BUILD" = success ]; then
             echo 'Kingdom Network release gate passed.'
             exit 0
           fi
-          echo "Kingdom Network release gate failed: pins=${ACTION_PINS}, permissions=${WORKFLOW_PERMISSIONS}, triggers=${WORKFLOW_TRIGGERS}, hold=${PRODUCTION_HOLD}, install=${INSTALL}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
+          echo "Kingdom Network release gate failed: pins=${ACTION_PINS}, permissions=${WORKFLOW_PERMISSIONS}, triggers=${WORKFLOW_TRIGGERS}, structure=${RELEASE_STRUCTURE}, hold=${PRODUCTION_HOLD}, install=${INSTALL}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
           exit 1
 
   publish-statuses:
@@ -105,6 +111,7 @@ jobs:
       ACTION_PINS: ${{ needs.build.outputs.action_pins }}
       WORKFLOW_PERMISSIONS: ${{ needs.build.outputs.workflow_permissions }}
       WORKFLOW_TRIGGERS: ${{ needs.build.outputs.workflow_triggers }}
+      RELEASE_STRUCTURE: ${{ needs.build.outputs.release_structure }}
       PRODUCTION_HOLD: ${{ needs.build.outputs.production_hold }}
       INSTALL: ${{ needs.build.outputs.install }}
       TESTS: ${{ needs.build.outputs.tests }}
@@ -129,17 +136,18 @@ jobs:
           publish action-pins "$ACTION_PINS"
           publish workflow-permissions "$WORKFLOW_PERMISSIONS"
           publish workflow-triggers "$WORKFLOW_TRIGGERS"
+          publish release-structure "$RELEASE_STRUCTURE"
           publish production-hold "$PRODUCTION_HOLD"
           publish install "$INSTALL"
           publish security-tests "$TESTS"
           publish lint "$LINT"
           publish build "$BUILD"
-          if [ "$ACTION_PINS" = success ] && [ "$WORKFLOW_PERMISSIONS" = success ] && [ "$WORKFLOW_TRIGGERS" = success ] && [ "$PRODUCTION_HOLD" = success ] && [ "$INSTALL" = success ] && [ "$TESTS" = success ] && [ "$LINT" = success ] && [ "$BUILD" = success ]; then
+          if [ "$ACTION_PINS" = success ] && [ "$WORKFLOW_PERMISSIONS" = success ] && [ "$WORKFLOW_TRIGGERS" = success ] && [ "$RELEASE_STRUCTURE" = success ] && [ "$PRODUCTION_HOLD" = success ] && [ "$INSTALL" = success ] && [ "$TESTS" = success ] && [ "$LINT" = success ] && [ "$BUILD" = success ]; then
             overall=success
-            description='pins, workflow permissions/triggers, production hold, install, security tests, lint, and build passed'
+            description='pins, workflow permissions/triggers/structure, production hold, install, security tests, lint, and build passed'
           else
             overall=failure
-            description="pins=${ACTION_PINS}, permissions=${WORKFLOW_PERMISSIONS}, triggers=${WORKFLOW_TRIGGERS}, hold=${PRODUCTION_HOLD}, install=${INSTALL}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
+            description="pins=${ACTION_PINS}, permissions=${WORKFLOW_PERMISSIONS}, triggers=${WORKFLOW_TRIGGERS}, structure=${RELEASE_STRUCTURE}, hold=${PRODUCTION_HOLD}, install=${INSTALL}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
           fi
           gh api --method POST \
             -H "Accept: application/vnd.github+json" \
