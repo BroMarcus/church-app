@@ -29,6 +29,7 @@ jobs:
       tests: ${{ steps.tests.outcome }}
       lint: ${{ steps.lint.outcome }}
       build: ${{ steps.build.outcome }}
+      release_gate: ${{ steps.release_gate.outcome }}
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -84,6 +85,7 @@ jobs:
         continue-on-error: true
         run: npm run build
       - name: Enforce release gate
+        id: release_gate
         if: always()
         env:
           ACTION_PINS: ${{ steps.action_pins.outcome }}
@@ -124,6 +126,7 @@ jobs:
       TESTS: ${{ needs.build.outputs.tests }}
       LINT: ${{ needs.build.outputs.lint }}
       BUILD: ${{ needs.build.outputs.build }}
+      RELEASE_GATE: ${{ needs.build.outputs.release_gate }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       - name: Publish release-gate statuses
@@ -150,12 +153,12 @@ jobs:
           publish security-tests "$TESTS"
           publish lint "$LINT"
           publish build "$BUILD"
-          if [ "$ACTION_PINS" = success ] && [ "$WORKFLOW_PERMISSIONS" = success ] && [ "$WORKFLOW_TRIGGERS" = success ] && [ "$RELEASE_STRUCTURE" = success ] && [ "$PRODUCTION_HOLD" = success ] && [ "$DEPENDENCY_SOURCES" = success ] && [ "$INSTALL" = success ] && [ "$TESTS" = success ] && [ "$LINT" = success ] && [ "$BUILD" = success ]; then
+          if [ "$RELEASE_GATE" = success ]; then
             overall=success
-            description='pins, workflow permissions/triggers/structure, production hold, dependency provenance, install, security tests, lint, and build passed'
+            description='final fail-closed release gate passed'
           else
             overall=failure
-            description="pins=${ACTION_PINS}, permissions=${WORKFLOW_PERMISSIONS}, triggers=${WORKFLOW_TRIGGERS}, structure=${RELEASE_STRUCTURE}, hold=${PRODUCTION_HOLD}, dependencies=${DEPENDENCY_SOURCES}, install=${INSTALL}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
+            description="final release gate=${RELEASE_GATE}; pins=${ACTION_PINS}, permissions=${WORKFLOW_PERMISSIONS}, triggers=${WORKFLOW_TRIGGERS}, structure=${RELEASE_STRUCTURE}, hold=${PRODUCTION_HOLD}, dependencies=${DEPENDENCY_SOURCES}, install=${INSTALL}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
           fi
           gh api --method POST \
             -H "Accept: application/vnd.github+json" \
