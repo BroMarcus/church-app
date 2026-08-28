@@ -1,6 +1,8 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { PendingSubmit } from '../../login/pending-submit'
 import { verifyAuthLink } from './actions'
+import { resolveLanguagePreference } from '@/lib/request-language'
 
 const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
 const MAX_AUTH_VALUE_LENGTH=1000
@@ -41,8 +43,8 @@ const copy={
 } as const
 
 export default async function VerifyPage({searchParams}:{searchParams:Promise<{token_hash?:string;type?:string;next?:string;invite?:string;lang?:string;error_code?:string}>}){
-  const params=await searchParams
-  const lang=params.lang==='es'?'es':'en'
+  const [params,requestHeaders]=await Promise.all([searchParams,headers()])
+  const lang=resolveLanguagePreference(params.lang,requestHeaders.get('accept-language'))
   const t=copy[lang]
   const validType=Boolean(params.type&&allowedTypes.has(params.type))
   const validToken=Boolean(params.token_hash&&params.token_hash.length<=MAX_AUTH_VALUE_LENGTH)
