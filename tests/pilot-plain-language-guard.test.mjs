@@ -24,14 +24,17 @@ test('first-login and Kingdom Guide crash recovery stays bilingual and member-sa
 })
 
 test('Fresh Church Setup recovery stays bilingual and does not render raw provider errors',async()=>{
-  for(const path of ['src/app/church/launch/error.tsx','src/app/church/setup-inbox/error.tsx']){
-    const source=await read(path)
-    assert.match(source,/en:\{/)
-    assert.match(source,/es:\{/)
-    assert.match(source,/lang/)
+  const launch=await read('src/app/church/launch/error.tsx')
+  const inbox=await read('src/app/church/setup-inbox/error.tsx')
+  for(const source of [launch,inbox]){
+    assert.match(source,/params\.get\('lang'\)==='es'/)
     assert.match(source,/role="alert"/)
     assert.doesNotMatch(source,/error\.message/)
   }
+  assert.match(launch,/Church Builder could not load\./)
+  assert.match(launch,/No se pudo abrir el Constructor de Iglesia\./)
+  assert.match(inbox,/Setup Inbox could not load\./)
+  assert.match(inbox,/No se pudo abrir la Bandeja de Configuración\./)
 })
 
 test('pilot auth and join surfaces keep raw provider messages out of rendered redirects',async()=>{
