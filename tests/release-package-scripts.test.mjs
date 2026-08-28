@@ -14,6 +14,14 @@ const canonicalScripts = {
   test: 'node --test tests/*.test.mjs',
 };
 
+function runActualGuard() {
+  return spawnSync(process.execPath, [guard], {
+    cwd: process.cwd(),
+    env: { ...process.env, KINGDOM_NETWORK_PACKAGE_SCRIPT_ROOT: process.cwd() },
+    encoding: 'utf8',
+  });
+}
+
 async function runGuard(scripts) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'kn-package-scripts-'));
   try {
@@ -28,6 +36,11 @@ async function runGuard(scripts) {
   }
 }
 
+test('current repository release scripts satisfy the guard', () => {
+  const result = runActualGuard();
+  assert.equal(result.status, 0, result.stderr);
+});
+
 test('accepts the reviewed canonical release scripts', async () => {
   const result = await runGuard(canonicalScripts);
   assert.equal(result.status, 0, result.stderr);
@@ -35,10 +48,14 @@ test('accepts the reviewed canonical release scripts', async () => {
 
 for (const [name, value] of [
   ['pretest', 'node steal-before-tests.mjs'],
+  ['posttest', 'node after-tests.mjs'],
+  ['prelint', 'node before-lint.mjs'],
   ['postlint', 'node after-lint.mjs'],
   ['prebuild', 'node before-build.mjs'],
   ['postbuild', 'node after-build.mjs'],
   ['prepare', 'node prepare.mjs'],
+  ['preinstall', 'node preinstall.mjs'],
+  ['install', 'node install.mjs'],
   ['postinstall', 'node postinstall.mjs'],
 ]) {
   test(`rejects protected lifecycle hook ${name}`, async () => {
@@ -52,6 +69,12 @@ test('rejects a changed build command', async () => {
   const result = await runGuard({ ...canonicalScripts, build: 'node custom-build.mjs && next build' });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /scripts\.build must remain exactly/);
+});
+
+test('rejects a changed lint command', async () => {
+  const result = await runGuard({ ...canonicalScripts, lint: 'eslint src' });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /scripts\.lint must remain exactly/);
 });
 
 test('rejects a changed test command', async () => {
