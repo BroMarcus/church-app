@@ -85,13 +85,20 @@ function verifyCheckoutProvenance() {
     return;
   }
 
-  const parents = run('git', ['rev-list', '--parents', '-n', '1', 'HEAD']).split(/\s+/).filter(Boolean);
-  if (parents.length !== 3) {
-    fail(`pull-request checkout must be GitHub's two-parent test merge; found ${Math.max(0, parents.length - 1)} parent(s)`);
+  // actions/checkout intentionally uses a shallow clone by default. Reading the HEAD commit
+  // object itself preserves its parent headers even when the parent commit objects are not
+  // present locally, so provenance verification does not need a broader/history fetch.
+  const commitObject = run('git', ['cat-file', '-p', 'HEAD']);
+  const parents = commitObject
+    .split('\n')
+    .filter((line) => line.startsWith('parent '))
+    .map((line) => line.slice('parent '.length).trim());
+  if (parents.length !== 2 || !parents.every(validSha)) {
+    fail(`pull-request checkout must be GitHub's two-parent test merge; found ${parents.length} valid parent(s)`);
     return;
   }
 
-  const [, firstParent, secondParent] = parents;
+  const [firstParent, secondParent] = parents;
   if (firstParent !== baseSha) {
     fail(`pull-request test merge first parent must equal event base SHA ${baseSha}; found ${firstParent}`);
   }
@@ -145,7 +152,7 @@ if (failures.length) {
   console.error('Runtime provenance guard failed:');
   for (const failure of failures) console.error(`- ${failure}`);
   console.error(
-    'Production HOLD requires the release gate to use the reviewed Node/npm toolchain, npm registry/user-config boundary, and the exact GitHub checkout state represented by the workflow event.',
+    'Production HOLD requires the release gate to use the reviewed npm registry/user-config boundary and Node/npm toolchain, plus the exact GitHub checkout state represented by the workflow event.',
   );
   process.exit(1);
 }
