@@ -7,9 +7,20 @@ const copy={
   es:{title:'El inicio de sesión no está disponible temporalmente.',body:'Tu cuenta no fue modificada. Revisa tu conexión e inténtalo otra vez. Si ya tienes una cuenta de Kingdom Network, sigue usando esa misma cuenta—no crees otra.',retry:'Intentar iniciar sesión otra vez',home:'Ir a Inicio'}
 } as const
 
+function browserLanguage(){
+  const languages=navigator.languages?.length?navigator.languages:[navigator.language]
+  for(const value of languages){
+    const tag=String(value||'').toLowerCase()
+    if(tag==='es'||tag.startsWith('es-')) return 'es'
+    if(tag==='en'||tag.startsWith('en-')) return 'en'
+  }
+  return 'en'
+}
+
 export default function LoginError({reset}:{reset:()=>void}){
   const params=useSearchParams()
-  const lang=params.get('lang')==='es'?'es':'en'
+  const explicitLang=params.get('lang')
+  const lang=explicitLang==='es'||explicitLang==='en'?explicitLang:browserLanguage()
   const t=copy[lang]
   return <main className="login-wrap">
     <div className="login card" role="alert" style={{maxWidth:620}}>
