@@ -2,11 +2,20 @@
 
 import {useEffect,useState} from 'react'
 
+const resolveRecoveryLanguage=(): 'en'|'es' => {
+  const requested=new URLSearchParams(window.location.search).get('lang')
+  if(requested==='es')return 'es'
+  if(requested==='en')return 'en'
+  if(document.documentElement.lang.toLowerCase().startsWith('es'))return 'es'
+  const browserLanguages=Array.isArray(navigator.languages)&&navigator.languages.length?navigator.languages:[navigator.language]
+  return browserLanguages.some(value=>String(value||'').toLowerCase().startsWith('es'))?'es':'en'
+}
+
 export default function HomeLoading(){
   const [lang,setLang]=useState<'en'|'es'>('en')
 
   useEffect(()=>{
-    const selected=new URLSearchParams(window.location.search).get('lang')==='es'?'es':'en'
+    const selected=resolveRecoveryLanguage()
     setLang(selected)
     document.documentElement.lang=selected
   },[])
