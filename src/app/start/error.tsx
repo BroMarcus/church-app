@@ -7,9 +7,20 @@ const copy={
   es:{label:'EMPIEZA AQUÍ',title:'No pudimos cargar tus primeros pasos.',body:'Tu cuenta y tu progreso no fueron modificados. Inténtalo otra vez cuando estés listo.',retry:'Intentar Empieza Aquí otra vez',signin:'Ir a Iniciar sesión'}
 } as const
 
+function browserLanguage(){
+  const languages=navigator.languages?.length?navigator.languages:[navigator.language]
+  for(const value of languages){
+    const tag=String(value||'').toLowerCase()
+    if(tag==='es'||tag.startsWith('es-')) return 'es'
+    if(tag==='en'||tag.startsWith('en-')) return 'en'
+  }
+  return 'en'
+}
+
 export default function StartError({reset}:{reset:()=>void}){
   const params=useSearchParams()
-  const lang=params.get('lang')==='es'?'es':'en'
+  const explicitLang=params.get('lang')
+  const lang=explicitLang==='es'||explicitLang==='en'?explicitLang:browserLanguage()
   const t=copy[lang]
   return <main style={{maxWidth:920,margin:'0 auto',padding:'28px 18px 80px'}}>
     <div role="alert" style={{border:'1px solid #fecaca',borderRadius:18,padding:24,background:'#fff'}}>
