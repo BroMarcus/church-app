@@ -23,6 +23,14 @@ test('first-login and Kingdom Guide crash recovery stays bilingual and member-sa
   }
 })
 
+test('Kingdom Guide identifies software as the Guide, not as a prophet',async()=>{
+  const source=await read('src/app/guide/prophet-command-box.tsx')
+  assert.match(source,/ASK KINGDOM GUIDE/)
+  assert.match(source,/PREGÚNTALE A KINGDOM GUIDE/)
+  assert.doesNotMatch(source,/ASK THE PROPHET/)
+  assert.doesNotMatch(source,/PREGÚNTALE AL PROFETA/)
+})
+
 test('Fresh Church Setup recovery stays bilingual and does not render raw provider errors',async()=>{
   const launch=await read('src/app/church/launch/error.tsx')
   const inbox=await read('src/app/church/setup-inbox/error.tsx')
