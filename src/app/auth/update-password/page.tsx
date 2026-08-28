@@ -27,6 +27,12 @@ function safeJoinNext(value:string|null){
   if(!value||value.length>500||!value.startsWith('/')||value.startsWith('//')||value.includes('\\'))return ''
   try{const base='https://kingdom.invalid',parsed=new URL(value,base);if(parsed.origin!==base||!parsed.pathname.startsWith('/join/'))return '';return `${parsed.pathname}${parsed.search}`}catch{return ''}
 }
+function preferredLanguage(params:URLSearchParams):'en'|'es'{
+  const explicit=params.get('lang')
+  if(explicit==='es')return 'es'
+  if(explicit==='en')return 'en'
+  return typeof navigator!=='undefined'&&navigator.language.toLowerCase().startsWith('es')?'es':'en'
+}
 function getBrowserSupabase(context:string){
   try{return createClient()}
   catch(error){console.error(`${context} client unavailable`,{code:diagnosticCode(error)});return null}
@@ -69,7 +75,7 @@ export default function UpdatePasswordPage(){
 
   useEffect(()=>{
     let mounted=true
-    const url=new URL(window.location.href),nextLang=url.searchParams.get('lang')==='es'?'es':'en',next=safeJoinNext(url.searchParams.get('next')),invite=safeInviteId(url.searchParams.get('invite'))
+    const url=new URL(window.location.href),nextLang=preferredLanguage(url.searchParams),next=safeJoinNext(url.searchParams.get('next')),invite=safeInviteId(url.searchParams.get('invite'))
     setLang(nextLang);setJoinNext(next);setInviteId(invite)
     const c=copy[nextLang];setMessage(c.opening);setRetryAvailable(false)
     const supabase=getBrowserSupabase('password reset initialization')
@@ -104,7 +110,7 @@ export default function UpdatePasswordPage(){
       }
     }
     void check()
-    const {data:listener}=supabase.auth.onAuthStateChange((event,session)=>{if(!mounted)return;if((event==='PASSWORD_RECOVERY'||event==='SIGNED_IN')&&session){const nextUrl=new URL(window.location.href),listenerLang=nextUrl.searchParams.get('lang')==='es'?'es':'en';setLang(listenerLang);setJoinNext(safeJoinNext(nextUrl.searchParams.get('next')));setInviteId(safeInviteId(nextUrl.searchParams.get('invite')));setRetryAvailable(false);setReady(true);setMessage(copy[listenerLang].choose)}})
+    const {data:listener}=supabase.auth.onAuthStateChange((event,session)=>{if(!mounted)return;if((event==='PASSWORD_RECOVERY'||event==='SIGNED_IN')&&session){const nextUrl=new URL(window.location.href),listenerLang=preferredLanguage(nextUrl.searchParams);setLang(listenerLang);setJoinNext(safeJoinNext(nextUrl.searchParams.get('next')));setInviteId(safeInviteId(nextUrl.searchParams.get('invite')));setRetryAvailable(false);setReady(true);setMessage(copy[listenerLang].choose)}})
     return()=>{mounted=false;listener.subscription.unsubscribe()}
   },[])
 
