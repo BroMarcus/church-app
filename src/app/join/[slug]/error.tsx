@@ -10,10 +10,21 @@ const copy={
 
 const boundedCode=(value:unknown)=>String(value||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48)||'unknown'
 
+function browserLanguage(){
+  const languages=navigator.languages?.length?navigator.languages:[navigator.language]
+  for(const value of languages){
+    const tag=String(value||'').toLowerCase()
+    if(tag==='es'||tag.startsWith('es-')) return 'es'
+    if(tag==='en'||tag.startsWith('en-')) return 'en'
+  }
+  return 'en'
+}
+
 export default function ChurchJoinError({error,reset}:{error:Error&{digest?:string};reset:()=>void}){
   const params=useSearchParams()
   const pathname=usePathname()
-  const lang=params.get('lang')==='es'?'es':'en'
+  const explicitLang=params.get('lang')
+  const lang=explicitLang==='es'||explicitLang==='en'?explicitLang:browserLanguage()
   const t=copy[lang]
   const next=pathname.startsWith('/join/')?`${pathname}?lang=${lang}`:''
   useEffect(()=>{console.error('church join page failed',{code:boundedCode(error.name),digest:boundedCode(error.digest)})},[error])
