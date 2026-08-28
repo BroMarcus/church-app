@@ -89,6 +89,9 @@ async function verifyExecutableScripts() {
   try {
     rootEntries = await readdir(scriptsRoot, { withFileTypes: true });
   } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+      return;
+    }
     fail(`scripts directory must remain readable (${error instanceof Error ? error.message : 'unknown error'})`);
     return;
   }
