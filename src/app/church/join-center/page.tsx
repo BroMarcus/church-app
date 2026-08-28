@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { CheckCircle2,ExternalLink,MailPlus,QrCode,ShieldCheck,Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
@@ -13,6 +14,7 @@ const diagnosticCode=(error:unknown,fallback:string)=>{
   return boundedCode(fallback)
 }
 type Lang='en'|'es'
+const prefersSpanish=(acceptLanguage:string|null)=>/^\s*es(?:-|_|,|;|$)/i.test(acceptLanguage||'')
 
 function AccessRecovery({lang,kind}:{lang:Lang;kind:'unavailable'|'unauthorized'}){
   const es=lang==='es'
@@ -20,7 +22,12 @@ function AccessRecovery({lang,kind}:{lang:Lang;kind:'unavailable'|'unauthorized'
 }
 
 export default async function JoinCenterPage({searchParams}:{searchParams:Promise<{lang?:string}>}){
-  const params=await searchParams,es=params.lang==='es',lang:Lang=es?'es':'en';const l=(p:string)=>`${p}${p.includes('?')?'&':'?'}lang=${lang}`
+  const params=await searchParams
+  const requestHeaders=await headers()
+  const browserLang:Lang=prefersSpanish(requestHeaders.get('accept-language'))?'es':'en'
+  const lang:Lang=params.lang==='es'?'es':params.lang==='en'?'en':browserLang
+  const es=lang==='es'
+  const l=(p:string)=>`${p}${p.includes('?')?'&':'?'}lang=${lang}`
   let supabase
   try{supabase=await createClient()}
   catch(error){console.error('join center client unavailable',{errorCode:diagnosticCode(error,'client_unavailable')});return <AccessRecovery lang={lang} kind="unavailable"/>}
