@@ -10,6 +10,7 @@ const dependencySections = ['dependencies', 'devDependencies', 'optionalDependen
 const forbiddenDirectSource = /^(?:git(?:\+[^:]+)?:|github:|https?:|file:|link:|workspace:|npm:)/i;
 const forbiddenTag = /^(?:latest|next|canary|beta|alpha|rc)$/i;
 const registryOrigin = 'https://registry.npmjs.org';
+const pinnedPackageManager = 'npm@10.9.8';
 
 function fail(message) {
   failures.push(message);
@@ -70,6 +71,12 @@ try {
   process.exit(1);
 }
 
+if (manifest.packageManager !== pinnedPackageManager) {
+  fail(`package.json packageManager must be exactly '${pinnedPackageManager}'; found ${String(manifest.packageManager)}`);
+}
+if (manifest.engines?.node !== '22.x') {
+  fail(`package.json engines.node must remain '22.x'; found ${String(manifest.engines?.node)}`);
+}
 if (lock.lockfileVersion !== 3) {
   fail(`package-lock.json must use lockfileVersion 3; found ${String(lock.lockfileVersion)}`);
 }
@@ -136,11 +143,11 @@ if (failures.length) {
   console.error('Dependency source provenance guard failed:');
   for (const failure of failures) console.error(`- ${failure}`);
   console.error(
-    'Production HOLD requires npm install behavior to stay CI-controlled and package-lock.json to remain the only install lock source; dependencies must stay lockfile-pinned to integrity-checked registry.npmjs.org tarballs, and repository config/shrinkwrap, Git/URL/local/alias sources, and mutable dist-tags are not allowed.',
+    `Production HOLD requires npm install behavior to stay CI-controlled with ${pinnedPackageManager}, package-lock.json to remain the only install lock source, dependencies to stay lockfile-pinned to integrity-checked registry.npmjs.org tarballs, and repository config/shrinkwrap, Git/URL/local/alias sources, and mutable dist-tags to remain blocked.`,
   );
   process.exit(1);
 }
 
 console.log(
-  'Dependency source provenance guard passed: install behavior is CI-controlled, package-lock.json is authoritative, direct specs are bounded registry ranges, and lockfile packages use integrity-checked registry.npmjs.org tarballs.',
+  `Dependency source provenance guard passed: ${pinnedPackageManager} is pinned, install behavior is CI-controlled, package-lock.json is authoritative, direct specs are bounded registry ranges, and lockfile packages use integrity-checked registry.npmjs.org tarballs.`,
 );
