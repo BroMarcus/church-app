@@ -4,19 +4,28 @@ import {useEffect,useState} from 'react'
 
 const boundedDigest=(value:unknown)=>String(value||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,80)||'unknown'
 
+const resolveRecoveryLanguage=(): 'en'|'es' => {
+  const requested=new URLSearchParams(window.location.search).get('lang')
+  if(requested==='es')return 'es'
+  if(requested==='en')return 'en'
+  if(document.documentElement.lang.toLowerCase().startsWith('es'))return 'es'
+  const browserLanguages=Array.isArray(navigator.languages)&&navigator.languages.length?navigator.languages:[navigator.language]
+  return browserLanguages.some(value=>String(value||'').toLowerCase().startsWith('es'))?'es':'en'
+}
+
 export default function HomeError({error,reset}:{error:Error&{digest?:string};reset:()=>void}){
   const [lang,setLang]=useState<'en'|'es'>('en')
 
   useEffect(()=>{
     console.error('Kingdom Network page failed',{digest:boundedDigest(error.digest)})
-    const selected=new URLSearchParams(window.location.search).get('lang')==='es'?'es':'en'
+    const selected=resolveRecoveryLanguage()
     setLang(selected)
     document.documentElement.lang=selected
   },[error])
 
   const es=lang==='es'
   const t=(en:string,sp:string)=>es?sp:en
-  const withLang=(path:string)=>es?`${path}${path.includes('?')?'&':'?'}lang=es`:path
+  const withLang=(path:string)=>`${path}${path.includes('?')?'&':'?'}lang=${lang}`
   const go=(path:string)=>{window.location.assign(withLang(path))}
   const selectLanguage=(next:'en'|'es')=>{
     setLang(next)
