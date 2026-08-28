@@ -31,7 +31,7 @@ const roleLabel=(role:unknown,lang:'en'|'es')=>{
   en:{member:'Member',pastor:'Pastor',church_admin:'Church Admin',leader:'Leader',group_leader:'Friendship Group Leader',assistant_leader:'Assistant Leader',ministry_leader:'Ministry Leader',minister:'Minister',finance_admin:'Finance Admin',platform_admin:'Platform Admin'},
   es:{member:'Miembro',pastor:'Pastor',church_admin:'Administrador de iglesia',leader:'Líder',group_leader:'Líder de Grupo de Amistad',assistant_leader:'Líder asistente',ministry_leader:'Líder de ministerio',minister:'Ministro',finance_admin:'Administrador de finanzas',platform_admin:'Administrador de plataforma'}
  }
- return labels[lang][value]||value.replaceAll('_',' ')
+ return labels[lang][value]||labels[lang].member
 }
 function startRecovery(lang:'en'|'es',code:string){
  const t=copy[lang]
