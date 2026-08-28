@@ -18,6 +18,17 @@ function safeJoinNext(value:string|null){
   }catch{return ''}
 }
 
+function browserLanguage(){
+  if(typeof navigator==='undefined')return 'en' as const
+  const languages=navigator.languages?.length?navigator.languages:[navigator.language]
+  for(const raw of languages){
+    const tag=(raw||'').toLowerCase()
+    if(tag==='es'||tag.startsWith('es-'))return 'es' as const
+    if(tag==='en'||tag.startsWith('en-'))return 'en' as const
+  }
+  return 'en' as const
+}
+
 const copy={
   en:{title:'We could not open this account link right now.',body:'This does not prove that your newest confirmation or password-reset link expired. Keep this page open and try it once more. If you already have a Kingdom Network account, keep using that same account.',retry:'Try this newest link again',signIn:'Return to Sign In',newEmail:'Do not request several new emails or create another account unless Kingdom Network specifically tells you the newest link expired.'},
   es:{title:'No pudimos abrir este enlace de cuenta en este momento.',body:'Esto no prueba que tu enlace de confirmación o cambio de contraseña más reciente haya vencido. Mantén esta página abierta e inténtalo una vez más. Si ya tienes una cuenta de Kingdom Network, sigue usando esa misma cuenta.',retry:'Intentar este enlace más reciente otra vez',signIn:'Volver a Iniciar sesión',newEmail:'No solicites varios correos nuevos ni crees otra cuenta a menos que Kingdom Network te diga específicamente que el enlace más reciente venció.'}
@@ -25,7 +36,8 @@ const copy={
 
 export default function VerifyError({reset}:{reset:()=>void}){
   const params=useSearchParams()
-  const lang=params.get('lang')==='es'?'es':'en'
+  const explicitLang=params.get('lang')
+  const lang=explicitLang==='es'||explicitLang==='en'?explicitLang:browserLanguage()
   const inviteId=safeInviteId(params.get('invite'))
   const joinNext=safeJoinNext(params.get('next'))
   const t=copy[lang]
