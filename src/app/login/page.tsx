@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { createClient as createPublicClient } from '@supabase/supabase-js'
 import { SUPABASE_PUBLISHABLE_KEY,SUPABASE_URL } from '@/lib/supabase/config'
 import { PasswordField } from '@/components/password-field'
@@ -24,10 +25,12 @@ const diagnosticCode=(error:unknown,fallback:string)=>{
 }
 const INVITE_ID_PATTERN=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 function safeJoinNext(value:string|undefined){if(!value||value.length>500||!value.startsWith('/')||value.startsWith('//')||value.includes('\\'))return '';try{const base='https://kingdom.invalid',parsed=new URL(value,base);if(parsed.origin!==base||!parsed.pathname.startsWith('/join/'))return '';return `${parsed.pathname}${parsed.search}${parsed.hash}`}catch{return ''}}
+function prefersSpanish(acceptLanguage:string|null){return /^\s*es(?:-|_|,|;|$)/i.test(acceptLanguage||'')}
 
 export default async function LoginPage({searchParams}:{searchParams:Promise<{error_code?:string;message_code?:string;invite?:string;lang?:string;mode?:string;next?:string}>}){
   const params=await searchParams
-  const lang=params.lang==='es'?'es':'en',t=copy[lang],joinNext=safeJoinNext(params.next)
+  const requestHeaders=await headers()
+  const lang=params.lang==='es'?'es':params.lang==='en'?'en':prefersSpanish(requestHeaders.get('accept-language'))?'es':'en',t=copy[lang],joinNext=safeJoinNext(params.next)
   const statusError=(authStatus[lang] as Record<string,string>)[params.error_code??'']||'',statusMessage=(authStatus[lang] as Record<string,string>)[params.message_code??'']||''
   const explicitSignin=params.mode==='signin'
   const supabase=createPublicClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}})
