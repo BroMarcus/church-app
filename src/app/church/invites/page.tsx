@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { Languages,MailPlus,ShieldCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
@@ -21,13 +22,19 @@ const statusCopy={
 } as const
 
 type Lang='en'|'es'
+const prefersSpanish=(acceptLanguage:string|null)=>/^\s*es(?:-|_|,|;|$)/i.test(acceptLanguage||'')
 function AccessRecovery({lang,kind}:{lang:Lang;kind:'unavailable'|'unauthorized'}){
   const es=lang==='es'
   return <main className="shell"><header className="topbar"><Link href={`/?lang=${lang}`} className="brand">Kingdom <span>Network</span></Link></header><section className="card" style={{padding:24,maxWidth:720,margin:'30px auto'}}><div className="pill">{es?'INVITACIONES':'INVITATIONS'}</div><h1>{kind==='unavailable'?(es?'No pudimos verificar tu acceso.':'We could not verify your access.'):(es?'Acceso no disponible':'Access not available')}</h1><p className="muted">{kind==='unavailable'?(es?'Puede ser un problema temporal de conexión. No se creó, cambió ni revocó ninguna invitación.':'This may be a temporary connection problem. No invitation was created, changed, or revoked.'):(es?'Esta cuenta no tiene permiso para administrar invitaciones.':'This account does not have permission to manage invitations.')}</p><div className="row" style={{gap:10,flexWrap:'wrap'}}><Link className="btn" href={`/church/invites?lang=${lang}`}>{es?'Intentar de nuevo':'Try again'}</Link><Link className="ghost" href={`/?lang=${lang}`}>{es?'Inicio':'Home'}</Link><Link className="ghost" href={`/help?lang=${lang}`}>{es?'Ayuda':'Help'}</Link></div></section></main>
 }
 
 export default async function InvitesPage({searchParams}:{searchParams:Promise<{status?:string;lang?:string}>}){
-  const query=await searchParams;const lang:Lang=query.lang==='es'?'es':'en';const es=lang==='es';const l=(p:string)=>`${p}${p.includes('?')?'&':'?'}lang=${lang}`
+  const query=await searchParams
+  const requestHeaders=await headers()
+  const browserLang:Lang=prefersSpanish(requestHeaders.get('accept-language'))?'es':'en'
+  const lang:Lang=query.lang==='es'?'es':query.lang==='en'?'en':browserLang
+  const es=lang==='es'
+  const l=(p:string)=>`${p}${p.includes('?')?'&':'?'}lang=${lang}`
   let supabase
   try{supabase=await createClient()}
   catch(error){console.error('member invitations client unavailable',{errorCode:diagnosticCode(error,'client_unavailable')});return <AccessRecovery lang={lang} kind="unavailable"/>}
