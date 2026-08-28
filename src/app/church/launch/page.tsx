@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { CalendarDays,Check,Church,FileUp,GraduationCap,KeyRound,Languages,MailPlus,Palette,ShieldCheck,Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
@@ -15,6 +16,7 @@ const diagnosticCode=(error:unknown,fallback:string)=>{
   if(error instanceof Error)return boundedCode(error.name)
   return boundedCode(fallback)
 }
+const prefersSpanish=(acceptLanguage:string|null)=>/^\s*es(?:-|_|,|;|$)/i.test(acceptLanguage||'')
 const failLoad=(area:string,error:unknown)=>{
   console.error('Church Builder load failed',{area:boundedCode(area),code:diagnosticCode(error,'unavailable')})
   throw new Error('church-launch-load-failed')
@@ -22,7 +24,8 @@ const failLoad=(area:string,error:unknown)=>{
 
 export default async function ChurchLaunchPage({searchParams}:{searchParams:Promise<{lang?:string}>}){
   const params=await searchParams
-  const lang=params.lang==='es'?'es':'en'
+  const requestHeaders=await headers()
+  const lang:'en'|'es'=params.lang==='es'?'es':params.lang==='en'?'en':prefersSpanish(requestHeaders.get('accept-language'))?'es':'en'
   const t=copy[lang]
   const l=(path:string)=>lang==='es'?`${path}${path.includes('?')?'&':'?'}lang=es`:path
   let supabase
