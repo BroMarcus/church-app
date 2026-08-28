@@ -3,11 +3,12 @@ import fs from 'node:fs'
 import test from 'node:test'
 
 const invitePerson=fs.readFileSync('src/app/church/invite-person/page.tsx','utf8')
+const invites=fs.readFileSync('src/app/church/invites/page.tsx','utf8')
 const joinCenter=fs.readFileSync('src/app/church/join-center/page.tsx','utf8')
 
-for(const [name,source] of [['private invitation',invitePerson],['Join Center',joinCenter]]){
+for(const [name,source] of [['private invitation',invitePerson],['invitations list',invites],['Join Center',joinCenter]]){
   test(`${name} keeps an explicit language choice authoritative`,()=>{
-    assert.match(source,/params\.lang===['"]es['"]\?['"]es['"]:params\.lang===['"]en['"]\?['"]en['"]:browserLang/)
+    assert.match(source,/(?:params|query)\.lang===['"]es['"]\?['"]es['"]:(?:params|query)\.lang===['"]en['"]\?['"]en['"]:browserLang/)
   })
 
   test(`${name} falls back to the phone language when lang is missing`,()=>{
