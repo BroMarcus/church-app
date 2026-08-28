@@ -13,11 +13,19 @@ const testDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(testDir, '..');
 const guardScript = path.join(repoRoot, 'scripts', 'verify-dependency-sources.mjs');
 
-async function fixture({ spec = '^1.2.3', resolved = 'https://registry.npmjs.org/example/-/example-1.2.3.tgz', integrity = 'sha512-QUJDRA==' } = {}) {
+async function fixture({
+  spec = '^1.2.3',
+  resolved = 'https://registry.npmjs.org/example/-/example-1.2.3.tgz',
+  integrity = 'sha512-QUJDRA==',
+  packageManager = 'npm@10.9.8',
+  nodeEngine = '22.x',
+} = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'kingdom-network-dependency-sources-'));
   const manifest = {
     name: 'fixture',
     version: '1.0.0',
+    packageManager,
+    engines: { node: nodeEngine },
     dependencies: { example: spec },
   };
   const lock = {
@@ -41,11 +49,44 @@ async function runGuard(root) {
   });
 }
 
-test('dependency source guard accepts bounded registry dependency with sha512 lock integrity', async () => {
+test('dependency source guard accepts pinned npm plus bounded registry dependency with sha512 lock integrity', async () => {
   const root = await fixture();
   try {
     const result = await runGuard(root);
+    assert.match(result.stdout, /npm@10\.9\.8 is pinned/i);
     assert.match(result.stdout, /provenance guard passed/i);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('dependency source guard rejects missing or drifted packageManager pin', async () => {
+  for (const packageManager of [undefined, 'npm@10.9.7', 'npm@latest', 'pnpm@10.0.0']) {
+    const root = await fixture({ packageManager });
+    try {
+      if (packageManager === undefined) {
+        const manifestPath = path.join(root, 'package.json');
+        const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+        delete manifest.packageManager;
+        await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+      }
+      await assert.rejects(runGuard(root), (error) => {
+        assert.match(error.stderr, /packageManager must be exactly 'npm@10\.9\.8'/i);
+        return true;
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test('dependency source guard rejects Node engine drift from the supported major line', async () => {
+  const root = await fixture({ nodeEngine: '>=20.9.0' });
+  try {
+    await assert.rejects(runGuard(root), (error) => {
+      assert.match(error.stderr, /engines\.node must remain '22\.x'/i);
+      return true;
+    });
   } finally {
     await rm(root, { recursive: true, force: true });
   }
