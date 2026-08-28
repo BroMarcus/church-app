@@ -1,4 +1,5 @@
 import { NextRequest,NextResponse } from 'next/server'
+import { resolveRequestLanguage } from '@/lib/request-language'
 
 const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
 const MAX_AUTH_VALUE_LENGTH=1000
@@ -79,10 +80,11 @@ function legacyRedirectContext(raw:string|null,fallback:string){
 }
 
 export async function GET(request:NextRequest){
-  const {searchParams}=new URL(request.url)
+  const requestUrl=new URL(request.url)
+  const {searchParams}=requestUrl
   const tokenHash=searchParams.get('token_hash')
   const type=searchParams.get('type')
-  const lang=searchParams.get('lang')==='es'?'es':'en'
+  const lang=resolveRequestLanguage(request,requestUrl)
   const rawNext=searchParams.get('next')
   const signupFallback=`/start?welcome=1${lang==='es'?'&lang=es':''}`
   const redirectContext=legacyRedirectContext(rawNext,signupFallback)
