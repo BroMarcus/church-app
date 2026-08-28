@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { BookOpen,CheckCircle2,Church,HandHeart,Home,Languages,MessageSquareWarning,Sparkles,UserRound,UsersRound } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
@@ -33,6 +34,7 @@ const roleLabel=(role:unknown,lang:'en'|'es')=>{
  }
  return labels[lang][value]||labels[lang].member
 }
+const prefersSpanish=(acceptLanguage:string|null)=>/^\s*es(?:-|_|,|;|$)/i.test(acceptLanguage||'')
 function startRecovery(lang:'en'|'es',code:string){
  const t=copy[lang]
  console.error('Start Here unavailable',{code:boundedCode(code)})
@@ -41,7 +43,8 @@ function startRecovery(lang:'en'|'es',code:string){
 
 export default async function StartPage({searchParams}:{searchParams:Promise<{lang?:string;error_code?:string;message_code?:string}>}){
  const params=await searchParams
- const requestedLang:'en'|'es'=params.lang==='es'?'es':'en'
+ const requestHeaders=await headers()
+ const requestedLang:'en'|'es'=params.lang==='es'?'es':params.lang==='en'?'en':prefersSpanish(requestHeaders.get('accept-language'))?'es':'en'
  let supabase
  try{supabase=await createClient()}
  catch(error){return startRecovery(requestedLang,`client_${diagnosticCode(error,'client_unavailable')}`)}
@@ -51,7 +54,7 @@ export default async function StartPage({searchParams}:{searchParams:Promise<{la
  catch(error){return startRecovery(requestedLang,`auth_${diagnosticCode(error,'auth_unavailable')}`)}
  const {data:{user},error:authError}=authResult
  const preferred=user?.user_metadata?.preferred_language==='es'?'es':'en'
- const lang:'en'|'es'=params.lang==='es'?'es':params.lang==='en'?'en':preferred,t=copy[lang]
+ const lang:'en'|'es'=params.lang==='es'?'es':params.lang==='en'?'en':user?preferred:requestedLang,t=copy[lang]
  const withLang=(path:string)=>lang==='es'?`${path}${path.includes('?')?'&':'?'}lang=es`:path
  if(authError)return startRecovery(lang,`auth_${boundedCode(authError.code)}`)
  const userId=user?.id
