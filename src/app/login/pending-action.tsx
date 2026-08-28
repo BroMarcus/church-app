@@ -21,8 +21,6 @@ export function PendingAction({label,pendingLabel,cooldownLabel,cooldownKey,cool
         if(seconds===0&&until)window.localStorage.removeItem(storageKey)
         if(seconds===0&&fallbackUntilRef.current<=now)fallbackUntilRef.current=0
       }catch{
-        // Storage can be unavailable in restricted/private browser modes. Keep an in-memory
-        // cooldown for this page so a successful send still resists accidental repeat taps.
         const seconds=Math.max(0,Math.ceil((fallbackUntilRef.current-now)/1000))
         setRemaining(seconds)
         if(seconds===0)fallbackUntilRef.current=0
@@ -50,17 +48,13 @@ export function PendingAction({label,pendingLabel,cooldownLabel,cooldownKey,cool
         setRemaining(cooldownSeconds)
       }
     }catch{
-      // Storage is optional. The in-memory fallback keeps this page guarded; server-side
-      // rate limits remain the authority if the page is closed or reloaded.
       setRemaining(cooldownSeconds)
     }
-    // Consume the one-time success marker without a navigation. Otherwise a later refresh of the
-    // same stale success URL could incorrectly start a brand-new cooldown even though no email was sent.
     url.searchParams.delete('message_code')
     window.history.replaceState(window.history.state,'',`${url.pathname}${url.search}${url.hash}`)
   },[cooldownSeconds,storageKey,successCode])
 
   const cooling=remaining>0
   const text=status.pending?pendingLabel:cooling?cooldownLabel.replace('{seconds}',String(remaining)):label
-  return <button className="btn secondary" type="submit" formAction={action} disabled={status.pending||cooling} aria-busy={status.pending} aria-disabled={status.pending||cooling}><span aria-live="polite">{text}</span></button>
+  return <button className="btn secondary" type="submit" formAction={action} disabled={status.pending||cooling} aria-busy={status.pending} aria-disabled={status.pending||cooling} style={{minHeight:44,touchAction:'manipulation'}}><span aria-live="polite">{text}</span></button>
 }
