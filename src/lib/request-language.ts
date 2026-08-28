@@ -6,12 +6,11 @@ type LanguagePreference={
   order:number
 }
 
-export function resolveRequestLanguage(request:{headers:Headers},url:URL):SupportedLanguage{
-  const explicit=url.searchParams.get('lang')
+export function resolveLanguagePreference(explicit:string|null|undefined,acceptLanguage:string|null|undefined):SupportedLanguage{
   if(explicit==='en'||explicit==='es')return explicit
 
   const preferences:LanguagePreference[]=[]
-  for(const [order,entry] of (request.headers.get('accept-language')||'').split(',').entries()){
+  for(const [order,entry] of (acceptLanguage||'').split(',').entries()){
     const [rawTag,...rawParams]=entry.trim().split(';')
     const tag=(rawTag||'').trim().toLowerCase()
     const language:SupportedLanguage|null=tag==='es'||tag.startsWith('es-')?'es':tag==='en'||tag.startsWith('en-')?'en':null
@@ -28,4 +27,8 @@ export function resolveRequestLanguage(request:{headers:Headers},url:URL):Suppor
 
   preferences.sort((a,b)=>b.quality-a.quality||a.order-b.order)
   return preferences[0]?.language||'en'
+}
+
+export function resolveRequestLanguage(request:{headers:Headers},url:URL):SupportedLanguage{
+  return resolveLanguagePreference(url.searchParams.get('lang'),request.headers.get('accept-language'))
 }
