@@ -9,6 +9,7 @@ const repoRoot = process.env.KINGDOM_NETWORK_HOLD_ROOT
   : path.resolve(scriptDir, '..');
 
 const failures = [];
+const executableExtensions = new Set(['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts', '.sh', '.bash', '.zsh', '.ps1']);
 
 async function readText(relativePath) {
   return readFile(path.join(repoRoot, relativePath), 'utf8');
@@ -82,10 +83,36 @@ async function verifyPackageScripts() {
   }
 }
 
+async function verifyExecutableScripts() {
+  const scriptsRoot = path.join(repoRoot, 'scripts');
+  let rootEntries;
+  try {
+    rootEntries = await readdir(scriptsRoot, { withFileTypes: true });
+  } catch (error) {
+    fail(`scripts directory must remain readable (${error instanceof Error ? error.message : 'unknown error'})`);
+    return;
+  }
+
+  const pending = rootEntries.map((entry) => ({ entry, directory: scriptsRoot, relativeDirectory: 'scripts' }));
+  while (pending.length) {
+    const { entry, directory, relativeDirectory } = pending.pop();
+    const absolutePath = path.join(directory, entry.name);
+    const relativePath = path.join(relativeDirectory, entry.name);
+    if (entry.isDirectory()) {
+      const children = await readdir(absolutePath, { withFileTypes: true });
+      for (const child of children) pending.push({ entry: child, directory: absolutePath, relativeDirectory: relativePath });
+      continue;
+    }
+    if (!entry.isFile() || !executableExtensions.has(path.extname(entry.name).toLowerCase())) continue;
+    findProductionDeployCommands(await readFile(absolutePath, 'utf8'), relativePath);
+  }
+}
+
 await Promise.all([
   verifyVercelConfig(),
   verifyWorkflows(),
   verifyPackageScripts(),
+  verifyExecutableScripts(),
 ]);
 
 if (failures.length > 0) {
@@ -94,4 +121,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log('Production HOLD guard passed: Vercel Git deployment is disabled and no obvious production-deploy commands were found.');
+console.log('Production HOLD guard passed: Vercel Git deployment is disabled and no production-deploy commands were found in workflows, package scripts, or executable scripts.');
