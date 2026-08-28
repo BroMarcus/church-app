@@ -163,9 +163,8 @@ export async function login(formData:FormData){
           })
         }else{
           const profile=profileResult.data
-          const hasBasicProfile=Boolean(profile?.first_name&&profile?.last_name)
           const hasActivity=(groupsResult.count??0)>0||(enrollmentsResult.count??0)>0||Boolean(profile?.bio)
-          if(hasBasicProfile&&!hasActivity)redirect(`/start?welcome=1${lang==='es'?'&lang=es':''}`)
+          if(!hasActivity)redirect(`/start?welcome=1${lang==='es'?'&lang=es':''}`)
         }
       }
     }
