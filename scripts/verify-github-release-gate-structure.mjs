@@ -12,6 +12,7 @@ const requiredTrackedSteps = [
   ['production_hold', 'PRODUCTION_HOLD'],
   ['dependency_sources', 'DEPENDENCY_SOURCES'],
   ['runtime_provenance', 'RUNTIME_PROVENANCE'],
+  ['package_scripts', 'PACKAGE_SCRIPTS'],
   ['install', 'INSTALL'],
   ['vulnerability_audit', 'VULNERABILITY_AUDIT'],
   ['tests', 'TESTS'],
@@ -129,9 +130,24 @@ for (const file of workflowFiles) {
     }
   }
 
+  const packageScriptsBlock = blocks.find((block) => /^\s{6}- name:\s*Release package-script guard\s*$/m.test(block));
+  if (!packageScriptsBlock) {
+    fail('missing Release package-script guard step');
+  } else {
+    if (!/^\s{8}id:\s*package_scripts\s*$/m.test(packageScriptsBlock)) {
+      fail("Release package-script guard must use id 'package_scripts'");
+    }
+    if (!/^\s{8}run:\s*node scripts\/verify-release-package-scripts\.mjs\s*$/m.test(packageScriptsBlock)) {
+      fail('Release package-script guard must execute scripts/verify-release-package-scripts.mjs');
+    }
+  }
+
   const installBlock = blocks.find((block) => /^\s{6}- name:\s*Install dependencies\s*$/m.test(block));
   if (!installBlock || blocks.indexOf(runtimeBlock) > blocks.indexOf(installBlock)) {
     fail('Runtime provenance guard must run before dependency installation');
+  }
+  if (!installBlock || blocks.indexOf(packageScriptsBlock) > blocks.indexOf(installBlock)) {
+    fail('Release package-script guard must run before dependency installation');
   }
 
   const auditBlock = blocks.find((block) => /^\s{6}- name:\s*Production dependency vulnerability audit\s*$/m.test(block));
@@ -244,6 +260,9 @@ for (const file of workflowFiles) {
   if (!/if \[ "\$RELEASE_GATE" = success \]; then/.test(publishJob)) {
     fail('publish-statuses overall result must come from the exact final RELEASE_GATE outcome');
   }
+  if (!/publish package-scripts "\$PACKAGE_SCRIPTS"/.test(publishJob)) {
+    fail('publish-statuses must publish the release package-script guard result');
+  }
   if (!/context='kingdom-network\/release-gate'/.test(publishJob)) {
     fail('publish-statuses must publish the canonical kingdom-network/release-gate context');
   }
@@ -256,5 +275,5 @@ for (const file of workflowFiles) {
 if (!foundReleaseWorkflow) fail('could not find workflow named Kingdom Network Build');
 
 if (!process.exitCode) {
-  console.log('Kingdom Network release-gate structure is fail-closed, the GitHub-hosted Ubuntu runner and Node/npm toolchain are exact-version pinned, production dependency vulnerability scanning is tracked and visible, npm registry/user config are pinned, stage failures are individually visible, PR-visible under the canonical required-check name, deterministic, lifecycle-script-free during install, time-bounded, and the canonical release status is tied to the exact final enforcement outcome.');
+  console.log('Kingdom Network release-gate structure is fail-closed, the GitHub-hosted Ubuntu runner and Node/npm toolchain are exact-version pinned, production dependency vulnerability scanning and package-script integrity are tracked and visible, npm registry/user config are pinned, stage failures are individually visible, PR-visible under the canonical required-check name, deterministic, lifecycle-script-free during install, time-bounded, and the canonical release status is tied to the exact final enforcement outcome.');
 }
