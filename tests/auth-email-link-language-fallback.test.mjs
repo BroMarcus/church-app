@@ -28,6 +28,22 @@ test('email-link routes resolve language before handing users to auth recovery a
   assert.match(confirm,/const lang=resolveRequestLanguage\(request,requestUrl\)/)
 })
 
+test('verification and temporary-link recovery also use server language fallback on direct entry',async()=>{
+  const [verifyPage,unavailablePage]=await Promise.all([
+    read('src/app/auth/verify/page.tsx'),
+    read('src/app/auth/link-unavailable/page.tsx')
+  ])
+
+  for(const source of [verifyPage,unavailablePage]){
+    assert.match(source,/import \{ headers \} from 'next\/headers'/)
+    assert.match(source,/resolveLanguagePreference/)
+    assert.match(source,/requestHeaders\.get\('accept-language'\)/)
+    assert.doesNotMatch(source,/params\.lang==='es'\?'es':'en'/)
+  }
+  assert.match(verifyPage,/type="hidden" name="lang" value=\{lang\}/)
+  assert.match(unavailablePage,/\/login\?lang=\$\{lang\}&mode=signin/)
+})
+
 test('email-link language remains explicit in downstream redirects after fallback is resolved',async()=>{
   const [callback,confirm]=await Promise.all([
     read('src/app/auth/callback/route.ts'),
