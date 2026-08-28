@@ -25,13 +25,17 @@ test('runtime provenance guard pins reviewed Node, npm, registry, user config, a
   assert.match(guard, /allowedReleaseEvents = new Set\(\['pull_request', 'push', 'workflow_dispatch'\]\)/);
   assert.match(guard, /checked-out commit must equal GITHUB_SHA/);
   assert.match(guard, /release gate checkout must be clean before dependency installation/);
+  assert.match(guard, /expectedRef = `refs\/pull\/\$\{prNumber\}\/merge`/);
+  assert.match(guard, /GITHUB_BASE_REF must match the pull-request base branch/);
   assert.match(guard, /run\('git', \['cat-file', '-p', 'HEAD'\]\)/);
   assert.match(guard, /actions\/checkout intentionally uses a shallow clone by default/);
+  assert.match(guard, /GitHub may refresh the synthetic merge against a newer base-tip SHA/);
   assert.match(guard, /pull-request checkout must be GitHub's two-parent test merge/);
-  assert.match(guard, /first parent must equal event base SHA/);
   assert.match(guard, /second parent must equal event head SHA/);
+  assert.match(guard, /base snapshot must be distinct from the PR head/);
+  assert.doesNotMatch(guard, /first parent must equal event base SHA/);
   assert.match(guard, /reviewed npm registry\/user-config boundary/);
-  assert.match(guard, /exact GitHub checkout state represented by the workflow event/);
+  assert.match(guard, /exact GitHub checkout and pull-request merge state represented by the workflow event/);
 });
 
 test('release workflow executes runtime provenance before dependency installation with immutable npm config', async () => {
