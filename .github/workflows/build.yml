@@ -30,6 +30,7 @@ jobs:
       production_hold: ${{ steps.production_hold.outcome }}
       dependency_sources: ${{ steps.dependency_sources.outcome }}
       runtime_provenance: ${{ steps.runtime_provenance.outcome }}
+      package_scripts: ${{ steps.package_scripts.outcome }}
       install: ${{ steps.install.outcome }}
       vulnerability_audit: ${{ steps.vulnerability_audit.outcome }}
       tests: ${{ steps.tests.outcome }}
@@ -75,6 +76,10 @@ jobs:
         id: runtime_provenance
         continue-on-error: true
         run: node scripts/verify-runtime-provenance.mjs
+      - name: Release package-script guard
+        id: package_scripts
+        continue-on-error: true
+        run: node scripts/verify-release-package-scripts.mjs
       - name: Install dependencies
         id: install
         continue-on-error: true
@@ -134,6 +139,11 @@ jobs:
         env:
           OUTCOME: ${{ steps.runtime_provenance.outcome }}
         run: test "$OUTCOME" = success
+      - name: Assert package_scripts outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.package_scripts.outcome }}
+        run: test "$OUTCOME" = success
       - name: Assert install outcome
         if: always()
         env:
@@ -170,17 +180,18 @@ jobs:
           PRODUCTION_HOLD: ${{ steps.production_hold.outcome }}
           DEPENDENCY_SOURCES: ${{ steps.dependency_sources.outcome }}
           RUNTIME_PROVENANCE: ${{ steps.runtime_provenance.outcome }}
+          PACKAGE_SCRIPTS: ${{ steps.package_scripts.outcome }}
           INSTALL: ${{ steps.install.outcome }}
           VULNERABILITY_AUDIT: ${{ steps.vulnerability_audit.outcome }}
           TESTS: ${{ steps.tests.outcome }}
           LINT: ${{ steps.lint.outcome }}
           BUILD: ${{ steps.build.outcome }}
         run: |
-          if [ "$ACTION_PINS" = success ] && [ "$WORKFLOW_PERMISSIONS" = success ] && [ "$WORKFLOW_TRIGGERS" = success ] && [ "$RELEASE_STRUCTURE" = success ] && [ "$PRODUCTION_HOLD" = success ] && [ "$DEPENDENCY_SOURCES" = success ] && [ "$RUNTIME_PROVENANCE" = success ] && [ "$INSTALL" = success ] && [ "$VULNERABILITY_AUDIT" = success ] && [ "$TESTS" = success ] && [ "$LINT" = success ] && [ "$BUILD" = success ]; then
+          if [ "$ACTION_PINS" = success ] && [ "$WORKFLOW_PERMISSIONS" = success ] && [ "$WORKFLOW_TRIGGERS" = success ] && [ "$RELEASE_STRUCTURE" = success ] && [ "$PRODUCTION_HOLD" = success ] && [ "$DEPENDENCY_SOURCES" = success ] && [ "$RUNTIME_PROVENANCE" = success ] && [ "$PACKAGE_SCRIPTS" = success ] && [ "$INSTALL" = success ] && [ "$VULNERABILITY_AUDIT" = success ] && [ "$TESTS" = success ] && [ "$LINT" = success ] && [ "$BUILD" = success ]; then
             echo 'Kingdom Network release gate passed.'
             exit 0
           fi
-          echo "Kingdom Network release gate failed: pins=${ACTION_PINS}, permissions=${WORKFLOW_PERMISSIONS}, triggers=${WORKFLOW_TRIGGERS}, structure=${RELEASE_STRUCTURE}, hold=${PRODUCTION_HOLD}, dependencies=${DEPENDENCY_SOURCES}, runtime=${RUNTIME_PROVENANCE}, install=${INSTALL}, audit=${VULNERABILITY_AUDIT}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
+          echo "Kingdom Network release gate failed: pins=${ACTION_PINS}, permissions=${WORKFLOW_PERMISSIONS}, triggers=${WORKFLOW_TRIGGERS}, structure=${RELEASE_STRUCTURE}, hold=${PRODUCTION_HOLD}, dependencies=${DEPENDENCY_SOURCES}, runtime=${RUNTIME_PROVENANCE}, package-scripts=${PACKAGE_SCRIPTS}, install=${INSTALL}, audit=${VULNERABILITY_AUDIT}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
           exit 1
 
   publish-statuses:
@@ -200,6 +211,7 @@ jobs:
       PRODUCTION_HOLD: ${{ needs.build.outputs.production_hold }}
       DEPENDENCY_SOURCES: ${{ needs.build.outputs.dependency_sources }}
       RUNTIME_PROVENANCE: ${{ needs.build.outputs.runtime_provenance }}
+      PACKAGE_SCRIPTS: ${{ needs.build.outputs.package_scripts }}
       INSTALL: ${{ needs.build.outputs.install }}
       VULNERABILITY_AUDIT: ${{ needs.build.outputs.vulnerability_audit }}
       TESTS: ${{ needs.build.outputs.tests }}
@@ -230,6 +242,7 @@ jobs:
           publish production-hold "$PRODUCTION_HOLD"
           publish dependency-sources "$DEPENDENCY_SOURCES"
           publish runtime-provenance "$RUNTIME_PROVENANCE"
+          publish package-scripts "$PACKAGE_SCRIPTS"
           publish install "$INSTALL"
           publish dependency-audit "$VULNERABILITY_AUDIT"
           publish security-tests "$TESTS"
@@ -240,7 +253,7 @@ jobs:
             description='final fail-closed release gate passed'
           else
             overall=failure
-            description="final release gate=${RELEASE_GATE}; pins=${ACTION_PINS}, permissions=${WORKFLOW_PERMISSIONS}, triggers=${WORKFLOW_TRIGGERS}, structure=${RELEASE_STRUCTURE}, hold=${PRODUCTION_HOLD}, dependencies=${DEPENDENCY_SOURCES}, runtime=${RUNTIME_PROVENANCE}, install=${INSTALL}, audit=${VULNERABILITY_AUDIT}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
+            description="final release gate=${RELEASE_GATE}; pins=${ACTION_PINS}, permissions=${WORKFLOW_PERMISSIONS}, triggers=${WORKFLOW_TRIGGERS}, structure=${RELEASE_STRUCTURE}, hold=${PRODUCTION_HOLD}, dependencies=${DEPENDENCY_SOURCES}, runtime=${RUNTIME_PROVENANCE}, package-scripts=${PACKAGE_SCRIPTS}, install=${INSTALL}, audit=${VULNERABILITY_AUDIT}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
           fi
           gh api --method POST \
             -H "Accept: application/vnd.github+json" \
