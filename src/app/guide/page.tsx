@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { Church,Compass,FileUp,GraduationCap,HandHeart,Languages,MessageSquareWarning,Megaphone,Search,Sparkles,Users,Wrench } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
@@ -40,6 +41,7 @@ const diagnosticCode=(error:unknown,fallback:string)=>{
   if(error instanceof Error)return boundedCode(error.name)
   return boundedCode(fallback)
 }
+const prefersSpanish=(acceptLanguage:string|null)=>/^\s*es(?:-|_|,|;|$)/i.test(acceptLanguage||'')
 const authority=(r:any)=>r.official_source?'official organization':lower(r.source_scope||'local_church')
 const status=(r:any)=>lower(r.archive_status||'current')
 const authorityScore=(v:string)=>v.includes('official')||v.includes('organization')?35:v.includes('district')?28:v.includes('local')||v.includes('church')?20:v.includes('ministry')?12:v.includes('group')?8:5
@@ -61,7 +63,9 @@ const languageScore=(resourceLanguage:unknown,lang:'en'|'es')=>{
 
 export default async function GuidePage({searchParams}:{searchParams:Promise<{q?:string;lang?:string}>}){
   const query=await searchParams
-  const requestedLang: 'en'|'es'=query.lang==='es'?'es':'en'
+  const requestHeaders=await headers()
+  const browserLang:'en'|'es'=prefersSpanish(requestHeaders.get('accept-language'))?'es':'en'
+  const requestedLang:'en'|'es'=query.lang==='es'?'es':query.lang==='en'?'en':browserLang
   let supabase
   try{supabase=await createClient()}
   catch(error){
@@ -77,8 +81,8 @@ export default async function GuidePage({searchParams}:{searchParams:Promise<{q?
     return <main className="shell"><section className="card guide-panel" style={{marginTop:24}}><div className="pill">KINGDOM GUIDE</div><h1>{t.accountUnavailable}</h1><p className="muted">{t.accountBody}</p><div className="row"><Link className="btn" href={withLang('/guide')}>{t.retryGuide}</Link><Link className="ghost" href={withLang('/')}>{t.home}</Link><Link className="ghost" href={withLang('/feedback')}>{t.feedbackCta}</Link></div></section></main>
   }
   const {data:{user},error:authError}=authResult,userId=user?.id
-  const preferred=user?.user_metadata?.preferred_language==='es'?'es':'en'
-  const lang: 'en'|'es'=query.lang==='es'?'es':query.lang==='en'?'en':preferred,t=copy[lang],q=String(query.q??'').trim().slice(0,160),needle=q.toLowerCase()
+  const preferred=user?.user_metadata?.preferred_language==='es'?'es':user?.user_metadata?.preferred_language==='en'?'en':null
+  const lang:'en'|'es'=query.lang==='es'?'es':query.lang==='en'?'en':preferred??browserLang,t=copy[lang],q=String(query.q??'').trim().slice(0,160),needle=q.toLowerCase()
   const withLang=(href:string)=>{const join=href.includes('?')?'&':'?';return lang==='es'?`${href}${join}lang=es`:href}
   if(authError){
     console.error('Kingdom Guide auth verification failed',{code:boundedCode(authError.code)})
