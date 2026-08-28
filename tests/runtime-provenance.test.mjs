@@ -25,9 +25,12 @@ test('runtime provenance guard pins reviewed Node, npm, registry, user config, a
   assert.match(guard, /allowedReleaseEvents = new Set\(\['pull_request', 'push', 'workflow_dispatch'\]\)/);
   assert.match(guard, /checked-out commit must equal GITHUB_SHA/);
   assert.match(guard, /release gate checkout must be clean before dependency installation/);
+  assert.match(guard, /run\('git', \['cat-file', '-p', 'HEAD'\]\)/);
+  assert.match(guard, /actions\/checkout intentionally uses a shallow clone by default/);
   assert.match(guard, /pull-request checkout must be GitHub's two-parent test merge/);
   assert.match(guard, /first parent must equal event base SHA/);
   assert.match(guard, /second parent must equal event head SHA/);
+  assert.match(guard, /reviewed npm registry\/user-config boundary/);
   assert.match(guard, /exact GitHub checkout state represented by the workflow event/);
 });
 
