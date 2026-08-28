@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
+import { resolveLanguagePreference } from '@/lib/request-language'
 
 const INVITE_ID_PATTERN=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -44,8 +46,8 @@ const copy={
 } as const
 
 export default async function AuthLinkUnavailablePage({searchParams}:{searchParams:Promise<{lang?:string;invite?:string;next?:string}>}){
-  const params=await searchParams
-  const lang=params.lang==='es'?'es':'en'
+  const [params,requestHeaders]=await Promise.all([searchParams,headers()])
+  const lang=resolveLanguagePreference(params.lang,requestHeaders.get('accept-language'))
   const t=copy[lang]
   const inviteId=safeInviteId(params.invite)
   const joinNext=safeJoinNext(params.next)
