@@ -253,7 +253,7 @@ jobs:
             description='final fail-closed release gate passed'
           else
             overall=failure
-            description="final release gate=${RELEASE_GATE}; pins=${ACTION_PINS}, permissions=${WORKFLOW_PERMISSIONS}, triggers=${WORKFLOW_TRIGGERS}, structure=${RELEASE_STRUCTURE}, hold=${PRODUCTION_HOLD}, dependencies=${DEPENDENCY_SOURCES}, runtime=${RUNTIME_PROVENANCE}, package-scripts=${PACKAGE_SCRIPTS}, install=${INSTALL}, audit=${VULNERABILITY_AUDIT}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
+            description='final fail-closed release gate failed; inspect workflow run'
           fi
           gh api --method POST \
             -H "Accept: application/vnd.github+json" \
