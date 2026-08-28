@@ -28,7 +28,7 @@ test('email-link routes resolve language before handing users to auth recovery a
   assert.match(confirm,/const lang=resolveRequestLanguage\(request,requestUrl\)/)
 })
 
-test('verification and temporary-link recovery also use server language fallback on direct entry',async()=>{
+test('verification and temporary-link recovery use server language fallback on direct entry',async()=>{
   const [verifyPage,unavailablePage]=await Promise.all([
     read('src/app/auth/verify/page.tsx'),
     read('src/app/auth/link-unavailable/page.tsx')
@@ -42,6 +42,22 @@ test('verification and temporary-link recovery also use server language fallback
   }
   assert.match(verifyPage,/type="hidden" name="lang" value=\{lang\}/)
   assert.match(unavailablePage,/\/login\?lang=\$\{lang\}&mode=signin/)
+})
+
+test('email-link error boundaries preserve explicit language and otherwise use the phone language',async()=>{
+  const [verifyError,unavailableError]=await Promise.all([
+    read('src/app/auth/verify/error.tsx'),
+    read('src/app/auth/link-unavailable/error.tsx')
+  ])
+
+  for(const source of [verifyError,unavailableError]){
+    assert.match(source,/const languages=navigator\.languages\?\.length\?navigator\.languages:\[navigator\.language\]/)
+    assert.match(source,/tag==='es'\|\|tag\.startsWith\('es-'\)/)
+    assert.match(source,/tag==='en'\|\|tag\.startsWith\('en-'\)/)
+    assert.match(source,/explicitLang==='es'\|\|explicitLang==='en'\?explicitLang:browserLanguage\(\)/)
+    assert.doesNotMatch(source,/params\.get\('lang'\)==='es'\?'es':'en'/)
+    assert.match(source,/\/login\?lang=\$\{lang\}&mode=signin/)
+  }
 })
 
 test('email-link language remains explicit in downstream redirects after fallback is resolved',async()=>{
