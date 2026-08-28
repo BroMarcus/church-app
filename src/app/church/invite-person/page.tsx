@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { MailPlus,ShieldCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
@@ -20,6 +21,7 @@ const messages={
 } as const
 
 type Lang='en'|'es'
+const prefersSpanish=(acceptLanguage:string|null)=>/^\s*es(?:-|_|,|;|$)/i.test(acceptLanguage||'')
 
 function AccessRecovery({lang,kind}:{lang:Lang;kind:'unavailable'|'unauthorized'}){
   const es=lang==='es'
@@ -27,7 +29,11 @@ function AccessRecovery({lang,kind}:{lang:Lang;kind:'unavailable'|'unauthorized'
 }
 
 export default async function InvitePersonPage({searchParams}:{searchParams:Promise<{lang?:string;created?:string;status?:string}>}){
-  const params=await searchParams,es=params.lang==='es',lang:Lang=es?'es':'en'
+  const params=await searchParams
+  const requestHeaders=await headers()
+  const browserLang:Lang=prefersSpanish(requestHeaders.get('accept-language'))?'es':'en'
+  const lang:Lang=params.lang==='es'?'es':params.lang==='en'?'en':browserLang
+  const es=lang==='es'
   const l=(p:string)=>`${p}${p.includes('?')?'&':'?'}lang=${lang}`
   let supabase
   try{supabase=await createClient()}
