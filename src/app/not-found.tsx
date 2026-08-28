@@ -3,17 +3,35 @@
 import Link from 'next/link'
 import {useEffect,useState} from 'react'
 
+const resolveRecoveryLanguage=(): 'en'|'es' => {
+  const requested=new URLSearchParams(window.location.search).get('lang')
+  if(requested==='es')return 'es'
+  if(requested==='en')return 'en'
+  if(document.documentElement.lang.toLowerCase().startsWith('es'))return 'es'
+  const browserLanguages=Array.isArray(navigator.languages)&&navigator.languages.length?navigator.languages:[navigator.language]
+  return browserLanguages.some(value=>String(value||'').toLowerCase().startsWith('es'))?'es':'en'
+}
+
 export default function NotFound(){
   const [lang,setLang]=useState<'en'|'es'>('en')
 
   useEffect(()=>{
-    setLang(new URLSearchParams(window.location.search).get('lang')==='es'?'es':'en')
+    const selected=resolveRecoveryLanguage()
+    setLang(selected)
+    document.documentElement.lang=selected
   },[])
 
   const es=lang==='es'
   const t=(en:string,sp:string)=>es?sp:en
-  const home=es?'/?lang=es':'/'
-  const signIn=es?'/login?mode=signin&lang=es':'/login?mode=signin'
+  const home=`/?lang=${lang}`
+  const signIn=`/login?mode=signin&lang=${lang}`
+  const selectLanguage=(next:'en'|'es')=>{
+    setLang(next)
+    document.documentElement.lang=next
+    const url=new URL(window.location.href)
+    url.searchParams.set('lang',next)
+    window.history.replaceState(window.history.state,'',`${url.pathname}${url.search}${url.hash}`)
+  }
 
   return <main style={{maxWidth:760,margin:'0 auto',padding:'28px 18px 80px'}}>
     <div className="card" style={{padding:24}}>
@@ -26,8 +44,8 @@ export default function NotFound(){
         <Link className="ghost" href={signIn}>{t('Sign in','Iniciar sesión')}</Link>
       </div>
       <div className="row" style={{gap:8,marginTop:18,flexWrap:'wrap'}} aria-label={t('Language','Idioma')}>
-        <button type="button" onClick={()=>setLang('en')} aria-pressed={!es} className="ghost">English</button>
-        <button type="button" onClick={()=>setLang('es')} aria-pressed={es} className="ghost">Español</button>
+        <button type="button" onClick={()=>selectLanguage('en')} aria-pressed={!es} className="ghost">English</button>
+        <button type="button" onClick={()=>selectLanguage('es')} aria-pressed={es} className="ghost">Español</button>
       </div>
     </div>
   </main>
