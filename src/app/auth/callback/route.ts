@@ -1,5 +1,6 @@
 import { NextRequest,NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { resolveRequestLanguage } from '@/lib/request-language'
 
 const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
 const boundedCode=(value:unknown)=>String(value||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,80)||'unknown'
@@ -41,7 +42,7 @@ function exchangeFailureCode(error:unknown){
 export async function GET(request:NextRequest){
   const url=new URL(request.url)
   const code=url.searchParams.get('code')
-  const lang=url.searchParams.get('lang')==='es'?'es':'en'
+  const lang=resolveRequestLanguage(request,url)
   const rawMode=url.searchParams.get('mode')
   const mode=rawMode==='signup'||rawMode==='recovery'?rawMode:null
   const rawInvite=url.searchParams.get('invite')
