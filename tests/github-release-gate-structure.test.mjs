@@ -17,6 +17,7 @@ const tracked = [
   ['production_hold', 'PRODUCTION_HOLD'],
   ['dependency_sources', 'DEPENDENCY_SOURCES'],
   ['runtime_provenance', 'RUNTIME_PROVENANCE'],
+  ['package_scripts', 'PACKAGE_SCRIPTS'],
   ['install', 'INSTALL'],
   ['vulnerability_audit', 'VULNERABILITY_AUDIT'],
   ['tests', 'TESTS'],
@@ -24,7 +25,7 @@ const tracked = [
   ['build', 'BUILD'],
 ];
 
-test('release workflow keeps a canonical PR-visible gate, exact GitHub runner/runtime, deterministic npm provenance, bounded jobs, and tracked production dependency audit', async () => {
+test('release workflow keeps a canonical PR-visible gate, exact GitHub runner/runtime, deterministic npm provenance, bounded jobs, and tracked package/dependency integrity guards', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
   const runnerLines = workflow.match(/^\s{4}runs-on:\s*ubuntu-24\.04\s*$/gm) || [];
   assert.equal(runnerLines.length, 2, 'build and status publisher must use the exact approved GitHub-hosted runner image');
@@ -43,9 +44,17 @@ test('release workflow keeps a canonical PR-visible gate, exact GitHub runner/ru
     workflow,
     /- name:\s*Runtime provenance guard\n\s*id:\s*runtime_provenance\n\s*continue-on-error:\s*true\n\s*run:\s*node scripts\/verify-runtime-provenance\.mjs/,
   );
+  assert.match(
+    workflow,
+    /- name:\s*Release package-script guard\n\s*id:\s*package_scripts\n\s*continue-on-error:\s*true\n\s*run:\s*node scripts\/verify-release-package-scripts\.mjs/,
+  );
   assert.ok(
     workflow.indexOf('Runtime provenance guard') < workflow.indexOf('Install dependencies'),
     'runtime provenance must be checked before dependency installation',
+  );
+  assert.ok(
+    workflow.indexOf('Release package-script guard') < workflow.indexOf('Install dependencies'),
+    'package-script integrity must be checked before dependency installation',
   );
   assert.match(
     workflow,
@@ -103,17 +112,21 @@ test('every intentionally fail-open release step feeds the final fail-closed gat
   );
   assert.match(publishJob, /if \[ "\$RELEASE_GATE" = success \]; then/);
   assert.match(publishJob, /publish runtime-provenance "\$RUNTIME_PROVENANCE"/);
+  assert.match(publishJob, /publish package-scripts "\$PACKAGE_SCRIPTS"/);
   assert.match(publishJob, /publish dependency-audit "\$VULNERABILITY_AUDIT"/);
   assert.match(publishJob, /context='kingdom-network\/release-gate'/);
 });
 
-test('release structure guard protects exact runtime provenance, dependency audit visibility, final provenance, runner trust, and publisher isolation', async () => {
+test('release structure guard protects package-script integrity, exact runtime provenance, dependency audit visibility, final provenance, runner trust, and publisher isolation', async () => {
   const guard = await readFile(guardPath, 'utf8');
   assert.match(guard, /canonical kingdom-network\/release-gate PR check name/);
   assert.match(guard, /approved GitHub-hosted ubuntu-24\.04 runner image/);
   assert.match(guard, /exact Node 22\.23\.2/);
   assert.match(guard, /Runtime provenance guard/);
   assert.match(guard, /verify-runtime-provenance\.mjs/);
+  assert.match(guard, /Release package-script guard/);
+  assert.match(guard, /verify-release-package-scripts\.mjs/);
+  assert.match(guard, /package-script guard must run before dependency installation/i);
   assert.match(guard, /must run before dependency installation/);
   assert.match(guard, /self-hosted, expression-selected, or runner-matrix execution/);
   assert.match(guard, /NPM_CONFIG_REGISTRY/);
@@ -122,6 +135,7 @@ test('release structure guard protects exact runtime provenance, dependency audi
   assert.match(guard, /untracked continue-on-error step/);
   assert.match(guard, /DEPENDENCY_SOURCES/);
   assert.match(guard, /RUNTIME_PROVENANCE/);
+  assert.match(guard, /PACKAGE_SCRIPTS/);
   assert.match(guard, /VULNERABILITY_AUDIT/);
   assert.match(guard, /Production dependency vulnerability audit must use id 'vulnerability_audit'/);
   assert.match(guard, /must block high\/critical production dependency advisories/);
@@ -137,12 +151,14 @@ test('release structure guard protects exact runtime provenance, dependency audi
   assert.match(guard, /publish-statuses must remain push-only/);
   assert.match(guard, /publish-statuses must receive RELEASE_GATE from needs\.build\.outputs\.release_gate/);
   assert.match(guard, /publish-statuses overall result must come from the exact final RELEASE_GATE outcome/);
+  assert.match(guard, /release package-script guard result/);
   assert.match(guard, /canonical kingdom-network\/release-gate context/);
   assert.match(guard, /publish-statuses must not checkout code or execute npm install\/test\/build commands/);
   assert.match(guard, /timeout-minutes between 1 and 20/);
   assert.match(guard, /npm ci --ignore-scripts --no-audit --no-fund/);
   assert.match(guard, /GitHub-hosted Ubuntu runner and Node\/npm toolchain are exact-version pinned/);
-  assert.match(guard, /production dependency vulnerability scanning is tracked and visible/);
+  assert.match(guard, /package-script integrity are tracked and visible/);
+  assert.match(guard, /production dependency vulnerability scanning and package-script integrity are tracked and visible/);
   assert.match(guard, /npm registry\/user config are pinned/);
   assert.match(guard, /stage failures are individually visible/);
   assert.match(guard, /PR-visible under the canonical required-check name/);
