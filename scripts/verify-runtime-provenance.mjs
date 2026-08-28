@@ -78,16 +78,27 @@ function verifyCheckoutProvenance() {
     return;
   }
 
+  const prNumber = event?.pull_request?.number;
   const headSha = event?.pull_request?.head?.sha || '';
-  const baseSha = event?.pull_request?.base?.sha || '';
-  if (!validSha(headSha) || !validSha(baseSha)) {
-    fail('pull-request event must provide exact 40-character head and base SHAs');
+  const baseRef = event?.pull_request?.base?.ref || '';
+  if (!Number.isInteger(prNumber) || prNumber < 1 || !validSha(headSha) || !baseRef) {
+    fail('pull-request event must provide a valid PR number, exact head SHA, and base branch');
     return;
   }
 
+  const expectedRef = `refs/pull/${prNumber}/merge`;
+  if (process.env.GITHUB_REF !== expectedRef) {
+    fail(`pull-request release gate must execute the GitHub merge ref ${expectedRef}; found ${process.env.GITHUB_REF || 'unset'}`);
+  }
+  if (process.env.GITHUB_BASE_REF !== baseRef) {
+    fail(`GITHUB_BASE_REF must match the pull-request base branch ${baseRef}; found ${process.env.GITHUB_BASE_REF || 'unset'}`);
+  }
+
   // actions/checkout intentionally uses a shallow clone by default. Reading the HEAD commit
-  // object itself preserves its parent headers even when the parent commit objects are not
-  // present locally, so provenance verification does not need a broader/history fetch.
+  // object itself preserves parent headers even when parent commit objects are not present.
+  // GitHub may refresh the synthetic merge against a newer base-tip SHA than the base SHA
+  // serialized in the triggering PR payload, so the authoritative tested base snapshot is the
+  // first parent of GITHUB_SHA. The exact PR head must remain the second parent.
   const commitObject = run('git', ['cat-file', '-p', 'HEAD']);
   const parents = commitObject
     .split('\n')
@@ -98,12 +109,12 @@ function verifyCheckoutProvenance() {
     return;
   }
 
-  const [firstParent, secondParent] = parents;
-  if (firstParent !== baseSha) {
-    fail(`pull-request test merge first parent must equal event base SHA ${baseSha}; found ${firstParent}`);
+  const [baseSnapshotSha, testedHeadSha] = parents;
+  if (testedHeadSha !== headSha) {
+    fail(`pull-request test merge second parent must equal event head SHA ${headSha}; found ${testedHeadSha}`);
   }
-  if (secondParent !== headSha) {
-    fail(`pull-request test merge second parent must equal event head SHA ${headSha}; found ${secondParent}`);
+  if (baseSnapshotSha === headSha) {
+    fail('pull-request test merge base snapshot must be distinct from the PR head');
   }
 }
 
@@ -152,7 +163,7 @@ if (failures.length) {
   console.error('Runtime provenance guard failed:');
   for (const failure of failures) console.error(`- ${failure}`);
   console.error(
-    'Production HOLD requires the release gate to use the reviewed npm registry/user-config boundary and Node/npm toolchain, plus the exact GitHub checkout state represented by the workflow event.',
+    'Production HOLD requires the release gate to use the reviewed npm registry/user-config boundary and Node/npm toolchain, plus the exact GitHub checkout and pull-request merge state represented by the workflow event.',
   );
   process.exit(1);
 }
