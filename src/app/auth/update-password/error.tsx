@@ -1,5 +1,6 @@
 'use client'
 
+import {useEffect,useState} from 'react'
 import {useSearchParams} from 'next/navigation'
 
 const INVITE_ID_PATTERN=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -25,7 +26,13 @@ const copy={
 
 export default function UpdatePasswordError({reset}:{reset:()=>void}){
   const params=useSearchParams()
-  const lang=params.get('lang')==='es'?'es':'en'
+  const explicitLang=params.get('lang')
+  const [browserLang,setBrowserLang]=useState<'en'|'es'>('en')
+  useEffect(()=>{
+    if(explicitLang==='en'||explicitLang==='es')return
+    if(typeof navigator!=='undefined'&&navigator.language.toLowerCase().startsWith('es'))setBrowserLang('es')
+  },[explicitLang])
+  const lang=explicitLang==='es'?'es':explicitLang==='en'?'en':browserLang
   const inviteId=safeInviteId(params.get('invite'))
   const joinNext=safeJoinNext(params.get('next'))
   const t=copy[lang]
