@@ -2,10 +2,16 @@
 
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
+import { useEffect,useState } from 'react'
+
+const prefersSpanish=(value:string|null|undefined)=>/^\s*es(?:-|_|,|;|$)/i.test(value||'')
 
 export default function ChurchLaunchError({reset}:{reset:()=>void}){
   const params=useSearchParams()
-  const es=params.get('lang')==='es'
+  const explicit=params.get('lang')
+  const [browserSpanish,setBrowserSpanish]=useState(false)
+  useEffect(()=>{setBrowserSpanish(prefersSpanish(navigator.language||navigator.languages?.[0]))},[])
+  const es=explicit==='es'||(explicit!=='en'&&browserSpanish)
   return <main style={{maxWidth:1040,margin:'0 auto',padding:'28px 18px 80px'}}>
     <div role="alert" style={{border:'1px solid #fecaca',borderRadius:18,padding:24,background:'#fff'}}>
       <div style={{fontSize:12,fontWeight:800,letterSpacing:'.08em',textTransform:'uppercase'}}>{es?'CONSTRUCTOR DE IGLESIA':'CHURCH BUILDER'}</div>
