@@ -1,7 +1,7 @@
 export default function LoginLoading(){
   return <main className="login-wrap" aria-busy="true" aria-live="polite">
     <div className="login card">
-      <div className="pill">KINGDOM NETWORK • PILOT</div>
+      <div className="pill">ONE KINGDOM • PILOT</div>
       <h1>Opening sign in…</h1>
       <p className="muted">Abriendo el inicio de sesión…</p>
       <div style={{display:'grid',gap:10,marginTop:18}}>
