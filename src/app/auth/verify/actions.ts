@@ -72,7 +72,7 @@ export async function verifyAuthLink(formData:FormData){
   const rawInviteId=String(formData.get('invite')??'')
   const inviteId=safeInviteId(rawInviteId)
   const joinNext=safeJoinDestination(rawNext)
-  const signupFallback=`/start?welcome=1${lang==='es'?'&lang=es':''}`
+  const signupFallback=`/start?welcome=1&lang=${lang}`
   const signupNext=safeSignupDestination(rawNext,signupFallback)
   const invitePart=inviteId?`&invite=${encodeURIComponent(inviteId)}`:''
   const loginBase=`/login?lang=${lang}&mode=signin${invitePart}${joinNext?`&next=${encodeURIComponent(joinNext)}`:''}`
@@ -170,7 +170,7 @@ export async function verifyAuthLink(formData:FormData){
 
   if(rawType==='email')redirect(signupNext)
   if(rawType==='invite')redirect(signupFallback)
-  if(rawType==='magiclink')redirect(joinNext||(lang==='es'?'/?lang=es':'/'))
+  if(rawType==='magiclink')redirect(joinNext||`/?lang=${lang}`)
   if(rawType==='email_change')redirect(`/account/security?lang=${lang}`)
 
   redirect(`${loginBase}&error_code=callback_incomplete`)
