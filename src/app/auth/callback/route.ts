@@ -47,7 +47,7 @@ export async function GET(request:NextRequest){
   const mode=rawMode==='signup'||rawMode==='recovery'?rawMode:null
   const rawInvite=url.searchParams.get('invite')
   const inviteId=safeInviteId(rawInvite)
-  const signupFallback=`/start?welcome=1${lang==='es'?'&lang=es':''}`
+  const signupFallback=`/start?welcome=1&lang=${lang}`
   const rawNext=url.searchParams.get('next')
   const joinNext=safeJoinDestination(rawNext)
   const signupNext=safeSignupDestination(rawNext,signupFallback)
