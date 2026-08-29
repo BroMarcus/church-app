@@ -14,7 +14,7 @@ const failureMessage=(lang:'en'|'es')=>lang==='es'
   : 'We could not safely save that step. Nothing was removed. Please try again.'
 
 export async function completeOnboarding(formData:FormData){
-  const lang:String=String(formData.get('lang')??'')
+  const lang=String(formData.get('lang')??'')
   const selectedLang:'en'|'es'=lang==='es'?'es':'en'
   let supabase
   try{supabase=await createClient()}
