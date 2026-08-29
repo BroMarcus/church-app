@@ -60,11 +60,12 @@ test('email-link error boundaries preserve explicit language and otherwise use t
   }
 })
 
-test('email-link language remains explicit in downstream redirects after fallback is resolved',async()=>{
-  const [callback,confirm,verifyAction]=await Promise.all([
+test('selected language remains explicit through confirmation, sign-in, signup, resend, and magic-link redirects',async()=>{
+  const [callback,confirm,verifyAction,loginActions]=await Promise.all([
     read('src/app/auth/callback/route.ts'),
     read('src/app/auth/confirm/route.ts'),
-    read('src/app/auth/verify/actions.ts')
+    read('src/app/auth/verify/actions.ts'),
+    read('src/app/login/actions.ts')
   ])
 
   assert.match(callback,/\/auth\/update-password\?lang=\$\{lang\}/)
@@ -79,4 +80,12 @@ test('email-link language remains explicit in downstream redirects after fallbac
   }
   assert.match(verifyAction,/rawType==='magiclink'\)redirect\(joinNext\|\|`\/\?lang=\$\{lang\}`\)/)
   assert.doesNotMatch(verifyAction,/rawType==='magiclink'\)redirect\(joinNext\|\|\(lang==='es'/)
+
+  assert.match(loginActions,/onboardingState===false\)redirect\(`\/start\?welcome=1&lang=\$\{lang\}`\)/)
+  assert.match(loginActions,/if\(!hasActivity\)redirect\(`\/start\?welcome=1&lang=\$\{lang\}`\)/)
+  assert.match(loginActions,/const startPath=`\/start\?welcome=1&lang=\$\{lang\}`/)
+  assert.match(loginActions,/const startPath=next\|\|`\/start\?welcome=1&lang=\$\{lang\}`/)
+  assert.match(loginActions,/redirect\(`\/\?lang=\$\{lang\}`\)/)
+  assert.doesNotMatch(loginActions,/welcome=1\$\{lang==='es'/)
+  assert.doesNotMatch(loginActions,/redirect\(lang==='es'\?'\/\?lang=es':'\/'\)/)
 })
