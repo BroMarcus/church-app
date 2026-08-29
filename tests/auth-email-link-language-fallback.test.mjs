@@ -61,9 +61,10 @@ test('email-link error boundaries preserve explicit language and otherwise use t
 })
 
 test('email-link language remains explicit in downstream redirects after fallback is resolved',async()=>{
-  const [callback,confirm]=await Promise.all([
+  const [callback,confirm,verifyAction]=await Promise.all([
     read('src/app/auth/callback/route.ts'),
-    read('src/app/auth/confirm/route.ts')
+    read('src/app/auth/confirm/route.ts'),
+    read('src/app/auth/verify/actions.ts')
   ])
 
   assert.match(callback,/\/auth\/update-password\?lang=\$\{lang\}/)
@@ -71,4 +72,11 @@ test('email-link language remains explicit in downstream redirects after fallbac
   assert.match(callback,/\/auth\/link-unavailable\?lang=\$\{lang\}/)
   assert.match(callback,/\/start\?lang=\$\{lang\}&message_code=joined_invite/)
   assert.match(confirm,/verifyUrl\.searchParams\.set\('lang',lang\)/)
+
+  for(const source of [callback,confirm,verifyAction]){
+    assert.match(source,/const signupFallback=`\/start\?welcome=1&lang=\$\{lang\}`/)
+    assert.doesNotMatch(source,/welcome=1\$\{lang==='es'/)
+  }
+  assert.match(verifyAction,/rawType==='magiclink'\)redirect\(joinNext\|\|`\/\?lang=\$\{lang\}`\)/)
+  assert.doesNotMatch(verifyAction,/rawType==='magiclink'\)redirect\(joinNext\|\|\(lang==='es'/)
 })
