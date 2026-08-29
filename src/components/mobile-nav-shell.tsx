@@ -27,7 +27,7 @@ export async function MobileNavShell(){
     canLeadGroups:isPrivileged||role==='group_leader'||manageGroups||leadOwnGroup,
     canManageTeams:isPrivileged||role==='ministry_leader'||role==='minister'||manageTeams,
     canManageLearning:isPrivileged||role==='minister'||manageLearning,
-    canManageOutreach:isPrivileged||role==='minister'||manageOutreach,
+    canManageOutreach:isPrivileged||manageOutreach,
     canManageCalendar:isPrivileged||role==='ministry_leader'||role==='minister'||manageCalendar,
     canViewLeadership:isPrivileged||viewLeadership,
     canManageChurch:isPrivileged,

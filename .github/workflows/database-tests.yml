@@ -1,0 +1,179 @@
+name: Supabase Migration Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/tests/**'
+      - '.github/workflows/database-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-migration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.115.0
+
+      - name: Show Supabase CLI version
+        run: supabase --version
+
+      - name: Initialize disposable local Supabase config
+        run: |
+          if [ ! -f supabase/config.toml ]; then
+            supabase init
+          fi
+
+      - name: Start pristine disposable Supabase database
+        run: |
+          # Kingdom Network's tracked migration folder begins after the original
+          # production baseline, so it cannot currently rebuild the whole app from
+          # zero. Keep that historical debt visible, but isolate Package 1: start a
+          # clean Supabase database with app migrations temporarily removed, then
+          # restore the files and load the CI-only pre-Package-1 contract fixture.
+          mkdir -p /tmp/kn-historical-migrations
+          mv supabase/migrations/*.sql /tmp/kn-historical-migrations/
+          supabase db start
+          mv /tmp/kn-historical-migrations/*.sql supabase/migrations/
+
+      - name: Load pre-Package-1 contract
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql 'postgresql://postgres:postgres@127.0.0.1:54322/postgres' \
+            -v ON_ERROR_STOP=1 \
+            -f supabase/tests/package_1_pre_migration_baseline.sql
+
+      - name: Apply Package 1 migrations in order
+        env:
+          PGPASSWORD: postgres
+        run: |
+          migrations=(
+            20260826180000_outreach_source_links_and_history.sql
+            20260826180500_harden_outreach_connection_reviews.sql
+            20260826181000_harden_outreach_source_link_lifecycle.sql
+            20260826181500_keep_outreach_followup_due_after_return.sql
+            20260826182000_scope_outreach_write_policies.sql
+            20260826182500_outreach_owner_and_public_group_privacy.sql
+            20260826183000_guard_public_outreach_intake.sql
+            20260826183500_connect_outreach_history_to_church_health.sql
+            20260826184000_guard_outreach_reassignment.sql
+            20260826184500_friendship_group_outreach_bridge.sql
+            20260826185000_group_report_guest_outreach_contract.sql
+            20260826185500_scope_outreach_by_group_history.sql
+          )
+          for migration in "${migrations[@]}"; do
+            echo "Applying ${migration}"
+            psql 'postgresql://postgres:postgres@127.0.0.1:54322/postgres' \
+              -v ON_ERROR_STOP=1 \
+              -f "supabase/migrations/${migration}"
+          done
+
+      - name: Verify Package 1 database contract
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql 'postgresql://postgres:postgres@127.0.0.1:54322/postgres' -v ON_ERROR_STOP=1 <<'SQL'
+          do $$
+          begin
+            if to_regclass('public.outreach_source_links') is null then
+              raise exception 'outreach_source_links is missing';
+            end if;
+            if to_regclass('public.outreach_connection_receipts') is null then
+              raise exception 'outreach_connection_receipts is missing';
+            end if;
+            if to_regclass('public.outreach_connection_reviews') is null then
+              raise exception 'outreach_connection_reviews is missing';
+            end if;
+            if not exists (
+              select 1 from information_schema.columns
+              where table_schema='public' and table_name='outreach_contacts' and column_name='first_steps_interest'
+            ) then
+              raise exception 'outreach_contacts.first_steps_interest is missing';
+            end if;
+            if not exists (
+              select 1 from information_schema.columns
+              where table_schema='public' and table_name='outreach_interactions' and column_name='source_key'
+            ) then
+              raise exception 'outreach_interactions.source_key is missing';
+            end if;
+            if not exists (
+              select 1 from information_schema.columns
+              where table_schema='public' and table_name='outreach_interactions' and column_name='visit_ordinal'
+            ) then
+              raise exception 'outreach_interactions.visit_ordinal is missing';
+            end if;
+            if to_regprocedure('public.resolve_outreach_source_link(text)') is null then
+              raise exception 'resolve_outreach_source_link is missing';
+            end if;
+            if to_regprocedure('public.submit_outreach_connection(text,uuid,text,text,text,text,text,boolean,boolean,boolean,boolean,text)') is null then
+              raise exception 'submit_outreach_connection is missing';
+            end if;
+            if to_regprocedure('public.resolve_outreach_connection_review(uuid,uuid,boolean)') is null then
+              raise exception 'resolve_outreach_connection_review is missing';
+            end if;
+            if to_regprocedure('public.record_friendship_group_outreach_visit(text,uuid,text,text,text,text,text,smallint,date)') is null then
+              raise exception 'record_friendship_group_outreach_visit is missing';
+            end if;
+            if to_regprocedure('public.record_group_report_guest_outreach(uuid,smallint,text,text,text,text,text)') is null then
+              raise exception 'record_group_report_guest_outreach is missing';
+            end if;
+            if to_regprocedure('private.can_operate_outreach_contact_group_history(uuid,uuid)') is null then
+              raise exception 'group-history scope helper is missing';
+            end if;
+            if not has_function_privilege('authenticated','private.can_operate_outreach_contact_group_history(uuid,uuid)','EXECUTE') then
+              raise exception 'authenticated role cannot execute group-history RLS helper';
+            end if;
+            if not exists (
+              select 1 from pg_policies
+              where schemaname='public' and tablename='outreach_contacts' and policyname='outreach_read'
+            ) then
+              raise exception 'outreach_read policy is missing';
+            end if;
+            if not exists (
+              select 1 from pg_policies
+              where schemaname='public' and tablename='outreach_contacts' and policyname='outreach_update'
+            ) then
+              raise exception 'outreach_update policy is missing';
+            end if;
+            if not exists (
+              select 1 from information_schema.triggers
+              where trigger_schema='public' and event_object_table='outreach_connection_receipts' and trigger_name='trg_guard_outreach_connection_receipt'
+            ) then
+              raise exception 'public-intake request guard trigger is missing';
+            end if;
+            if not exists (
+              select 1 from information_schema.triggers
+              where trigger_schema='public' and event_object_table='outreach_contacts' and trigger_name='trg_validate_outreach_assignment'
+            ) then
+              raise exception 'Outreach assignment guard trigger is missing';
+            end if;
+          end
+          $$;
+          SQL
+
+      - name: Run Package 1 runtime RLS and integration proof
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql 'postgresql://postgres:postgres@127.0.0.1:54322/postgres' \
+            -v ON_ERROR_STOP=1 \
+            -f supabase/tests/package_1_outreach_runtime.sql
+
+      - name: Stop disposable local database
+        if: always()
+        run: supabase stop --no-backup || true
