@@ -9,7 +9,6 @@ on:
 
 permissions:
   contents: read
-  statuses: write
 
 concurrency:
   group: kingdom-network-build-${{ github.ref }}
@@ -17,21 +16,79 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    name: kingdom-network/release-gate
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
+    env:
+      NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
+      NPM_CONFIG_USERCONFIG: /dev/null
+    outputs:
+      action_pins: ${{ steps.action_pins.outcome }}
+      workflow_permissions: ${{ steps.workflow_permissions.outcome }}
+      workflow_triggers: ${{ steps.workflow_triggers.outcome }}
+      release_structure: ${{ steps.release_structure.outcome }}
+      production_hold: ${{ steps.production_hold.outcome }}
+      dependency_sources: ${{ steps.dependency_sources.outcome }}
+      runtime_provenance: ${{ steps.runtime_provenance.outcome }}
+      package_scripts: ${{ steps.package_scripts.outcome }}
+      install: ${{ steps.install.outcome }}
+      vulnerability_audit: ${{ steps.vulnerability_audit.outcome }}
+      tests: ${{ steps.tests.outcome }}
+      lint: ${{ steps.lint.outcome }}
+      build: ${{ steps.build.outcome }}
+      release_gate: ${{ steps.release_gate.outcome }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          node-version: 22
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.23.2
           cache: npm
           cache-dependency-path: package-lock.json
+      - name: GitHub Actions pin guard
+        id: action_pins
+        continue-on-error: true
+        run: node scripts/verify-github-actions-pins.mjs
+      - name: GitHub workflow permission guard
+        id: workflow_permissions
+        continue-on-error: true
+        run: node scripts/verify-github-workflow-permissions.mjs
+      - name: GitHub workflow trigger guard
+        id: workflow_triggers
+        continue-on-error: true
+        run: node scripts/verify-github-workflow-triggers.mjs
+      - name: GitHub release-gate structure guard
+        id: release_structure
+        continue-on-error: true
+        run: node scripts/verify-github-release-gate-structure.mjs
+      - name: Production HOLD guard
+        id: production_hold
+        continue-on-error: true
+        run: node scripts/verify-production-hold.mjs
+      - name: Dependency source provenance guard
+        id: dependency_sources
+        continue-on-error: true
+        run: node scripts/verify-dependency-sources.mjs
+      - name: Runtime provenance guard
+        id: runtime_provenance
+        continue-on-error: true
+        run: node scripts/verify-runtime-provenance.mjs
+      - name: Release package-script guard
+        id: package_scripts
+        continue-on-error: true
+        run: node scripts/verify-release-package-scripts.mjs
       - name: Install dependencies
         id: install
         continue-on-error: true
-        run: npm ci --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Production dependency vulnerability audit
+        id: vulnerability_audit
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high --no-fund
       - name: Security regression tests
         id: tests
         if: steps.install.outcome == 'success'
@@ -47,16 +104,125 @@ jobs:
         if: steps.install.outcome == 'success'
         continue-on-error: true
         run: npm run build
-      - name: Publish release-gate statuses
-        if: always() && github.event_name == 'push'
+      - name: Assert action_pins outcome
+        if: always()
         env:
-          GH_TOKEN: ${{ github.token }}
+          OUTCOME: ${{ steps.action_pins.outcome }}
+        run: test "$OUTCOME" = success
+      - name: Assert workflow_permissions outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.workflow_permissions.outcome }}
+        run: test "$OUTCOME" = success
+      - name: Assert workflow_triggers outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.workflow_triggers.outcome }}
+        run: test "$OUTCOME" = success
+      - name: Assert release_structure outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.release_structure.outcome }}
+        run: test "$OUTCOME" = success
+      - name: Assert production_hold outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.production_hold.outcome }}
+        run: test "$OUTCOME" = success
+      - name: Assert dependency_sources outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.dependency_sources.outcome }}
+        run: test "$OUTCOME" = success
+      - name: Assert runtime_provenance outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.runtime_provenance.outcome }}
+        run: test "$OUTCOME" = success
+      - name: Assert package_scripts outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.package_scripts.outcome }}
+        run: test "$OUTCOME" = success
+      - name: Assert install outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.install.outcome }}
+        run: test "$OUTCOME" = success
+      - name: Assert vulnerability_audit outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.vulnerability_audit.outcome }}
+        run: test "$OUTCOME" = success
+      - name: Assert tests outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.tests.outcome }}
+        run: test "$OUTCOME" = success
+      - name: Assert lint outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.lint.outcome }}
+        run: test "$OUTCOME" = success
+      - name: Assert build outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.build.outcome }}
+        run: test "$OUTCOME" = success
+      - name: Enforce release gate
+        id: release_gate
+        if: always()
+        env:
+          ACTION_PINS: ${{ steps.action_pins.outcome }}
+          WORKFLOW_PERMISSIONS: ${{ steps.workflow_permissions.outcome }}
+          WORKFLOW_TRIGGERS: ${{ steps.workflow_triggers.outcome }}
+          RELEASE_STRUCTURE: ${{ steps.release_structure.outcome }}
+          PRODUCTION_HOLD: ${{ steps.production_hold.outcome }}
+          DEPENDENCY_SOURCES: ${{ steps.dependency_sources.outcome }}
+          RUNTIME_PROVENANCE: ${{ steps.runtime_provenance.outcome }}
+          PACKAGE_SCRIPTS: ${{ steps.package_scripts.outcome }}
           INSTALL: ${{ steps.install.outcome }}
+          VULNERABILITY_AUDIT: ${{ steps.vulnerability_audit.outcome }}
           TESTS: ${{ steps.tests.outcome }}
           LINT: ${{ steps.lint.outcome }}
           BUILD: ${{ steps.build.outcome }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          if [ "$ACTION_PINS" = success ] && [ "$WORKFLOW_PERMISSIONS" = success ] && [ "$WORKFLOW_TRIGGERS" = success ] && [ "$RELEASE_STRUCTURE" = success ] && [ "$PRODUCTION_HOLD" = success ] && [ "$DEPENDENCY_SOURCES" = success ] && [ "$RUNTIME_PROVENANCE" = success ] && [ "$PACKAGE_SCRIPTS" = success ] && [ "$INSTALL" = success ] && [ "$VULNERABILITY_AUDIT" = success ] && [ "$TESTS" = success ] && [ "$LINT" = success ] && [ "$BUILD" = success ]; then
+            echo 'Kingdom Network release gate passed.'
+            exit 0
+          fi
+          echo "Kingdom Network release gate failed: pins=${ACTION_PINS}, permissions=${WORKFLOW_PERMISSIONS}, triggers=${WORKFLOW_TRIGGERS}, structure=${RELEASE_STRUCTURE}, hold=${PRODUCTION_HOLD}, dependencies=${DEPENDENCY_SOURCES}, runtime=${RUNTIME_PROVENANCE}, package-scripts=${PACKAGE_SCRIPTS}, install=${INSTALL}, audit=${VULNERABILITY_AUDIT}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
+          exit 1
+
+  publish-statuses:
+    if: always() && github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      statuses: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ACTION_PINS: ${{ needs.build.outputs.action_pins }}
+      WORKFLOW_PERMISSIONS: ${{ needs.build.outputs.workflow_permissions }}
+      WORKFLOW_TRIGGERS: ${{ needs.build.outputs.workflow_triggers }}
+      RELEASE_STRUCTURE: ${{ needs.build.outputs.release_structure }}
+      PRODUCTION_HOLD: ${{ needs.build.outputs.production_hold }}
+      DEPENDENCY_SOURCES: ${{ needs.build.outputs.dependency_sources }}
+      RUNTIME_PROVENANCE: ${{ needs.build.outputs.runtime_provenance }}
+      PACKAGE_SCRIPTS: ${{ needs.build.outputs.package_scripts }}
+      INSTALL: ${{ needs.build.outputs.install }}
+      VULNERABILITY_AUDIT: ${{ needs.build.outputs.vulnerability_audit }}
+      TESTS: ${{ needs.build.outputs.tests }}
+      LINT: ${{ needs.build.outputs.lint }}
+      BUILD: ${{ needs.build.outputs.build }}
+      RELEASE_GATE: ${{ needs.build.outputs.release_gate }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Publish release-gate statuses
+        run: |
+          set -euo pipefail
           publish() {
             context="$1"
             outcome="$2"
@@ -69,16 +235,25 @@ jobs:
               -f description="${context}: ${outcome}" \
               -f target_url="$RUN_URL"
           }
+          publish action-pins "$ACTION_PINS"
+          publish workflow-permissions "$WORKFLOW_PERMISSIONS"
+          publish workflow-triggers "$WORKFLOW_TRIGGERS"
+          publish release-structure "$RELEASE_STRUCTURE"
+          publish production-hold "$PRODUCTION_HOLD"
+          publish dependency-sources "$DEPENDENCY_SOURCES"
+          publish runtime-provenance "$RUNTIME_PROVENANCE"
+          publish package-scripts "$PACKAGE_SCRIPTS"
           publish install "$INSTALL"
+          publish dependency-audit "$VULNERABILITY_AUDIT"
           publish security-tests "$TESTS"
           publish lint "$LINT"
           publish build "$BUILD"
-          if [ "$INSTALL" = success ] && [ "$TESTS" = success ] && [ "$LINT" = success ] && [ "$BUILD" = success ]; then
+          if [ "$RELEASE_GATE" = success ]; then
             overall=success
-            description='install, security tests, lint, and build passed'
+            description='final fail-closed release gate passed'
           else
             overall=failure
-            description="install=${INSTALL}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
+            description='final fail-closed release gate failed; inspect workflow run'
           fi
           gh api --method POST \
             -H "Accept: application/vnd.github+json" \
@@ -87,4 +262,3 @@ jobs:
             -f context='kingdom-network/release-gate' \
             -f description="$description" \
             -f target_url="$RUN_URL"
-          [ "$overall" = success ]
