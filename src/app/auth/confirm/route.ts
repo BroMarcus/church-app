@@ -86,7 +86,7 @@ export async function GET(request:NextRequest){
   const type=searchParams.get('type')
   const lang=resolveRequestLanguage(request,requestUrl)
   const rawNext=searchParams.get('next')
-  const signupFallback=`/start?welcome=1${lang==='es'?'&lang=es':''}`
+  const signupFallback=`/start?welcome=1&lang=${lang}`
   const redirectContext=legacyRedirectContext(rawNext,signupFallback)
   const directJoinNext=safeJoinDestination(rawNext)
   const joinNext=directJoinNext||redirectContext.recoveryNext
