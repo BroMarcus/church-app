@@ -140,7 +140,7 @@ export async function login(formData:FormData){
   const userId=data.user.id
   if(userId){
     const onboardingState=data.user?.user_metadata?.onboarding_completed
-    if(onboardingState===false)redirect(`/start?welcome=1${lang==='es'?'&lang=es':''}`)
+    if(onboardingState===false)redirect(`/start?welcome=1&lang=${lang}`)
     if(onboardingState===undefined){
       let historyResults
       try{
@@ -164,12 +164,12 @@ export async function login(formData:FormData){
         }else{
           const profile=profileResult.data
           const hasActivity=(groupsResult.count??0)>0||(enrollmentsResult.count??0)>0||Boolean(profile?.bio)
-          if(!hasActivity)redirect(`/start?welcome=1${lang==='es'?'&lang=es':''}`)
+          if(!hasActivity)redirect(`/start?welcome=1&lang=${lang}`)
         }
       }
     }
   }
-  redirect(lang==='es'?'/?lang=es':'/')
+  redirect(`/?lang=${lang}`)
 }
 
 export async function signup(formData:FormData){
@@ -229,7 +229,7 @@ export async function signup(formData:FormData){
   }
 
   const displayName=`${firstName} ${lastName}`.trim()
-  const startPath=`/start?welcome=1${lang==='es'?'&lang=es':''}`
+  const startPath=`/start?welcome=1&lang=${lang}`
   let signupResult
   try{
     signupResult=await supabase.auth.signUp({email,password,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath,inviteId),data:{first_name:firstName,last_name:lastName,display_name:displayName,public_signup:publicSignup,onboarding_completed:false,preferred_language:lang}}})
@@ -292,7 +292,7 @@ export async function resendConfirmation(formData:FormData){
   if(emailError)redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error',emailError)))
   const supabase=await getSupabase('confirmation resend')
   if(!supabase)redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+statusPart('error','email_failed')))
-  const startPath=next||`/start?welcome=1${lang==='es'?'&lang=es':''}`
+  const startPath=next||`/start?welcome=1&lang=${lang}`
   let resendResult
   try{resendResult=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:callbackUrl(lang,'signup',startPath,inviteId)}})}
   catch(error){
