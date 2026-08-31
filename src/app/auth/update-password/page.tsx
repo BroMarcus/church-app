@@ -20,9 +20,7 @@ function numericStatus(error:unknown){
   const status=Number((error as {status?:unknown}).status)
   return Number.isInteger(status)&&status>=100&&status<=599?status:0
 }
-function isCertainInvalidRecoveryLink(error:unknown){
-  return TERMINAL_AUTH_LINK_CODES.has(diagnosticCode(error))
-}
+function isCertainInvalidRecoveryLink(error:unknown){return TERMINAL_AUTH_LINK_CODES.has(diagnosticCode(error))}
 function safeJoinNext(value:string|null){
   if(!value||value.length>500||!value.startsWith('/')||value.startsWith('//')||value.includes('\\'))return ''
   try{const base='https://kingdom.invalid',parsed=new URL(value,base);if(parsed.origin!==base||!parsed.pathname.startsWith('/join/'))return '';return `${parsed.pathname}${parsed.search}`}catch{return ''}
@@ -41,20 +39,12 @@ async function finishPostResetSignOut(supabase:ReturnType<typeof createClient>){
   for(let attempt=1;attempt<=2;attempt+=1){
     try{
       const {error}=await supabase.auth.signOut({scope:'local'})
-      if(error){
-        console.error('post-reset local sign out failed',{attempt,code:diagnosticCode(error)})
-        continue
-      }
+      if(error){console.error('post-reset local sign out failed',{attempt,code:diagnosticCode(error)});continue}
       const verification=await supabase.auth.getSession()
-      if(verification.error){
-        console.error('post-reset sign out verification failed',{attempt,code:diagnosticCode(verification.error)})
-        continue
-      }
+      if(verification.error){console.error('post-reset sign out verification failed',{attempt,code:diagnosticCode(verification.error)});continue}
       if(!verification.data.session)return true
       console.error('post-reset session still present',{attempt,code:'session_still_present'})
-    }catch(error){
-      console.error('post-reset local sign out unavailable',{attempt,code:diagnosticCode(error)})
-    }
+    }catch(error){console.error('post-reset local sign out unavailable',{attempt,code:diagnosticCode(error)})}
   }
   return false
 }
@@ -135,5 +125,5 @@ export default function UpdatePasswordPage(){
   const signInHref=`/login?lang=${lang}&mode=signin${invitePart}${nextPart}`
   const securityHref=`/account/security?lang=${lang}${invitePart}${nextPart}`
   const noticeTone=ready||(completed&&!signOutIncomplete)?'success':'error'
-  return <main className="login-wrap"><div className="login card"><div className="pill">KINGDOM NETWORK</div><h1>{t.title}</h1><div className={`notice ${noticeTone}`} role={ready||completed&&!signOutIncomplete?'status':'alert'} aria-live="polite">{message}</div>{retryAvailable&&!completed&&<p style={{marginTop:16}}><button className="btn" type="button" onClick={()=>window.location.reload()}>{t.retry}</button></p>}{ready&&!completed&&<form onSubmit={save}><PasswordField name="password" label={t.newPassword} minLength={8} maxLength={128} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><PasswordField name="confirm_password" label={t.again} minLength={8} maxLength={128} autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><button className="btn" type="submit" disabled={busy} aria-disabled={busy} aria-busy={busy}><span aria-live="polite">{busy?t.updating:t.update}</span></button></form>}{completed?<p style={{marginTop:16}}><a className="btn" href={signOutIncomplete?securityHref:signInHref}>{signOutIncomplete?t.accountSecurity:t.continue}</a></p>:<p className="small muted" style={{marginTop:16}}><a href={signInHref}>{t.back}</a></p>}</div></main>
+  return <main className="login-wrap"><div className="login card"><div className="pill">ONE KINGDOM</div><h1>{t.title}</h1><div className={`notice ${noticeTone}`} role={ready||completed&&!signOutIncomplete?'status':'alert'} aria-live="polite">{message}</div>{retryAvailable&&!completed&&<p style={{marginTop:16}}><button className="btn" type="button" onClick={()=>window.location.reload()}>{t.retry}</button></p>}{ready&&!completed&&<form onSubmit={save}><PasswordField name="password" label={t.newPassword} minLength={8} maxLength={128} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><PasswordField name="confirm_password" label={t.again} minLength={8} maxLength={128} autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} required showLabel={t.showPassword} hideLabel={t.hidePassword}/><button className="btn" type="submit" disabled={busy} aria-disabled={busy} aria-busy={busy}><span aria-live="polite">{busy?t.updating:t.update}</span></button></form>}{completed?<p style={{marginTop:16}}><a className="btn" href={signOutIncomplete?securityHref:signInHref}>{signOutIncomplete?t.accountSecurity:t.continue}</a></p>:<p className="small muted" style={{marginTop:16}}><a href={signInHref}>{t.back}</a></p>}</div></main>
 }

@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { Church,Compass,FileUp,GraduationCap,HandHeart,Languages,MessageSquareWarning,Megaphone,Search,Sparkles,Users,Wrench } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
@@ -7,8 +6,8 @@ import { commonHelp,searchHelp } from '@/lib/help-knowledge'
 import './guide.css'
 
 const copy={
-  en:{title:'What are you trying to do?',subtitle:'Ask a question in normal words. Kingdom Guide will explain it and take you to the right place.',searchTitle:'Ask Kingdom Guide',searchBody:'Ask how to use the app, fix an account problem, join your church, or find a church lesson, form, policy or resource.',search:'Ask / Search',placeholder:'Try: I forgot my password, how do I join my church, where is my group…',hint:'Help answers come from Kingdom Network’s navigation knowledge base. Church-resource results come only from member-approved material stored by your church.',quick:'COMMON THINGS',leadership:'CHURCH SETUP & LEADERSHIP',answers:'HELP ANSWERS',resourceResults:'TRUSTED CHURCH RESOURCES',resultsFor:'Results for',none:'No matching approved church resource was found. The help answer above can still guide you.',resourceUnavailable:'We could not safely check your church resources right now. Nothing was removed or changed. Try the search again.',accountUnavailable:'We could not safely verify your account right now.',accountBody:'Do not create another account. Nothing was changed. Try Kingdom Guide again in a moment, or use Help & Feedback if the problem continues.',connectionUnavailable:'We could not safely check your church connection right now.',connectionBody:'Nothing was changed. Try Kingdom Guide again, or go Home and use Help & Feedback if the problem continues.',retry:'Try search again',retryGuide:'Try Kingdom Guide again',open:'Open in Resource Library →',trust:'WHY THIS IS SAFE',trustTitle:'Help and church teaching stay separate.',trustBody:'Kingdom Guide can explain how to use Kingdom Network without inventing church teaching. When it searches teaching material, the source and archive status remain visible.',home:'← Home',english:'English',spanish:'Español',church:'Your Church',feedback:'Something missing or confusing?',feedbackBody:'Send an idea or problem directly to the pilot feedback box.',feedbackCta:'Share feedback →',openAnswer:'Open this section →'},
-  es:{title:'¿Qué estás tratando de hacer?',subtitle:'Haz tu pregunta con palabras normales. Kingdom Guide te explicará y te llevará al lugar correcto.',searchTitle:'Pregúntale a Kingdom Guide',searchBody:'Pregunta cómo usar la aplicación, resolver un problema de cuenta, unirte a tu iglesia o encontrar una lección, formulario, política o recurso.',search:'Preguntar / Buscar',placeholder:'Prueba: olvidé mi contraseña, cómo me uno a mi iglesia, dónde está mi grupo…',hint:'Las respuestas de ayuda vienen de la base de navegación de Kingdom Network. Los recursos de iglesia vienen solamente de material aprobado para miembros.',quick:'COSAS COMUNES',leadership:'CONFIGURACIÓN Y LIDERAZGO',answers:'RESPUESTAS DE AYUDA',resourceResults:'RECURSOS CONFIABLES DE LA IGLESIA',resultsFor:'Resultados para',none:'No encontramos un recurso aprobado que coincida. La respuesta de ayuda arriba todavía puede orientarte.',resourceUnavailable:'No pudimos revisar con seguridad los recursos de tu iglesia en este momento. No se borró ni cambió nada. Intenta la búsqueda otra vez.',accountUnavailable:'No pudimos verificar tu cuenta de forma segura en este momento.',accountBody:'No crees otra cuenta. No se cambió nada. Intenta abrir Guía Kingdom otra vez en un momento, o usa Ayuda y Comentarios si el problema continúa.',connectionUnavailable:'No pudimos revisar con seguridad tu conexión con la iglesia en este momento.',connectionBody:'No se cambió nada. Intenta abrir Guía Kingdom otra vez, o ve a Inicio y usa Ayuda y Comentarios si el problema continúa.',retry:'Intentar búsqueda otra vez',retryGuide:'Intentar Guía Kingdom otra vez',open:'Abrir en la Biblioteca de Recursos →',trust:'POR QUÉ ES CONFIABLE',trustTitle:'La ayuda y la enseñanza de la iglesia se mantienen separadas.',trustBody:'Kingdom Guide puede explicar cómo usar Kingdom Network sin inventar enseñanza. Cuando busca material de iglesia, la fuente y el estado de archivo siguen visibles.',home:'← Inicio',english:'English',spanish:'Español',church:'Tu Iglesia',feedback:'¿Falta algo o algo es confuso?',feedbackBody:'Envía una idea o problema directamente al buzón de comentarios del piloto.',feedbackCta:'Compartir comentario →',openAnswer:'Abrir esta sección →'}
+  en:{title:'What are you trying to do?',subtitle:'Ask a question in normal words. Kingdom Guide will explain it and take you to the right place.',searchTitle:'Ask Kingdom Guide',searchBody:'Ask how to use the app, fix an account problem, join your church, or find a church lesson, form, policy or resource.',search:'Ask / Search',placeholder:'Try: I forgot my password, how do I join my church, where is my group…',hint:'Help answers come from One Kingdom’s navigation knowledge base. Church-resource results come only from member-approved material stored by your church.',quick:'COMMON THINGS',leadership:'CHURCH SETUP & LEADERSHIP',answers:'HELP ANSWERS',resourceResults:'TRUSTED CHURCH RESOURCES',resultsFor:'Results for',none:'No matching approved church resource was found. The help answer above can still guide you.',open:'Open in Resource Library →',trust:'WHY THIS IS SAFE',trustTitle:'Help and church teaching stay separate.',trustBody:'Kingdom Guide can explain how to use One Kingdom without inventing church teaching. When it searches teaching material, the source and archive status remain visible.',home:'← Home',english:'English',spanish:'Español',church:'Your Church',feedback:'Something missing or confusing?',feedbackBody:'Send an idea or problem directly to the pilot feedback box.',feedbackCta:'Share feedback →',openAnswer:'Open this section →'},
+  es:{title:'¿Qué estás tratando de hacer?',subtitle:'Haz tu pregunta con palabras normales. Kingdom Guide te explicará y te llevará al lugar correcto.',searchTitle:'Pregúntale a Kingdom Guide',searchBody:'Pregunta cómo usar la aplicación, resolver un problema de cuenta, unirte a tu iglesia o encontrar una lección, formulario, política o recurso.',search:'Preguntar / Buscar',placeholder:'Prueba: olvidé mi contraseña, cómo me uno a mi iglesia, dónde está mi grupo…',hint:'Las respuestas de ayuda vienen de la base de navegación de One Kingdom. Los recursos de iglesia vienen solamente de material aprobado para miembros.',quick:'COSAS COMUNES',leadership:'CONFIGURACIÓN Y LIDERAZGO',answers:'RESPUESTAS DE AYUDA',resourceResults:'RECURSOS CONFIABLES DE LA IGLESIA',resultsFor:'Resultados para',none:'No encontramos un recurso aprobado que coincida. La respuesta de ayuda arriba todavía puede orientarte.',open:'Abrir en la Biblioteca de Recursos →',trust:'POR QUÉ ES CONFIABLE',trustTitle:'La ayuda y la enseñanza de la iglesia se mantienen separadas.',trustBody:'Kingdom Guide puede explicar cómo usar One Kingdom sin inventar enseñanza. Cuando busca material de iglesia, la fuente y el estado de archivo siguen visibles.',home:'← Inicio',english:'English',spanish:'Español',church:'Tu Iglesia',feedback:'¿Falta algo o algo es confuso?',feedbackBody:'Envía una idea o problema directamente al buzón de comentarios del piloto.',feedbackCta:'Compartir comentario →',openAnswer:'Abrir esta sección →'}
 } as const
 
 const memberQuick={
@@ -35,87 +34,31 @@ const adminQuick={
 } as const
 
 const lower=(v:any)=>String(v??'').toLowerCase()
-const boundedCode=(value:unknown)=>String(value||'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48)||'unknown'
-const diagnosticCode=(error:unknown,fallback:string)=>{
-  if(error&&typeof error==='object'&&'code' in error)return boundedCode((error as {code?:unknown}).code)
-  if(error instanceof Error)return boundedCode(error.name)
-  return boundedCode(fallback)
-}
-const prefersSpanish=(acceptLanguage:string|null)=>/^\s*es(?:-|_|,|;|$)/i.test(acceptLanguage||'')
 const authority=(r:any)=>r.official_source?'official organization':lower(r.source_scope||'local_church')
 const status=(r:any)=>lower(r.archive_status||'current')
 const authorityScore=(v:string)=>v.includes('official')||v.includes('organization')?35:v.includes('district')?28:v.includes('local')||v.includes('church')?20:v.includes('ministry')?12:v.includes('group')?8:5
 const statusScore=(v:string)=>v==='current'?25:v.includes('reference')?16:v==='legacy'?4:v==='draft'?-15:v==='retired'?-30:8
 const display=(v:string)=>v.replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase())
-const displayMeta=(value:string,lang:'en'|'es',kind:'authority'|'status')=>{
-  if(lang==='en')return display(value)
-  const authorityLabels:Record<string,string>={
-    'official organization':'Organización oficial',district:'Distrito','local church':'Iglesia local','local_church':'Iglesia local',ministry:'Ministerio',group:'Grupo'
-  }
-  const statusLabels:Record<string,string>={current:'Actual',reference:'Referencia',legacy:'Legado',draft:'Borrador',retired:'Retirado'}
-  return (kind==='authority'?authorityLabels[value]:statusLabels[value])||display(value)
-}
-const languageScore=(resourceLanguage:unknown,lang:'en'|'es')=>{
-  const code=lower(resourceLanguage)
-  if(!code)return 0
-  return lang==='es'?(code==='es'||code.startsWith('es-')?10:0):(code==='en'||code.startsWith('en-')?10:0)
-}
 
 export default async function GuidePage({searchParams}:{searchParams:Promise<{q?:string;lang?:string}>}){
   const query=await searchParams
-  const requestHeaders=await headers()
-  const browserLang:'en'|'es'=prefersSpanish(requestHeaders.get('accept-language'))?'es':'en'
-  const requestedLang:'en'|'es'=query.lang==='es'?'es':query.lang==='en'?'en':browserLang
-  let supabase
-  try{supabase=await createClient()}
-  catch(error){
-    console.error('Kingdom Guide client unavailable',{code:diagnosticCode(error,'client_unavailable')})
-    const t=copy[requestedLang],withLang=(href:string)=>requestedLang==='es'?`${href}${href.includes('?')?'&':'?'}lang=es`:href
-    return <main className="shell"><section className="card guide-panel" style={{marginTop:24}}><div className="pill">KINGDOM GUIDE</div><h1>{t.accountUnavailable}</h1><p className="muted">{t.accountBody}</p><div className="row"><Link className="btn" href={withLang('/guide')}>{t.retryGuide}</Link><Link className="ghost" href={withLang('/')}>{t.home}</Link><Link className="ghost" href={withLang('/feedback')}>{t.feedbackCta}</Link></div></section></main>
-  }
-  let authResult
-  try{authResult=await supabase.auth.getUser()}
-  catch(error){
-    console.error('Kingdom Guide auth transport unavailable',{code:diagnosticCode(error,'auth_unavailable')})
-    const t=copy[requestedLang],withLang=(href:string)=>requestedLang==='es'?`${href}${href.includes('?')?'&':'?'}lang=es`:href
-    return <main className="shell"><section className="card guide-panel" style={{marginTop:24}}><div className="pill">KINGDOM GUIDE</div><h1>{t.accountUnavailable}</h1><p className="muted">{t.accountBody}</p><div className="row"><Link className="btn" href={withLang('/guide')}>{t.retryGuide}</Link><Link className="ghost" href={withLang('/')}>{t.home}</Link><Link className="ghost" href={withLang('/feedback')}>{t.feedbackCta}</Link></div></section></main>
-  }
-  const {data:{user},error:authError}=authResult,userId=user?.id
-  const preferred=user?.user_metadata?.preferred_language==='es'?'es':user?.user_metadata?.preferred_language==='en'?'en':null
-  const lang:'en'|'es'=query.lang==='es'?'es':query.lang==='en'?'en':preferred??browserLang,t=copy[lang],q=String(query.q??'').trim().slice(0,160),needle=q.toLowerCase()
+  const supabase=await createClient(),{data:{user}}=await supabase.auth.getUser(),userId=user?.id
+  const preferred=user?.user_metadata?.preferred_language==='es'?'es':'en'
+  const lang=query.lang==='es'?'es':query.lang==='en'?'en':preferred,t=copy[lang],q=String(query.q??'').trim().slice(0,160),needle=q.toLowerCase()
   const withLang=(href:string)=>{const join=href.includes('?')?'&':'?';return lang==='es'?`${href}${join}lang=es`:href}
-  if(authError){
-    console.error('Kingdom Guide auth verification failed',{code:boundedCode(authError.code)})
-    return <main className="shell"><section className="card guide-panel" style={{marginTop:24}}><div className="pill">KINGDOM GUIDE</div><h1>{t.accountUnavailable}</h1><p className="muted">{t.accountBody}</p><div className="row"><Link className="btn" href={withLang('/guide')}>{t.retryGuide}</Link><Link className="ghost" href={withLang('/')}>{t.home}</Link><Link className="ghost" href={withLang('/feedback')}>{t.feedbackCta}</Link></div></section></main>
-  }
-  if(!userId)redirect(`/login?lang=${lang}&mode=signin`)
-  let membershipResult
-  try{membershipResult=await supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).single()}
-  catch(error){
-    console.error('Kingdom Guide membership transport unavailable',{code:diagnosticCode(error,'membership_unavailable')})
-    return <main className="shell"><section className="card guide-panel" style={{marginTop:24}}><div className="pill">KINGDOM GUIDE</div><h1>{t.connectionUnavailable}</h1><p className="muted">{t.connectionBody}</p><div className="row"><Link className="btn" href={withLang('/guide')}>{t.retryGuide}</Link><Link className="ghost" href={withLang('/')}>{t.home}</Link><Link className="ghost" href={withLang('/feedback')}>{t.feedbackCta}</Link></div></section></main>
-  }
-  const {data:membership,error:membershipError}=membershipResult
-  if(membershipError&&membershipError.code!=='PGRST116'){
-    console.error('Kingdom Guide membership read failed',{code:boundedCode(membershipError.code)})
-    return <main className="shell"><section className="card guide-panel" style={{marginTop:24}}><div className="pill">KINGDOM GUIDE</div><h1>{t.connectionUnavailable}</h1><p className="muted">{t.connectionBody}</p><div className="row"><Link className="btn" href={withLang('/guide')}>{t.retryGuide}</Link><Link className="ghost" href={withLang('/')}>{t.home}</Link><Link className="ghost" href={withLang('/feedback')}>{t.feedbackCta}</Link></div></section></main>
-  }
+  if(!userId)redirect(`/login?lang=${lang}`)
+  const {data:membership}=await supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).single()
   if(!membership?.church_id)redirect(lang==='es'?'/?lang=es':'/')
   const church:any=Array.isArray(membership.churches)?membership.churches[0]:membership.churches,isAdmin=['pastor','church_admin'].includes(membership.role)
   const helpResults=q?searchHelp(q,lang):commonHelp(lang).slice(0,6)
-  let results:any[]=[],resourceSearchFailed=false
+  let results:any[]=[]
   if(q){
-    let resourceResult
-    try{resourceResult=await supabase.from('media_assets').select('id,title,description,asset_type,resource_type,language_code,source_year,ministry_area,topic_tags,scripture_refs,archive_status,source_label,source_scope,official_source,approved_for_members,library_kind,organization_status,created_at').eq('church_id',membership.church_id).eq('approved_for_members',true).not('archive_status','in','(draft,retired)').order('created_at',{ascending:false}).limit(400)}
-    catch(error){resourceSearchFailed=true;console.error('Kingdom Guide resource transport unavailable',{code:diagnosticCode(error,'resource_search_unavailable')})}
-    if(resourceResult){
-      const {data,error}=resourceResult
-      if(error){resourceSearchFailed=true;console.error('Kingdom Guide resource search failed',{code:boundedCode(error.code)})}
-      if(!resourceSearchFailed)results=(data??[]).map((r:any)=>{const searchable=[r.title,r.description,r.asset_type,r.resource_type,r.language_code,r.source_year,r.ministry_area,r.topic_tags,r.scripture_refs,r.source_label,r.source_scope,r.library_kind,r.organization_status].flatMap(v=>Array.isArray(v)?v:[v]).filter(Boolean).join(' ').toLowerCase();let score=0;if(lower(r.title).includes(needle))score+=55;if(lower(r.description).includes(needle))score+=22;if(searchable.includes(needle))score+=12;score+=authorityScore(authority(r))+statusScore(status(r))+languageScore(r.language_code,lang);return {...r,__score:score,__searchable:searchable,__authority:authority(r),__status:status(r)}}).filter((r:any)=>r.__searchable.includes(needle)||lower(r.title).includes(needle)||lower(r.description).includes(needle)).sort((a:any,b:any)=>b.__score-a.__score||new Date(b.created_at).getTime()-new Date(a.created_at).getTime()).slice(0,24)
-    }
+    const {data,error}=await supabase.from('media_assets').select('id,title,description,asset_type,resource_type,language_code,source_year,ministry_area,topic_tags,scripture_refs,archive_status,source_label,source_scope,official_source,approved_for_members,library_kind,organization_status,created_at').eq('church_id',membership.church_id).eq('approved_for_members',true).not('archive_status','in','(draft,retired)').order('created_at',{ascending:false}).limit(400)
+    if(error)console.error('Kingdom Guide resource search failed',{message:error.message})
+    results=(data??[]).map((r:any)=>{const searchable=[r.title,r.description,r.asset_type,r.resource_type,r.language_code,r.source_year,r.ministry_area,r.topic_tags,r.scripture_refs,r.source_label,r.source_scope,r.library_kind,r.organization_status].flatMap(v=>Array.isArray(v)?v:[v]).filter(Boolean).join(' ').toLowerCase();let score=0;if(lower(r.title).includes(needle))score+=55;if(lower(r.description).includes(needle))score+=22;if(searchable.includes(needle))score+=12;score+=authorityScore(authority(r))+statusScore(status(r));return {...r,__score:score,__searchable:searchable,__authority:authority(r),__status:status(r)}}).filter((r:any)=>r.__searchable.includes(needle)||lower(r.title).includes(needle)||lower(r.description).includes(needle)).sort((a:any,b:any)=>b.__score-a.__score||new Date(b.created_at).getTime()-new Date(a.created_at).getTime()).slice(0,24)
   }
 
-  return <main className="shell"><header className="topbar"><div><Link href={withLang('/')} className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??t.church} • Kingdom Guide</div></div><div className="row"><Languages size={15}/><Link className="ghost" href={`/guide${q?`?q=${encodeURIComponent(q)}&lang=en`:'?lang=en'}`}>{t.english}</Link><Link className="ghost" href={`/guide${q?`?q=${encodeURIComponent(q)}&lang=es`:'?lang=es'}`}>{t.spanish}</Link><Link className="ghost" href={withLang('/')}>{t.home}</Link></div></header>
+  return <main className="shell"><header className="topbar"><div><Link href={withLang('/')} className="brand">One <span>Kingdom</span></Link><div className="small muted">{church?.name??t.church} • Kingdom Guide</div></div><div className="row"><Languages size={15}/><Link className="ghost" href={`/guide${q?`?q=${encodeURIComponent(q)}&lang=en`:'?lang=en'}`}>{t.english}</Link><Link className="ghost" href={`/guide${q?`?q=${encodeURIComponent(q)}&lang=es`:'?lang=es'}`}>{t.spanish}</Link><Link className="ghost" href={withLang('/')}>{t.home}</Link></div></header>
     <section className="guide-hero card"><div><div className="pill">KINGDOM GUIDE</div><h1>{t.title}</h1><p className="muted">{t.subtitle}</p></div><div className="hero-stat"><Sparkles size={24}/><span>{lang==='es'?'Pregunta con tus propias palabras':'Ask in your own words'}</span></div></section>
 
     {!q&&<section className="card guide-panel" style={{marginBottom:16}}><div className="pill">{t.quick}</div><div className="quick-grid" style={{marginTop:14}}>{memberQuick[lang].map(({title,body,href,Icon})=><Link className="quick-card" href={withLang(href)} key={href}><div className="quick-icon"><Icon size={16}/></div><div><strong>{title}</strong><span>{body}</span></div></Link>)}</div></section>}
@@ -125,7 +68,7 @@ export default async function GuidePage({searchParams}:{searchParams:Promise<{q?
 
     <section className="card guide-panel" style={{marginTop:16}}><div className="pill">{t.answers}</div>{q&&<h2>{t.resultsFor} “{q}”</h2>}<div className="result-list">{helpResults.map(answer=><article className="guide-result" key={answer.id}><h3>{answer.question}</h3><p>{answer.answer}</p><Link className="record-link resource-link" href={withLang(answer.href)}>{answer.cta} →</Link></article>)}</div></section>
 
-    {q&&<section className="card guide-panel" style={{marginTop:16}}><div className="pill">{t.resourceResults}</div><h2>{t.resultsFor} “{q}”</h2><div className="result-list">{resourceSearchFailed?<div className="guide-beta" role="alert"><strong>{t.resourceUnavailable}</strong><div style={{marginTop:10}}><Link className="ghost" href={`/guide?q=${encodeURIComponent(q)}${lang==='es'?'&lang=es':''}`}>{t.retry}</Link></div></div>:<>{results.map((r:any)=>{const title=r.title||(lang==='es'?'Recurso de la iglesia':'Church resource');return <article className="guide-result" key={r.id}><div className="result-head"><div><h3>{title}</h3><div className="result-tags"><span className={`result-tag ${r.__authority.includes('official')||r.__authority.includes('organization')?'official':''}`}>{displayMeta(r.__authority,lang,'authority')}</span><span className={`result-tag ${r.__status==='current'?'current':''}`}>{displayMeta(r.__status,lang,'status')}</span>{r.language_code&&<span className="result-tag">{String(r.language_code).toUpperCase()}</span>}</div></div><Compass size={16}/></div>{r.description&&<p>{r.description}</p>}<Link className="record-link resource-link" href={withLang(`/resources?q=${encodeURIComponent(title)}`)}>{t.open}</Link></article>})}{!results.length&&<div className="guide-beta">{t.none}</div>}</>}</div></section>}
+    {q&&<section className="card guide-panel" style={{marginTop:16}}><div className="pill">{t.resourceResults}</div><h2>{t.resultsFor} “{q}”</h2><div className="result-list">{results.map((r:any)=>{const title=r.title||(lang==='es'?'Recurso de la iglesia':'Church resource');return <article className="guide-result" key={r.id}><div className="result-head"><div><h3>{title}</h3><div className="result-tags"><span className={`result-tag ${r.__authority.includes('official')||r.__authority.includes('organization')?'official':''}`}>{display(r.__authority)}</span><span className={`result-tag ${r.__status==='current'?'current':''}`}>{display(r.__status)}</span>{r.language_code&&<span className="result-tag">{String(r.language_code).toUpperCase()}</span>}</div></div><Compass size={16}/></div>{r.description&&<p>{r.description}</p>}<Link className="record-link resource-link" href={withLang(`/resources?q=${encodeURIComponent(title)}`)}>{t.open}</Link></article>})}{!results.length&&<div className="guide-beta">{t.none}</div>}</div></section>}
 
     <div className="guide-layout" style={{marginTop:16}}><section className="card guide-panel"><div className="pill">{t.trust}</div><h2>{t.trustTitle}</h2><p className="small muted">{t.trustBody}</p></section><aside className="card guide-panel"><MessageSquareWarning size={20}/><h2>{t.feedback}</h2><p className="small muted">{t.feedbackBody}</p><Link className="ghost" href={withLang('/feedback')}>{t.feedbackCta}</Link></aside></div>
   </main>
