@@ -27,7 +27,7 @@ export default async function ChurchLaunchPage({searchParams}:{searchParams:Prom
   const requestHeaders=await headers()
   const lang:'en'|'es'=params.lang==='es'?'es':params.lang==='en'?'en':prefersSpanish(requestHeaders.get('accept-language'))?'es':'en'
   const t=copy[lang]
-  const l=(path:string)=>lang==='es'?`${path}${path.includes('?')?'&':'?'}lang=es`:path
+  const l=(path:string)=>`${path}${path.includes('?')?'&':'?'}lang=${lang}`
   let supabase
   try{supabase=await createClient()}
   catch(error){failLoad('client',error)}
@@ -91,13 +91,13 @@ export default async function ChurchLaunchPage({searchParams}:{searchParams:Prom
     {title:'6. Agrega un próximo evento',body:'Pon algo real en el calendario para que los miembros vean qué sigue.',href:l('/calendar'),done:calendar,Icon:CalendarDays},
     {title:'7. Haz la revisión final',body:'Comprueba los flujos esenciales antes de ampliar el piloto.',href:l('/church/readiness'),done:false,Icon:Check}
   ]:[
-    {title:'1. Confirm church basics',body:'Church name, city, state and timezone.',href:'/church/settings',done:identity,Icon:Church},
-    {title:'2. Add a backup admin',body:'Give one trusted leader admin access. Never share passwords.',href:'/church/admin-backup',done:adminReady,Icon:ShieldCheck},
-    {title:'3. Add one real pilot member',body:'Use Join Center to share the QR code or link. A pending invitation alone does not count as complete.',href:'/church/join-center',done:people,Icon:MailPlus},
-    {title:'4. Publish one next step',body:'Have at least one class or course available to members.',href:'/learning',done:learning,Icon:GraduationCap},
-    {title:'5. Add one group',body:'Create at least one active Friendship Group or community.',href:'/groups',done:groupReady,Icon:Users},
-    {title:'6. Add one upcoming event',body:'Put something real on the calendar so members can see what is next.',href:'/calendar',done:calendar,Icon:CalendarDays},
-    {title:'7. Run the final pilot check',body:'Verify the essential member flows before expanding the pilot.',href:'/church/readiness',done:false,Icon:Check}
+    {title:'1. Confirm church basics',body:'Church name, city, state and timezone.',href:l('/church/settings'),done:identity,Icon:Church},
+    {title:'2. Add a backup admin',body:'Give one trusted leader admin access. Never share passwords.',href:l('/church/admin-backup'),done:adminReady,Icon:ShieldCheck},
+    {title:'3. Add one real pilot member',body:'Use Join Center to share the QR code or link. A pending invitation alone does not count as complete.',href:l('/church/join-center'),done:people,Icon:MailPlus},
+    {title:'4. Publish one next step',body:'Have at least one class or course available to members.',href:l('/learning'),done:learning,Icon:GraduationCap},
+    {title:'5. Add one group',body:'Create at least one active Friendship Group or community.',href:l('/groups'),done:groupReady,Icon:Users},
+    {title:'6. Add one upcoming event',body:'Put something real on the calendar so members can see what is next.',href:l('/calendar'),done:calendar,Icon:CalendarDays},
+    {title:'7. Run the final pilot check',body:'Verify the essential member flows before expanding the pilot.',href:l('/church/readiness'),done:false,Icon:Check}
   ]
   const essentials=steps.slice(0,6),completed=essentials.filter(s=>s.done).length,pct=Math.round(completed/essentials.length*100),nextStep=essentials.find(s=>!s.done)??steps[6],NextIcon=nextStep.Icon
   return <main className="shell"><header className="topbar"><div><Link href={l('/')} className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church.name} • Church Builder</div></div><nav className="row launch-nav" aria-label={lang==='es'?'Navegación de Church Builder':'Church Builder navigation'}><Languages size={15}/><Link className="ghost" href="/church/launch?lang=en" aria-current={lang==='en'?'page':undefined}>{t.english}</Link><Link className="ghost" href="/church/launch?lang=es" aria-current={lang==='es'?'page':undefined}>{t.spanish}</Link><Link className="ghost" href={l('/guide')}>Kingdom Guide</Link><Link className="ghost" href={l('/church')}>{t.admin}</Link></nav></header>
