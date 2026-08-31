@@ -30,7 +30,7 @@ const roleLabel=(role:unknown,lang:'en'|'es')=>{
  const value=String(role||'member')
  const labels:Record<'en'|'es',Record<string,string>>={
   en:{member:'Member',pastor:'Pastor',church_admin:'Church Admin',leader:'Leader',group_leader:'Friendship Group Leader',assistant_leader:'Assistant Leader',ministry_leader:'Ministry Leader',minister:'Minister',finance_admin:'Finance Admin',platform_admin:'Platform Admin'},
-  es:{member:'Miembro',pastor:'Pastor',church_admin:'Administrador de iglesia',leader:'Líder',group_leader:'Líder de Grupo de Amistad',assistant_leader:'Líder asistente',ministry_leader:'Líder de ministerio',minister:'Minister',finance_admin:'Administrador de finanzas',platform_admin:'Administrador de plataforma'}
+  es:{member:'Miembro',pastor:'Pastor',church_admin:'Administrador de iglesia',leader:'Líder',group_leader:'Líder de Grupo de Amistad',assistant_leader:'Líder asistente',ministry_leader:'Líder de ministerio',minister:'Ministro',finance_admin:'Administrador de finanzas',platform_admin:'Administrador de plataforma'}
  }
  return labels[lang][value]||labels[lang].member
 }
@@ -55,7 +55,7 @@ export default async function StartPage({searchParams}:{searchParams:Promise<{la
  const {data:{user},error:authError}=authResult
  const preferred=user?.user_metadata?.preferred_language==='es'?'es':'en'
  const lang:'en'|'es'=params.lang==='es'?'es':params.lang==='en'?'en':user?preferred:requestedLang,t=copy[lang]
- const withLang=(path:string)=>lang==='es'?`${path}${path.includes('?')?'&':'?'}lang=es`:path
+ const withLang=(path:string)=>`${path}${path.includes('?')?'&':'?'}lang=${lang}`
  if(authError)return startRecovery(lang,`auth_${boundedCode(authError.code)}`)
  const userId=user?.id
  if(!userId)redirect(`/login?lang=${lang}&mode=signin`)
@@ -69,14 +69,14 @@ export default async function StartPage({searchParams}:{searchParams:Promise<{la
  }catch(error){return startRecovery(lang,`reads_${diagnosticCode(error,'reads_unavailable')}`)}
  if(profileResult.error||membershipResult.error)return startRecovery(lang,`reads_${profileResult.error?boundedCode(profileResult.error.code):'ok'}_${membershipResult.error?boundedCode(membershipResult.error.code):'ok'}`)
  const profile=profileResult.data,membership=membershipResult.data
- if(!membership?.church_id)redirect(lang==='es'?'/?lang=es':'/')
+ if(!membership?.church_id)redirect(withLang('/'))
  const church:any=Array.isArray(membership.churches)?membership.churches[0]:membership.churches
  const name=profile?.display_name||[profile?.first_name,profile?.last_name].filter(Boolean).join(' ')||(lang==='es'?'Miembro':'Member'),isAdmin=['pastor','church_admin'].includes(String(membership.role))
  const statusError=(statusCopy[lang] as Record<string,string>)[params.error_code??'']||''
  const statusMessage=(messageCopy[lang] as Record<string,string>)[params.message_code??'']||''
  const optional=[[UserRound,t.profile,t.profileBody,'/profile'],[Sparkles,t.journey,t.journeyBody,'/journey'],[UsersRound,t.groups,t.groupsBody,'/groups']] as const
  const tour=[[Home,t.home,t.homeBody,'/'],[BookOpen,t.learning,t.learningBody,'/learning'],[UsersRound,t.groups,t.groupsBody,'/groups'],[Sparkles,t.guide,t.guideBody,'/guide'],[HandHeart,t.prayer,t.prayerBody,'/prayer']] as const
- return <main className="shell start-shell"><header className="topbar"><div><Link href={lang==='es'?'/?lang=es':'/'} className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??t.church} • {t.start}</div></div><div className="row"><Languages size={15}/><Link className="ghost" href="/start?lang=en">{t.english}</Link><Link className="ghost" href="/start?lang=es">{t.spanish}</Link></div></header>
+ return <main className="shell start-shell"><header className="topbar"><div><Link href={withLang('/')} className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??t.church} • {t.start}</div></div><div className="row"><Languages size={15}/><Link className="ghost" href="/start?lang=en">{t.english}</Link><Link className="ghost" href="/start?lang=es">{t.spanish}</Link></div></header>
  <section className="card start-hero"><div><div className="pill">{t.start.toUpperCase()}</div><h1>{t.title}</h1><p className="muted">{t.subtitle}</p><p className="small muted" style={{marginTop:10}}>{name} • {church?.name??t.church} • {roleLabel(membership.role,lang)}</p></div><div className="start-ready"><CheckCircle2 size={28}/><strong>{t.ready}</strong></div></section>{statusError&&<div className="notice error" role="alert"><strong>{t.error}:</strong> {statusError}</div>}{statusMessage&&<div className="notice success" role="status" aria-live="polite">{statusMessage}</div>}
  <section className="card start-note"><h2>{t.quickTitle}</h2><p>{t.quickBody}</p><form action={completeOnboarding}><input type="hidden" name="lang" value={lang}/><StartSubmitButton label={t.finish} pendingLabel={t.saving}/></form></section>
  {isAdmin&&<section className="card start-admin"><div className="start-admin-copy"><div className="start-icon"><Church size={20}/></div><div><div className="pill">{t.adminPill}</div><h2>{t.adminTitle}</h2><p className="muted">{t.adminBody}</p></div></div><Link className="btn" href={withLang('/church/launch')}>{t.adminButton}</Link></section>}
