@@ -45,10 +45,10 @@ export default async function GuidePage({searchParams}:{searchParams:Promise<{q?
   const supabase=await createClient(),{data:{user}}=await supabase.auth.getUser(),userId=user?.id
   const preferred=user?.user_metadata?.preferred_language==='es'?'es':'en'
   const lang=query.lang==='es'?'es':query.lang==='en'?'en':preferred,t=copy[lang],q=String(query.q??'').trim().slice(0,160),needle=q.toLowerCase()
-  const withLang=(href:string)=>{const join=href.includes('?')?'&':'?';return lang==='es'?`${href}${join}lang=es`:href}
+  const withLang=(href:string)=>`${href}${href.includes('?')?'&':'?'}lang=${lang}`
   if(!userId)redirect(`/login?lang=${lang}`)
   const {data:membership}=await supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).single()
-  if(!membership?.church_id)redirect(lang==='es'?'/?lang=es':'/')
+  if(!membership?.church_id)redirect(lang==='es'?'/?lang=es':'/?lang=en')
   const church:any=Array.isArray(membership.churches)?membership.churches[0]:membership.churches,isAdmin=['pastor','church_admin'].includes(membership.role)
   const helpResults=q?searchHelp(q,lang):commonHelp(lang).slice(0,6)
   let results:any[]=[]
