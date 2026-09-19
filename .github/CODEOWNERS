@@ -1,0 +1,19 @@
+# Kingdom Network sensitive release/security surfaces.
+# This routes review to the repository owner. Enforcement still requires a GitHub
+# ruleset/branch-protection rule that requires CODEOWNERS review.
+
+/.github/CODEOWNERS @BroMarcus
+/.github/workflows/ @BroMarcus
+/vercel.json @BroMarcus
+/package.json @BroMarcus
+/package-lock.json @BroMarcus
+/scripts/verify-*.mjs @BroMarcus
+/tests/github-*.test.mjs @BroMarcus
+/tests/codeowners-sensitive-paths.test.mjs @BroMarcus
+/supabase/ @BroMarcus
+/proxy.ts @BroMarcus
+/src/lib/supabase/ @BroMarcus
+/src/app/auth/ @BroMarcus
+/src/app/account/ @BroMarcus
+/src/app/guide/ @BroMarcus
+/src/app/church/ @BroMarcus
