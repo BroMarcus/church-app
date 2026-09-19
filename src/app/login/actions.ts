@@ -4,7 +4,10 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 
 const text=(f:FormData,k:string)=>String(f.get(k)??'').trim()
-const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
+// DO-NOT-MERGE phone-QA branch: keep every absolute auth callback on the
+// isolated Package 1 preview. Do not inherit NEXT_PUBLIC_SITE_URL here because
+// the Vercel project-level value points at production.
+const siteUrl='https://kingdom-network-git-preview-packa-81e01d-tmak209-6568s-projects.vercel.app'
 const langOf=(f:FormData)=>text(f,'lang')==='es'?'es':'en'
 const loginUrl=(lang:string,extra='')=>`/login?lang=${lang}${extra}`
 const callbackUrl=(lang:'en'|'es',mode:'signup'|'recovery',next:string)=>`${siteUrl}/auth/callback?lang=${lang}&mode=${mode}&next=${encodeURIComponent(next)}`

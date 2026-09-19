@@ -22,9 +22,12 @@ const sourceForQuickAdd=(stage:string)=>{
   if(stage==='bible_study')return {source_type:'outreach',source_label:'Bible study connection'}
   return {source_type:'leader_entry',source_label:'Leader entry'}
 }
+const saveError=(f:FormData)=>msg(f,'We could not save that Outreach change. Please try again.','No pudimos guardar ese cambio de Evangelismo. Inténtelo otra vez.')
+const interactionError=(f:FormData)=>msg(f,'We could not save that follow-up entry with certainty. Check the person before trying again.','No pudimos guardar ese seguimiento con certeza. Revise a la persona antes de intentarlo otra vez.')
+const timeError=(f:FormData)=>msg(f,'We could not confirm that date or time. Check it and try again.','No pudimos confirmar esa fecha u hora. Revísela e inténtelo otra vez.')
 
 async function auth(){const supabase=await createClient();const {data}=await supabase.auth.getClaims();const userId=data?.claims?.sub;if(!userId)redirect('/login');return{supabase,userId}}
-async function localToUtc(supabase:any,churchId:string,value:string){if(!value)return null;const {data,error}=await supabase.rpc('church_local_datetime_to_utc',{p_church_id:churchId,p_local_datetime:value});if(error)throw new Error(error.message);return data as string|null}
+async function localToUtc(supabase:any,churchId:string,value:string){if(!value)return null;const {data,error}=await supabase.rpc('church_local_datetime_to_utc',{p_church_id:churchId,p_local_datetime:value});if(error)throw new Error('OUTREACH_TIME_CONVERSION_FAILED');return data as string|null}
 
 async function syncLinkedMemberJourney(supabase:any,contactId:string){
   const {data:contact}=await supabase.from('outreach_contacts').select('church_id,member_user_id,stage,service_count').eq('id',contactId).maybeSingle()
@@ -51,7 +54,7 @@ export async function createOutreachContact(formData:FormData){
   const churchId=text(formData,'church_id'),firstName=text(formData,'first_name')
   if(!churchId||!firstName)redirect(href(formData,'error',msg(formData,'First name is required.','El nombre es obligatorio.')))
   let followUp:string|null=null
-  try{followUp=await localToUtc(supabase,churchId,text(formData,'follow_up_due_at'))}catch(e:any){redirect(href(formData,'error',e.message||msg(formData,'Invalid follow-up time.','La hora de seguimiento no es válida.')))}
+  try{followUp=await localToUtc(supabase,churchId,text(formData,'follow_up_due_at'))}catch{redirect(href(formData,'error',timeError(formData)))}
   followUp=followUp||afterHours(24)
   const requestedStage=text(formData,'stage')
   const initialStage=stages.includes(requestedStage as any)?requestedStage:'new_contact'
@@ -61,7 +64,7 @@ export async function createOutreachContact(formData:FormData){
   const payload={church_id:churchId,created_by:userId,assigned_to:nullable(formData,'assigned_to')||userId,first_name:firstName,last_name:nullable(formData,'last_name'),phone:nullable(formData,'phone'),email:nullable(formData,'email'),stage:initialStage,source_type:source.source_type,source_label:source.source_label,source_occurred_at:now,bible_study_interest:checked(formData,'bible_study_interest'),messaging_consent:emailConsent||smsConsent,email_consent:emailConsent,sms_consent:smsConsent,email_consent_at:emailConsent?now:null,sms_consent_at:smsConsent?now:null,communication_language:language,prayer_request:nullable(formData,'prayer_request'),follow_up_due_at:followUp,notes:nullable(formData,'notes')}
   const {error}=await supabase.from('outreach_contacts').insert(payload)
   if(error){
-    const message=error.code==='23505'?msg(formData,'This person may already be in Outreach. Check the existing pipeline before adding another record.','Esta persona puede que ya esté en Evangelismo. Revise la lista antes de crear otro registro.'):error.message
+    const message=error.code==='23505'?msg(formData,'This person may already be in Outreach. Check the existing pipeline before adding another record.','Esta persona puede que ya esté en Evangelismo. Revise la lista antes de crear otro registro.'):saveError(formData)
     redirect(href(formData,'error',message))
   }
   revalidateOutreach();redirect(href(formData,'created','1'))
@@ -74,14 +77,14 @@ export async function updateOutreachContact(formData:FormData){
   const {data:contact,error:contactError}=await supabase.from('outreach_contacts').select('church_id,email_consent,sms_consent,email_consent_at,sms_consent_at,communication_opt_out_at').eq('id',id).single()
   if(contactError||!contact?.church_id)redirect(href(formData,'error',msg(formData,'Outreach contact not found or not available to you.','No se encontró el contacto o no está disponible para usted.')))
   let followUp:string|null=null,lastContacted:string|null=null
-  try{followUp=await localToUtc(supabase,contact.church_id,text(formData,'follow_up_due_at'));lastContacted=await localToUtc(supabase,contact.church_id,text(formData,'last_contacted_at'))}catch(e:any){redirect(href(formData,'error',e.message||msg(formData,'Invalid follow-up time.','La hora de seguimiento no es válida.')))}
+  try{followUp=await localToUtc(supabase,contact.church_id,text(formData,'follow_up_due_at'));lastContacted=await localToUtc(supabase,contact.church_id,text(formData,'last_contacted_at'))}catch{redirect(href(formData,'error',timeError(formData)))}
   const serviceCount=int(formData,'service_count')
   const stage=serviceCount>=2?laterStage(requestedStage,'regular_attendee'):requestedStage
   const emailConsent=checked(formData,'email_consent'),smsConsent=checked(formData,'sms_consent'),now=new Date().toISOString()
   const language=text(formData,'communication_language')==='es'?'es':'en'
   const payload={stage,assigned_to:nullable(formData,'assigned_to'),service_count:serviceCount,bible_study_interest:checked(formData,'bible_study_interest'),messaging_consent:emailConsent||smsConsent,email_consent:emailConsent,sms_consent:smsConsent,email_consent_at:emailConsent?(contact.email_consent?contact.email_consent_at||now:now):null,sms_consent_at:smsConsent?(contact.sms_consent?contact.sms_consent_at||now:now):null,communication_language:language,bible_study_lesson:text(formData,'bible_study_lesson')?int(formData,'bible_study_lesson'):null,prayer_request:nullable(formData,'prayer_request'),follow_up_due_at:followUp,last_contacted_at:lastContacted,notes:nullable(formData,'notes'),updated_at:now}
   const {error}=await supabase.from('outreach_contacts').update(payload).eq('id',id)
-  if(error)redirect(href(formData,'error',error.message))
+  if(error)redirect(href(formData,'error',saveError(formData)))
   await syncLinkedMemberJourney(supabase,id)
   revalidateOutreach();redirect(href(formData,'saved','1'))
 }
@@ -95,7 +98,7 @@ export async function logOutreachInteraction(formData:FormData){
   const lesson=type==='bible_study'&&text(formData,'bible_study_lesson')?int(formData,'bible_study_lesson'):null
   const now=new Date().toISOString()
   const {error}=await supabase.from('outreach_interactions').insert({contact_id:contactId,church_id:contact.church_id,recorded_by:userId,interaction_type:type,summary,bible_study_lesson:lesson})
-  if(error)redirect(href(formData,'error',error.message))
+  if(error)redirect(href(formData,'error',interactionError(formData)))
   const updates:any={last_contacted_at:now,updated_at:now}
   if(type==='invitation')updates.stage=laterStage(contact.stage,'invited')
   if(type==='service_attendance'){
@@ -112,7 +115,7 @@ export async function logOutreachInteraction(formData:FormData){
   }
   if(['call','text','visit','follow_up'].includes(type))updates.follow_up_due_at=afterHours(72)
   const {error:updateError}=await supabase.from('outreach_contacts').update(updates).eq('id',contactId)
-  if(updateError)redirect(href(formData,'error',updateError.message))
+  if(updateError)redirect(href(formData,'error',interactionError(formData)))
   await syncLinkedMemberJourney(supabase,contactId)
   revalidateOutreach();redirect(href(formData,'interaction','1'))
 }
