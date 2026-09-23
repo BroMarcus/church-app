@@ -24,13 +24,16 @@ test('shared schedule RLS keeps church isolation and allows schedule participant
   assert.match(source,/s\.church_id=team_assignments\.church_id/)
 })
 
-test('control tools preserve history instead of deleting roster or schedule assignments',async()=>{
+test('control tools preserve history while allowing scoped Friendship Group roster removal',async()=>{
   const teamActions=await read('src/app/teams/manage/actions.ts')
   const scheduleActions=await read('src/app/calendar/manage/actions.ts')
   const groupRosterActions=await read('src/app/groups/[groupId]/roster/actions.ts')
   assert.doesNotMatch(teamActions,/\.delete\s*\(/)
   assert.doesNotMatch(scheduleActions,/\.delete\s*\(/)
-  assert.doesNotMatch(groupRosterActions,/\.delete\s*\(/)
+  assert.match(groupRosterActions,/from\('group_memberships'\)\.delete\(\)\.eq\('group_id',groupId\)\.eq\('user_id',memberUserId\)/)
+  assert.doesNotMatch(groupRosterActions,/from\('group_report_attendance'\)\.delete\s*\(/)
+  assert.doesNotMatch(groupRosterActions,/from\('group_reports'\)\.delete\s*\(/)
+  assert.match(groupRosterActions,/memberUserId===leaderId/)
   assert.match(teamActions,/member_status:'active'/)
   assert.match(scheduleActions,/assignment_status:'removed'/)
   assert.match(scheduleActions,/\['scheduled','cancelled'\]\.includes\(status\)/)

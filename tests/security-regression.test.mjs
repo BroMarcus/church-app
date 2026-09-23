@@ -4,9 +4,12 @@ import {readFile} from 'node:fs/promises'
 
 const read=(path)=>readFile(new URL(`../${path}`,import.meta.url),'utf8')
 
-test('Vercel automatic Git deployment stays disabled during release audit',async()=>{
+test('Vercel Git deployment stays disabled except for the claimed Friendship Group preview branch',async()=>{
   const config=JSON.parse(await read('vercel.json'))
-  assert.equal(config.git?.deploymentEnabled,false)
+  assert.equal(config.git?.deploymentEnabled?.['*'],false)
+  assert.equal(config.git?.deploymentEnabled?.main,false)
+  assert.equal(config.git?.deploymentEnabled?.['workstream/friendship-group-report-hardening'],true)
+  assert.equal(Object.values(config.git?.deploymentEnabled??{}).filter(Boolean).length,1)
 })
 
 test('production dependency manifest contains no floating latest versions',async()=>{
