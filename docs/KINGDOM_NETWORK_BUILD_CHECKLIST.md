@@ -18,8 +18,12 @@ A page or workflow is **not VERIFIED / locked** until the final inspection clear
 5. **State-complete** — loading, empty, success, retry, error, restricted-access, and stale-client/PWA states are intentionally handled where applicable.
 6. **SPEED CLEAR** — performance is inspected every time, not deferred to a later cleanup day. Check first load, repeat navigation, common actions, and realistic-data rendering for slow queries, request waterfalls, duplicate fetches, unnecessary rerenders, unbounded data loads, oversized payloads, or other avoidable work. A page with obvious multi-second/minute delays or sluggish common actions is not final even if it is functionally correct.
 7. **Regression-clear** — after a fix, retest the affected route/workflow and any shared component/data dependency it could have changed.
+8. **Resilient / duplicate-safe** — common failure behavior is safe: double-taps/submits, retries, refresh/back navigation, weak/interrupted network, and expired sessions must not create duplicate records or corrupt state. Protect unsaved work where practical, and require deliberate confirmation/recovery for destructive actions.
+9. **Accessible / language-complete** — for user-facing surfaces, verify readable contrast and text, useful labels, keyboard/focus behavior where relevant, reasonable tap targets, and no mystery icon-only actions. Where the workflow supports Spanish, check the strategic Spanish path for untranslated text, truncation, or broken layout.
+10. **Observable / privacy-safe** — failures should not disappear silently. Important errors must be diagnosable through appropriate logging/audit context without exposing sensitive pastoral/member data in URLs, browser storage, caches, or logs.
+11. **Real-world scale / device sanity** — test with realistic record counts and the devices/browser modes that matter for the pilot. A page that is fast only with empty/demo data or works only in desktop Preview is not final.
 
-Final inspection reports should explicitly record **Speed: CLEAR / NEEDS OPTIMIZATION / BLOCKED**. If speed needs optimization, fix it while the page is already in scope whenever reasonably safe, then retest before marking the page VERIFIED.
+Final inspection reports should explicitly record **Speed: CLEAR / NEEDS OPTIMIZATION / BLOCKED** and flag any failure of resilience, accessibility/language, observability/privacy, or realistic-scale/device checks before the page is locked. If speed needs optimization, fix it while the page is already in scope whenever reasonably safe, then retest before marking the page VERIFIED.
 
 This is a standing rule for every route-by-route acceptance pass so performance debt is caught continuously instead of accumulating into a separate full-app cleanup.
 
