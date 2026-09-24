@@ -91,6 +91,11 @@ Reopen only for:
 
 If reopened, rerun the relevant final-inspection and regression checks before relocking.
 
+## CI / automated quality gate direction
+As the automated suite grows, pull requests and integration work should fail visibly when required tests, lint, build, or other release-gate checks fail. A green review should mean the required checks truly passed, not merely that the workflow completed.
+
+Do not treat CI as a substitute for Marcus's human acceptance of important UX. CI protects the locked contract; the live walkthrough decides whether the product actually feels right.
+
 ## Performance rule
 Performance is part of completion, not cleanup.
 
