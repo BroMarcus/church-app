@@ -7,6 +7,8 @@ Kingdom Network is a church growth, discipleship, leadership-development, commun
 
 Core operating rule: **Enter information once. Update every authorized place that information affects.**
 
+Founder-locked working method: follow `docs/ONE_KINGDOM_ROUTE_ACCEPTANCE_WORKFLOW.md` for route-by-route human walkthroughs, screenshot/visual acceptance, small-batch fixes, final inspection, regression protection, LOCK, and exact-next-route handoff.
+
 ## Standing Final Inspection Gate
 
 A page or workflow is **not VERIFIED / locked** until the final inspection clears all of these together:
