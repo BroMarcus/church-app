@@ -7,6 +7,22 @@ Kingdom Network is a church growth, discipleship, leadership-development, commun
 
 Core operating rule: **Enter information once. Update every authorized place that information affects.**
 
+## Standing Final Inspection Gate
+
+A page or workflow is **not VERIFIED / locked** until the final inspection clears all of these together:
+
+1. **Functional** — the real human workflow works end to end; buttons, forms, navigation, saves, and follow-up actions do what they claim.
+2. **Connected / data-correct** — the page reads and writes the canonical records without duplicate or stale sources of truth.
+3. **Secure / permission-correct** — role, tenant, privacy, and restricted-data behavior is correct for the affected surface.
+4. **Simple / responsive** — mobile-first usability is clear, desktop remains sound, and the user knows what to do next.
+5. **State-complete** — loading, empty, success, retry, error, restricted-access, and stale-client/PWA states are intentionally handled where applicable.
+6. **SPEED CLEAR** — performance is inspected every time, not deferred to a later cleanup day. Check first load, repeat navigation, common actions, and realistic-data rendering for slow queries, request waterfalls, duplicate fetches, unnecessary rerenders, unbounded data loads, oversized payloads, or other avoidable work. A page with obvious multi-second/minute delays or sluggish common actions is not final even if it is functionally correct.
+7. **Regression-clear** — after a fix, retest the affected route/workflow and any shared component/data dependency it could have changed.
+
+Final inspection reports should explicitly record **Speed: CLEAR / NEEDS OPTIMIZATION / BLOCKED**. If speed needs optimization, fix it while the page is already in scope whenever reasonably safe, then retest before marking the page VERIFIED.
+
+This is a standing rule for every route-by-route acceptance pass so performance debt is caught continuously instead of accumulating into a separate full-app cleanup.
+
 ---
 
 ## P0 — Pilot-critical: make existing functions truly usable
