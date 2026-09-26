@@ -1,6 +1,6 @@
 # Kingdom Network Build Checklist
 
-Updated: 2026-08-19
+Updated: 2026-09-25
 
 ## Mission
 Kingdom Network is a church growth, discipleship, leadership-development, communication, and organization system. The product should help the church reach people, follow up consistently, disciple them, train leaders, coordinate schedules, preserve each member's spiritual journey, and give pastors/admins reliable real-time church-health information.
@@ -52,6 +52,9 @@ This is a standing rule for every route-by-route acceptance pass so performance 
 - [ ] Expand Effective Soul Winning final from 8 questions to 20–25.
 - [ ] Verify Effective Soul Winning lesson content against uploaded New Life materials and Scripture.
 - [ ] Build a reusable course-builder pattern so all future courses use the same lesson → checkpoint → continue → final model.
+- [ ] Finish live acceptance of the source-owned Course Builder workflow: whole-course ZIP/file dump, duplicate-safe Add Files later, Miscellaneous/Unsorted review, preview/open-original, manual Add Resource, exact church-owned source-link matching, and Draft activation guard. One Kingdom stores source links + metadata rather than duplicating curriculum file bytes into Base44.
+- [ ] Complete live provider setup/acceptance for course sources (Dropbox Chooser first; Google Drive Picker next) using explicit user-selected files, tenant-scoped church administration, and no long-lived provider token storage in One Kingdom.
+- [ ] Convert verified imported assessment sources (including First Steps Lessons 4 and 10) into native One Kingdom assessments after the source files are connected and reviewed.
 - [ ] Add clear progress/resume state: current lesson, next test, locked sections, final status.
 - [ ] Make "Resume course" available from Home and The Prophet.
 
@@ -234,6 +237,7 @@ This is a standing rule for every route-by-route acceptance pass so performance 
 - [x] Member/leader navigation concepts exist.
 - [x] Learning engine has courses, modules, assessments, attempts, passing scores, final exams, credentials, and backend completion logic.
 - [x] First Steps exists as a published course.
+- [x] Deterministic Build Course from Files Draft workflow exists: lesson/file classification, protected Director/Admin and Course Promotions inventory, exact approved-link reuse, cross-filetype safety, duplicate-safe incremental Add Files, and Miscellaneous retention. Live Dropbox/Google provider credential testing is still pending.
 - [x] Effective Soul Winning exists as a published course, but its assessments are below the newly required question counts and need expansion.
 - [x] Draft New Convert Bible Studies and Bible Study Teacher Training courses exist from Effective Soul Winning source material.
 - [x] Kingdom Guide Beta exists as trusted-resource search/navigation, but it still needs to become The Prophet operational mentor.
