@@ -1,9 +1,7 @@
-export default function InvitesLoading(){
-  return <main aria-busy="true" style={{maxWidth:1000,margin:'0 auto',padding:'28px 18px 80px'}}>
-    <div style={{border:'1px solid #e5e7eb',borderRadius:18,padding:24,background:'#fff'}}>
-      <div style={{fontSize:12,fontWeight:800,letterSpacing:'.08em',textTransform:'uppercase'}}>Church Invitations / Invitaciones de la Iglesia</div>
-      <h1 style={{margin:'10px 0 8px'}}>Loading invitations… / Cargando invitaciones…</h1>
-      <p style={{margin:0,color:'#6b7280'}}>We’re checking active invitation links and church access. / Estamos revisando los enlaces de invitación activos y el acceso a la iglesia.</p>
-    </div>
-  </main>
-}
+'use client'
+
+import {useEffect,useState} from 'react'
+type Lang='en'|'es'
+const copy={en:{pill:'CHURCH INVITATIONS',title:'Checking invitations…',body:'Keep this page open while we verify church access and active invitation links. Nothing is being changed.'},es:{pill:'INVITACIONES DE LA IGLESIA',title:'Verificando las invitaciones…',body:'Mantén esta página abierta mientras verificamos el acceso de la iglesia y los enlaces activos. No se está cambiando nada.'}} as const
+function currentLanguage():Lang{if(typeof window==='undefined')return'en';const requested=new URLSearchParams(window.location.search).get('lang');if(requested==='es')return'es';if(requested==='en')return'en';return document.documentElement.lang.toLowerCase().startsWith('es')?'es':'en'}
+export default function InvitesLoading(){const[lang,setLang]=useState<Lang>('en');useEffect(()=>setLang(currentLanguage()),[]);const t=copy[lang];return <main className="shell" aria-busy="true"><section className="card" role="status" aria-live="polite" style={{padding:26,marginTop:24,maxWidth:760}}><div className="pill">{t.pill}</div><h1>{t.title}</h1><p className="muted">{t.body}</p></section></main>}
