@@ -23,18 +23,23 @@ export default async function OutreachPage({searchParams}:{searchParams:Promise<
   const {data:claims}=await supabase.auth.getClaims()
   const userId=claims?.claims?.sub
   if(!userId)redirect('/login')
-  const {data:membership}=await supabase.from('church_memberships').select('church_id,role,churches(name,timezone)').eq('user_id',userId).eq('status','active').limit(1).single()
+  const {data:membership,error:membershipError}=await supabase.from('church_memberships').select('church_id,role,churches(name,timezone)').eq('user_id',userId).eq('status','active').limit(1).single()
+  if(membershipError)throw new Error('Outreach membership context could not load')
   if(!membership?.church_id)redirect('/')
   const churchId=membership.church_id
-  const [{data:contacts},{data:churchMembers},{data:customManage}]=await Promise.all([
+  const [{data:contacts,error:contactsError},{data:churchMembers,error:membersError},{data:customManage,error:permissionError}]=await Promise.all([
     supabase.from('outreach_contacts').select('*').eq('church_id',churchId).order('updated_at',{ascending:false}),
     supabase.from('church_memberships').select('user_id,role').eq('church_id',churchId).eq('status','active'),
     supabase.rpc('current_user_has_church_permission',{p_church_id:churchId,p_permission_key:'manage_outreach'})
   ])
-  const canManageOutreach=['pastor','church_admin','minister'].includes(membership.role)||Boolean(customManage)
+  if(contactsError)throw new Error('Outreach follow-up records could not load')
+  const baseManage=['pastor','church_admin','minister'].includes(membership.role)
+  if(permissionError&&!baseManage)console.info('Outreach permission lookup unavailable; failing closed',{message:permissionError.message})
+  const canManageOutreach=baseManage||(!permissionError&&Boolean(customManage))
+  if(membersError&&canManageOutreach)throw new Error('Outreach assignment directory could not load')
   const memberIds=(churchMembers??[]).map((m:any)=>m.user_id)
   let profiles:any[]=[]
-  if(memberIds.length){const r=await supabase.from('profiles').select('id,display_name,first_name,last_name').in('id',memberIds);profiles=r.data??[]}
+  if(memberIds.length){const r=await supabase.from('profiles').select('id,display_name,first_name,last_name').in('id',memberIds);if(r.error)console.info('Outreach profile labels unavailable',{message:r.error.message});profiles=r.data??[]}
   const pm=new Map(profiles.map((p:any)=>[p.id,p]))
   const options=(churchMembers??[]).map((m:any)=>({id:m.user_id,name:personName(pm.get(m.user_id),es),role:m.role})).sort((a:any,b:any)=>a.name.localeCompare(b.name))
   const church:any=Array.isArray(membership.churches)?membership.churches[0]:membership.churches
@@ -45,7 +50,7 @@ export default async function OutreachPage({searchParams}:{searchParams:Promise<
   const rows=[...rawRows].sort((a:any,b:any)=>{const ao=isOverdue(a),bo=isOverdue(b);if(ao!==bo)return ao?-1:1;const ad=a.follow_up_due_at?new Date(a.follow_up_due_at).getTime():Number.MAX_SAFE_INTEGER;const bd=b.follow_up_due_at?new Date(b.follow_up_due_at).getTime():Number.MAX_SAFE_INTEGER;if(ad!==bd)return ad-bd;return new Date(b.updated_at).getTime()-new Date(a.updated_at).getTime()})
   const contactIds=rows.map((c:any)=>c.id)
   let interactions:any[]=[]
-  if(contactIds.length){const r=await supabase.from('outreach_interactions').select('id,contact_id,interaction_type,occurred_at,summary,bible_study_lesson,source_type,source_label,recorded_by,profiles:recorded_by(display_name,first_name,last_name)').in('contact_id',contactIds).order('occurred_at',{ascending:false});interactions=r.data??[]}
+  if(contactIds.length){const r=await supabase.from('outreach_interactions').select('id,contact_id,interaction_type,occurred_at,summary,bible_study_lesson,source_type,source_label,recorded_by,profiles:recorded_by(display_name,first_name,last_name)').in('contact_id',contactIds).order('occurred_at',{ascending:false});if(r.error)throw new Error('Outreach follow-up history could not load');interactions=r.data??[]}
   const interactionMap=new Map<string,any[]>();for(const item of interactions){const list=interactionMap.get(item.contact_id)??[];list.push(item);interactionMap.set(item.contact_id,list)}
   const count=(...keys:string[])=>rows.filter((c:any)=>keys.includes(c.stage)).length
   const overdueCount=rows.filter(isOverdue).length
