@@ -11,7 +11,9 @@ test('required assessments cannot publish outside the 5-10 checkpoint / 20-25 fi
   assert.match(migration,/Required final exams must contain 20 to 25 questions/)
   assert.match(migration,/Required checkpoint assessments must contain 5 to 10 questions/)
   assert.match(migration,/greatest\(80,coalesce\(v_course_passing,80\)\)/)
-  assert.match(migration,/trg_validate_required_assessment_publish_ready/)
+  assert.match(migration,/trg_validate_required_assessment_publish_ready_insert/)
+  assert.match(migration,/trg_validate_required_assessment_publish_ready_update/)
+  assert.match(migration,/before insert on public\.course_assessments/)
 })
 
 test('course publishing fails closed when required assessments are incomplete or invalid',()=>{
