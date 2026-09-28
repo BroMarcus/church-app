@@ -61,6 +61,7 @@ export function resolveJourneyStep(step:JourneyStepDefinition,ctx:JourneyResolut
     status=value===expected||(!step.completion_value&&COMPLETE_VALUES.has(value))
       ?'completed'
       :STARTED_VALUES.has(value)?'in_progress':'not_started'
+    if(status==='in_progress')lastActivityAt=String(ctx.milestones.updated_at??lastActivityAt??'')||null
   }else if(step.completion_source==='course'){
     const enrollment=ctx.enrollments.find((row)=>String(row.course_id??'')===String(step.completion_key??''))
     if(enrollment){
