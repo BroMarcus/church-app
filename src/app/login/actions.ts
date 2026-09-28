@@ -2,9 +2,10 @@
 
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { PUBLIC_APP_ORIGIN } from '@/lib/public-app-origin'
 
 const text=(f:FormData,k:string)=>String(f.get(k)??'').trim()
-const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
+const siteUrl=PUBLIC_APP_ORIGIN
 const langOf=(f:FormData)=>text(f,'lang')==='es'?'es':'en'
 const loginUrl=(lang:string,extra='')=>`/login?lang=${lang}${extra}`
 const callbackUrl=(lang:'en'|'es',mode:'signup'|'recovery',next:string)=>`${siteUrl}/auth/callback?lang=${lang}&mode=${mode}&next=${encodeURIComponent(next)}`
@@ -33,8 +34,9 @@ function friendlyAuthEmailError(message:string,lang:'en'|'es'){
 
 export async function login(formData:FormData){
   const supabase=await createClient()
-  const lang=langOf(formData),next=safeJoinNext(text(formData,'next'))
+  const lang=langOf(formData),next=safeJoinNext(text(formData,'next')),inviteId=text(formData,'invite_id')
   const nextPart=next?`&next=${encodeURIComponent(next)}`:''
+  const invitePart=inviteId?`&invite=${encodeURIComponent(inviteId)}`:''
   const email=text(formData,'email').toLowerCase(),password=String(formData.get('password')??'')
   const {data,error}=await supabase.auth.signInWithPassword({email,password})
   if(error){
@@ -51,7 +53,22 @@ export async function login(formData:FormData){
     if(!normalized.includes('invalid login credentials')&&!normalized.includes('email not confirmed')){
       console.error('login failed',{message:error.message})
     }
-    redirect(loginUrl(lang,'&mode=signin'+nextPart+'&error='+encodeURIComponent(message)))
+    redirect(loginUrl(lang,'&mode=signin'+invitePart+nextPart+'&error='+encodeURIComponent(message)))
+  }
+  if(inviteId){
+    const {data:redeemed,error:redeemError}=await supabase.rpc('redeem_invite_for_current_user',{p_invite_id:inviteId})
+    if(redeemError){
+      console.error('existing-account invite redemption failed',{message:redeemError.message})
+      const message=lang==='es'
+        ? 'Iniciaste sesión, pero no pudimos aplicar esa invitación. Puede haber vencido, ya haberse usado o pertenecer a otro correo.'
+        : 'You signed in, but we could not apply that invitation. It may be expired, already used, or tied to a different email.'
+      redirect(loginUrl(lang,'&mode=signin'+invitePart+'&error='+encodeURIComponent(message)))
+    }
+    const row:any=Array.isArray(redeemed)?redeemed[0]:redeemed
+    const message=lang==='es'
+      ? `Tu cuenta existente ya está conectada con ${row?.church_name||'la iglesia'}.`
+      : `Your existing account is now connected to ${row?.church_name||'the church'}.`
+    redirect(`/start?welcome=1${lang==='es'?'&lang=es':''}&message=${encodeURIComponent(message)}`)
   }
   if(next)redirect(next)
   const userId=data.user?.id
@@ -102,7 +119,7 @@ export async function signup(formData:FormData){
     const message=lang==='es'
       ? 'Ese correo ya tiene una cuenta. Inicia sesión con tu contraseña existente o usa “Olvidé mi contraseña” si no la recuerdas.'
       : 'That email already has an account. Sign in with your existing password, or use “I forgot my password” if you do not remember it.'
-    redirect(loginUrl(lang,'&mode=signin&message='+encodeURIComponent(message)))
+    redirect(loginUrl(lang,invitePart+'&mode=signin&message='+encodeURIComponent(message)))
   }
   if(data.session)redirect(startPath)
   const message=lang==='es'
