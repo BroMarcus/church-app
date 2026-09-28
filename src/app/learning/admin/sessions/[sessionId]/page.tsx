@@ -13,10 +13,26 @@ export default async function SessionRosterPage({params,searchParams}:{params:Pr
   const {data:claims}=await supabase.auth.getClaims()
   const actorId=claims?.claims?.sub
   if(!actorId)redirect('/login')
-  const {data:session}=await supabase.from('course_sessions').select('id,course_id,church_id,session_date,starts_at,title,instructor_name,courses(title)').eq('id',sessionId).single()
+  const {data:session}=await supabase.from('course_sessions').select('id,course_id,church_id,session_date,starts_at,title,instructor_name,module_ids,courses(title)').eq('id',sessionId).single()
   if(!session)redirect('/learning')
   const {data:membership}=await supabase.from('church_memberships').select('role').eq('church_id',session.church_id).eq('user_id',actorId).eq('status','active').single()
   if(!membership||!['minister','pastor','church_admin'].includes(membership.role))redirect('/learning')
+
+  const linkedModuleIds=Array.isArray(session.module_ids)?session.module_ids.filter(Boolean):[]
+  let linkedModules:any[]=[];let linkedAssets:any[]=[]
+  if(linkedModuleIds.length){
+    const [{data:moduleRows},{data:assetRows}]=await Promise.all([
+      supabase.from('course_modules').select('id,title,position,content,source_url,source_label,source_provider').eq('course_id',session.course_id).in('id',linkedModuleIds).order('position'),
+      supabase.from('course_module_assets').select('id,module_id,title,asset_type,storage_path').in('module_id',linkedModuleIds).order('position')
+    ])
+    linkedModules=moduleRows??[]
+    linkedAssets=await Promise.all((assetRows??[]).map(async(asset:any)=>{
+      const signed=await supabase.storage.from('learning-assets').createSignedUrl(asset.storage_path,900)
+      return {...asset,url:signed.data?.signedUrl??null}
+    }))
+  }
+  const assetsByModule=new Map<string,any[]>()
+  for(const asset of linkedAssets){const list=assetsByModule.get(asset.module_id)??[];list.push(asset);assetsByModule.set(asset.module_id,list)}
 
   const {data:enrollments}=await supabase.from('course_enrollments').select('user_id').eq('course_id',session.course_id)
   const ids=Array.from(new Set((enrollments??[]).map((e:any)=>e.user_id)))
@@ -32,6 +48,7 @@ export default async function SessionRosterPage({params,searchParams}:{params:Pr
   return <main className="shell"><header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">Learning Studio • Attendance</div></div><div className="row"><Link className="ghost" href={`/learning/${session.course_id}`}>← Course</Link><Link className="ghost" href="/learning/admin">Learning Studio</Link></div></header>
     <section className="card roster-hero"><div><div className="pill">CLASS ROSTER</div><h1>{session.title}</h1><div className="roster-meta"><CalendarDays size={12}/> {fmtDate(session.session_date)} • {session.instructor_name||'Instructor TBD'} • {course?.title||'Course'}</div></div><UsersRound/></section>
     {query.saved&&<div className="notice success">Attendance saved.</div>}{query.error&&<div className="notice error">{query.error}</div>}
+    <section className="card" style={{padding:18,marginBottom:18}}><div className="pill">TODAY'S LESSON MATERIALS</div><h2 style={{margin:'8px 0 6px'}}>Teach from the same course your learners use.</h2><p className="muted">Linked lessons, original source links, and attached files stay together here so the live class does not need a separate curriculum copy.</p>{linkedModules.length?<div style={{display:'grid',gap:12,marginTop:14}}>{linkedModules.map((module:any)=>{const assets=assetsByModule.get(module.id)??[];return <article className="card" style={{padding:14,background:'rgba(255,255,255,.025)'}} key={module.id}><div className="pill">LESSON {module.position}</div><h3 style={{margin:'8px 0 5px'}}>{module.title}</h3>{module.content?.summary&&<p className="muted">{module.content.summary}</p>}{module.source_url&&<a className="ghost" href={module.source_url} target="_blank" rel="noreferrer">Open original source →</a>}{assets.length>0&&<div style={{display:'grid',gap:7,marginTop:10}}>{assets.map((asset:any)=><div className="row" style={{justifyContent:'space-between',gap:8,flexWrap:'wrap'}} key={asset.id}><span>{asset.title} <span className="small muted">• {String(asset.asset_type).replaceAll('_',' ')}</span></span>{asset.url?<a className="ghost" href={asset.url} target="_blank" rel="noreferrer">Open</a>:<span className="small muted">File unavailable</span>}</div>)}</div>}</article>})}</div>:<div className="notice" style={{marginTop:12}}>No lesson is connected to this class meeting yet. Link the lesson in Learning Studio before class so the teacher has the right material.</div>}</section>
     <form action={saveSessionAttendance} className="card roster-form"><input type="hidden" name="session_id" value={session.id}/><div className="roster-summary"><span>{rows.length} enrolled</span><span>{counts.present} present</span><span>{counts.absent} absent</span><span>{counts.excused} excused</span><span>{counts.makeup_completed} make-up complete</span></div><div className="roster-table">{rows.map((row:any)=><div className="roster-row" key={row.id}><div className="roster-person"><strong>{row.name}</strong><span>{am.has(row.id)?'Attendance previously recorded':'Not yet recorded — defaults to present'}</span></div><select name={`attendance:${row.id}`} defaultValue={row.status}><option value="present">Present</option><option value="absent">Absent</option><option value="excused">Excused</option><option value="makeup_completed">Make-up completed</option></select></div>)}{!rows.length&&<div className="empty"><h3>No enrolled students yet.</h3><p className="muted">Students will appear here after they start or are enrolled in this course.</p></div>}</div><div className="roster-save"><div><strong>Save the class record</strong><div className="small muted">Attendance is separate from online lesson completion.</div></div><button className="btn" disabled={!rows.length}>Save attendance</button></div></form>
   </main>
 }
