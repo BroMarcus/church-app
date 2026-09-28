@@ -2,13 +2,13 @@ import type {MetadataRoute} from 'next'
 
 export default function manifest():MetadataRoute.Manifest{
   return {
-    name:'Kingdom Network',
-    short_name:'Kingdom',
-    description:'Church community, discipleship and ministry platform',
+    name:'One Kingdom OS',
+    short_name:'One Kingdom',
+    description:'Know every person. Clarify every next step. Let nobody be forgotten.',
     start_url:'/',
     display:'standalone',
-    background_color:'#0b0810',
-    theme_color:'#0b0810',
+    background_color:'#f5f7fb',
+    theme_color:'#1e5bff',
     orientation:'portrait-primary',
     icons:[
       {src:'/kingdom-icon.svg',sizes:'any',type:'image/svg+xml',purpose:'any'},

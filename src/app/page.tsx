@@ -1,74 +1,208 @@
+import type { CSSProperties } from 'react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowRight,BookOpen,BriefcaseBusiness,CalendarDays,Church,FileText,Globe2,GraduationCap,HandHeart,HeartHandshake,Images,MessageCircle,MessageSquareWarning,Megaphone,ShieldCheck,Store,Users } from 'lucide-react'
+import {
+  ArrowRight,
+  Bell,
+  BookOpen,
+  BriefcaseBusiness,
+  CalendarDays,
+  Church,
+  Crown,
+  GraduationCap,
+  HandHeart,
+  Megaphone,
+  ShieldCheck,
+  Sparkles,
+  UserRound,
+  Users,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { CommunityFeed } from '@/components/community-feed'
 import { NotificationBell } from '@/components/notification-bell'
-import { OfficialUpdates } from '@/components/official-updates'
 import { UpcomingSnapshot } from '@/components/upcoming-snapshot'
 import { FeaturedEvents } from '@/components/featured-events'
 import { getNextStep } from '@/lib/journey'
 import { getLearningResumeState } from '@/lib/learning-resume'
+import styles from './home-v2.module.css'
+
+const roleNames:Record<string,string>={
+  pastor:'Pastor',
+  church_admin:'Church Admin',
+  minister:'Minister',
+  group_leader:'Group Leader',
+  ministry_leader:'Ministry Leader',
+  member:'Member',
+}
 
 export default async function Home({searchParams}:{searchParams:Promise<{lang?:string}>}){
-  const params=await searchParams,es=params.lang==='es',lang=es?'es':'en',t=(en:string,sp:string)=>es?sp:en
-  const l=(path:string)=>{if(!es)return path;const [base,hash]=path.split('#');return `${base}${base.includes('?')?'&':'?'}lang=es${hash?`#${hash}`:''}`}
-  const everyday=[
-    {title:t('Learning','Aprendizaje'),desc:t('Classes & progress','Clases y progreso'),Icon:GraduationCap,href:'/learning'},
-    {title:t('Groups','Grupos'),desc:t('Friendship Group & community','Grupo de Amistad y comunidad'),Icon:Users,href:'/groups'},
-    {title:t('Calendar','Calendario'),desc:t('Services, classes & events','Servicios, clases y eventos'),Icon:CalendarDays,href:'/calendar'},
-    {title:t('Prayer & Testimony','Oración y Testimonio'),desc:t('Prayer needs & victories','Necesidades y victorias'),Icon:HandHeart,href:'/prayer'}
-  ] as const
-  const explore=[
-    {title:'Kingdom Guide',desc:t('Help finding anything','Ayuda para encontrar lo que necesitas'),Icon:BookOpen,href:'/guide'},
-    {title:t('Messages','Mensajes'),desc:t('Private conversations','Conversaciones privadas'),Icon:MessageCircle,href:'/messages'},
-    {title:t('Serve','Servir'),desc:t('Ministries & opportunities','Ministerios y oportunidades'),Icon:HandHeart,href:'/serve'},
-    {title:t('Teams','Equipos'),desc:t('Schedules & assignments','Horarios y asignaciones'),Icon:BriefcaseBusiness,href:'/teams'},
-    {title:t('Documents','Documentos'),desc:t('Certificates & records','Certificados y registros'),Icon:FileText,href:'/documents'},
-    {title:t('Media Library','Biblioteca de Medios'),desc:t('Flyers, photos & graphics','Volantes, fotos y gráficos'),Icon:Images,href:'/media'},
-    {title:t('Business Partners','Negocios de Miembros'),desc:t('Support member businesses','Apoya negocios de miembros'),Icon:Store,href:'/business'},
-    {title:t('Fundraising','Recaudación'),desc:t('Campaigns & goals','Campañas y metas'),Icon:HeartHandshake,href:'/fundraising'},
-    {title:t('Network','Red'),desc:t('District & organization','Distrito y organización'),Icon:Globe2,href:'/network'},
-    {title:t('Church Directory','Directorio de la Iglesia'),desc:t('Find church family','Encuentra a tu familia de iglesia'),Icon:Church,href:'/directory'},
-    {title:t('Private Care','Cuidado Privado'),desc:t('Private prayer & pastoral help','Oración privada y ayuda pastoral'),Icon:HandHeart,href:'/help'}
-  ] as const
+  const params=await searchParams
+  const es=params.lang==='es'
+  const lang=es?'es':'en'
+  const t=(en:string,sp:string)=>es?sp:en
+  const l=(path:string)=>{
+    if(!es)return path
+    const [base,hash]=path.split('#')
+    return `${base}${base.includes('?')?'&':'?'}lang=es${hash?`#${hash}`:''}`
+  }
 
-  const supabase=await createClient();const {data:claimsData}=await supabase.auth.getClaims();const userId=claimsData?.claims?.sub;if(!userId)redirect(l('/login'))
-  const [{data:profile},{data:membership}]=await Promise.all([supabase.from('profiles').select('display_name,first_name,last_name').eq('id',userId).single(),supabase.from('church_memberships').select('church_id,role,churches(name,city,state,logo_path,brand_color,welcome_message)').eq('user_id',userId).eq('status','active').limit(1).single()])
-  if(!membership?.church_id)return <main className="shell"><div className="card" style={{padding:24}}><h1>{t('Account created.','Cuenta creada.')}</h1><p>{t('Your account is not connected to an active church yet. If this should already be connected, use Feedback below and tell us what happened.','Tu cuenta todavía no está conectada a una iglesia activa. Si ya debería estar conectada, usa Comentarios abajo y dinos qué pasó.')}</p><div className="row"><Link className="btn" href={l('/feedback')}>{t('Give feedback','Enviar comentarios')}</Link><form action="/auth/signout" method="post"><button className="ghost">{t('Sign out','Cerrar sesión')}</button></form></div></div></main>
-  const isAdmin=['pastor','church_admin'].includes(membership.role),nowIso=new Date().toISOString()
+  const supabase=await createClient()
+  const {data:claimsData}=await supabase.auth.getClaims()
+  const userId=claimsData?.claims?.sub
+  if(!userId)redirect(l('/login'))
+
+  const [{data:profile},{data:membership}]=await Promise.all([
+    supabase.from('profiles').select('display_name,first_name,last_name').eq('id',userId).single(),
+    supabase.from('church_memberships').select('church_id,role,churches(name,city,state,logo_path,brand_color,welcome_message)').eq('user_id',userId).eq('status','active').limit(1).single(),
+  ])
+
+  if(!membership?.church_id){
+    return <main className={styles.page}><div className={styles.shell}><div className={styles.emptyState}><section className={styles.emptyCard}><div className={styles.identity}><div className={styles.mark}><Crown/></div><div className={styles.brand}><strong>ONE KINGDOM</strong><span>Church OS</span></div></div><h1>{t('Your account is ready.','Tu cuenta está lista.')}</h1><p className={styles.muted}>{t('You are not connected to an active church yet. A church administrator can finish your connection without recreating your account.','Todavía no estás conectado a una iglesia activa. Un administrador puede completar tu conexión sin volver a crear tu cuenta.')}</p><div className={styles.actionRow}><Link className={styles.primaryButton} href={l('/feedback')}>{t('Get help','Obtener ayuda')} <ArrowRight/></Link><Link className={styles.secondaryButton} href={l('/profile')}>{t('Open profile','Abrir perfil')}</Link></div></section></div></div></main>
+  }
+
+  const churchId=membership.church_id
+  const role=String(membership.role??'member')
+  const isAdmin=['pastor','church_admin'].includes(role)
+  const isLeader=isAdmin||['minister','group_leader','ministry_leader'].includes(role)
+  const nowIso=new Date().toISOString()
+
   const [{data:milestones},{count:groupCount},{count:teamCount},{count:acceptedCount},{data:newConvertCourses},{data:activeLearning}]=await Promise.all([
-    supabase.from('member_milestones').select('holy_ghost_received,baptized,first_steps_status,soul_winning_status,bible_study_teacher_status').eq('church_id',membership.church_id).eq('user_id',userId).maybeSingle(),
+    supabase.from('member_milestones').select('holy_ghost_received,baptized,first_steps_status,soul_winning_status,bible_study_teacher_status').eq('church_id',churchId).eq('user_id',userId).maybeSingle(),
     supabase.from('group_memberships').select('*',{count:'exact',head:true}).eq('user_id',userId),
     supabase.from('team_assignments').select('*',{count:'exact',head:true}).eq('assigned_user_id',userId),
     supabase.from('ministry_applications').select('*',{count:'exact',head:true}).eq('user_id',userId).eq('status','accepted'),
-    supabase.from('courses').select('id').eq('church_id',membership.church_id).eq('published',true).eq('pathway_stage','new_convert'),
-    supabase.from('course_enrollments').select('course_id,progress,updated_at').eq('user_id',userId).eq('credential_earned',false).order('updated_at',{ascending:false}).limit(1)
+    supabase.from('courses').select('id').eq('church_id',churchId).eq('published',true).eq('pathway_stage','new_convert'),
+    supabase.from('course_enrollments').select('course_id,progress,updated_at').eq('user_id',userId).eq('credential_earned',false).order('updated_at',{ascending:false}).limit(1),
   ])
-  let leadershipNeeds=0;if(isAdmin){const [{count:care},{count:reports},{count:outreach},{count:docs},{count:applications}]=await Promise.all([supabase.from('care_requests').select('*',{count:'exact',head:true}).eq('church_id',membership.church_id).in('status',['new','in_review']),supabase.from('message_reports').select('*',{count:'exact',head:true}).eq('church_id',membership.church_id).eq('status','open'),supabase.from('outreach_contacts').select('*',{count:'exact',head:true}).eq('church_id',membership.church_id).lt('follow_up_due_at',nowIso).not('stage','in','("inactive","serving")'),supabase.from('member_documents').select('*',{count:'exact',head:true}).eq('church_id',membership.church_id).eq('verification_status','pending'),supabase.from('ministry_applications').select('id,ministries!inner(church_id)',{count:'exact',head:true}).eq('ministries.church_id',membership.church_id).in('status',['submitted','under_review'])]);leadershipNeeds=(care??0)+(reports??0)+(outreach??0)+(docs??0)+(applications??0)}
-  const newConvertIds=(newConvertCourses??[]).map((c:any)=>c.id);let newConvertCompleted=false;if(newConvertIds.length){const {data:completedRows}=await supabase.from('course_enrollments').select('course_id').eq('user_id',userId).eq('credential_earned',true).in('course_id',newConvertIds).limit(1);newConvertCompleted=Boolean(completedRows?.length)}
+
+  let leadershipNeeds=0
+  if(isAdmin){
+    const [{count:care},{count:reports},{count:outreach},{count:docs},{count:applications}]=await Promise.all([
+      supabase.from('care_requests').select('*',{count:'exact',head:true}).eq('church_id',churchId).in('status',['new','in_review']),
+      supabase.from('message_reports').select('*',{count:'exact',head:true}).eq('church_id',churchId).eq('status','open'),
+      supabase.from('outreach_contacts').select('*',{count:'exact',head:true}).eq('church_id',churchId).lt('follow_up_due_at',nowIso).not('stage','in','("inactive","serving")'),
+      supabase.from('member_documents').select('*',{count:'exact',head:true}).eq('church_id',churchId).eq('verification_status','pending'),
+      supabase.from('ministry_applications').select('id,ministries!inner(church_id)',{count:'exact',head:true}).eq('ministries.church_id',churchId).in('status',['submitted','under_review']),
+    ])
+    leadershipNeeds=(care??0)+(reports??0)+(outreach??0)+(docs??0)+(applications??0)
+  }
+
+  const newConvertIds=(newConvertCourses??[]).map((course:any)=>course.id)
+  let newConvertCompleted=false
+  if(newConvertIds.length){
+    const {data:completedRows}=await supabase.from('course_enrollments').select('course_id').eq('user_id',userId).eq('credential_earned',true).in('course_id',newConvertIds).limit(1)
+    newConvertCompleted=Boolean(completedRows?.length)
+  }
+
   let learningResume:any=null
-  if(activeLearning?.[0]?.course_id){const {data:activeCourse}=await supabase.from('courses').select('id,title,passing_score,language_code').eq('id',activeLearning[0].course_id).eq('published',true).maybeSingle();if(activeCourse)learningResume=await getLearningResumeState(supabase,userId,activeCourse)}
-  const learningResumeDesc=learningResume?.kind==='lesson'?`${t('Continue','Continuar')}: ${learningResume.moduleTitle??t('Next lesson','Próxima lección')}`:learningResume?.kind==='final'?t('Final exam ready','Examen final listo'):learningResume?.kind==='complete'?t('Course ready to finish','Curso listo para terminar'):null
-  const m:any=milestones??{},nextStep=getNextStep({holyGhost:m.holy_ghost_received,baptized:m.baptized,newConvertAvailable:newConvertIds.length>0,newConvertCompleted,firstSteps:m.first_steps_status,soulWinning:m.soul_winning_status,bibleStudyTeacher:m.bible_study_teacher_status,groupCount:groupCount??0,serveCount:(teamCount??0)+(acceptedCount??0)},lang),church=Array.isArray(membership.churches)?membership.churches[0]:membership.churches as any,name=profile?.display_name||[profile?.first_name,profile?.last_name].filter(Boolean).join(' ')||t('Member','Miembro'),churchLogo=church?.logo_path?supabase.storage.from('church-branding').getPublicUrl(church.logo_path).data.publicUrl:null,accent=church?.brand_color||'#5a3a7d'
+  if(activeLearning?.[0]?.course_id){
+    const {data:activeCourse}=await supabase.from('courses').select('id,title,passing_score,language_code').eq('id',activeLearning[0].course_id).eq('published',true).maybeSingle()
+    if(activeCourse)learningResume=await getLearningResumeState(supabase,userId,activeCourse)
+  }
 
-  return <main className="shell"><header className="topbar"><div><div className="brand">Kingdom <span>Network</span></div><div className="small muted">{church?.name??t('Your Church','Tu Iglesia')}</div></div><div className="row"><Link className="ghost" href="/?lang=en">English</Link><Link className="ghost" href="/?lang=es">Español</Link><NotificationBell userId={userId}/>{isAdmin&&<Link className="ghost" href={l('/church/leadership')}>{t('Leadership','Liderazgo')}</Link>}{isAdmin&&<Link className="ghost" href={l('/church')}>{t('Admin','Admin')}</Link>}<Link className="ghost" href={l('/start')}>{t('Start Here','Empieza Aquí')}</Link><Link className="ghost" href={l('/feedback')}>{t('Feedback','Comentarios')}</Link><Link className="ghost" href={l('/profile')}>{t('Profile','Perfil')}</Link><form action="/auth/signout" method="post"><button className="ghost">{t('Sign out','Cerrar sesión')}</button></form></div></header>
+  const m:any=milestones??{}
+  const nextStep=getNextStep({
+    holyGhost:m.holy_ghost_received,
+    baptized:m.baptized,
+    newConvertAvailable:newConvertIds.length>0,
+    newConvertCompleted,
+    firstSteps:m.first_steps_status,
+    soulWinning:m.soul_winning_status,
+    bibleStudyTeacher:m.bible_study_teacher_status,
+    groupCount:groupCount??0,
+    serveCount:(teamCount??0)+(acceptedCount??0),
+  },lang)
 
-  <section className="hero card" style={{borderColor:accent}}><div style={{display:'flex',alignItems:'center',gap:14}}>{churchLogo&&<img src={churchLogo} alt={`${church?.name??t('Church','Iglesia')} logo`} style={{width:64,height:64,borderRadius:16,objectFit:'contain',background:'#100c14',padding:6,border:'1px solid #3b3043'}}/>}<div><div className="pill">{t('WELCOME BACK','BIENVENIDO')}</div><h1>{name}</h1><p>{church?.welcome_message||t('One place to grow, connect, serve and walk with God.','Un lugar para crecer, conectarte, servir y caminar con Dios.')}</p></div></div><div className="hero-stat"><strong>{church?.name??'Kingdom Network'}</strong><span>{[church?.city,church?.state].filter(Boolean).join(', ')||t('Church community','Comunidad de iglesia')}</span></div></section>
+  const church=Array.isArray(membership.churches)?membership.churches[0]:membership.churches as any
+  const name=profile?.display_name||[profile?.first_name,profile?.last_name].filter(Boolean).join(' ')||t('Member','Miembro')
+  const firstName=name.split(' ')[0]
+  const churchLogo=church?.logo_path?supabase.storage.from('church-branding').getPublicUrl(church.logo_path).data.publicUrl:null
+  const accent=church?.brand_color||'#1E5BFF'
+  const roleName=roleNames[role]??role.replaceAll('_',' ').replace(/\b\w/g,(letter)=>letter.toUpperCase())
+  const learningTarget=learningResume?.href??'/learning'
+  const learningDescription=learningResume?.kind==='lesson'?t('Continue where you left off','Continúa donde te quedaste'):learningResume?.kind==='final'?t('Your final exam is ready','Tu examen final está listo'):t('Classes, training and progress','Clases, capacitación y progreso')
 
-  {isAdmin&&<section className="card" style={{padding:18,marginBottom:16,borderColor:accent,display:'flex',justifyContent:'space-between',alignItems:'center',gap:16,flexWrap:'wrap'}}><div style={{display:'flex',gap:12}}><ShieldCheck size={26}/><div><div className="pill">{t('LEADERSHIP','LIDERAZGO')}</div><h2 style={{margin:'6px 0'}}>{leadershipNeeds>0?t(`${leadershipNeeds} item${leadershipNeeds===1?'':'s'} need attention`,`${leadershipNeeds} asunto${leadershipNeeds===1?'':'s'} necesita${leadershipNeeds===1?'':'n'} atención`):t('Leadership queue is clear','No hay asuntos urgentes de liderazgo')}</h2><p className="muted" style={{margin:0}}>{leadershipNeeds>0?t('Start with the most important leadership item.','Comienza con el asunto de liderazgo más importante.'):t('Nothing urgent is waiting right now.','No hay nada urgente esperando ahora.')}</p></div></div><Link className="btn" href={l('/church/leadership')}>{leadershipNeeds>0?t('Do this first','Haz esto primero'):t('Open leadership','Abrir liderazgo')} <ArrowRight size={15}/></Link></section>}
+  const coreTools=[
+    {title:t('Learning','Aprendizaje'),desc:learningDescription,href:learningTarget,Icon:GraduationCap},
+    {title:t('Friendship Groups','Grupos de Amistad'),desc:t('Connect, belong and grow','Conéctate, pertenece y crece'),href:'/groups',Icon:Users},
+    {title:t('Calendar','Calendario'),desc:t('Services, events and schedules','Servicios, eventos y horarios'),href:'/calendar',Icon:CalendarDays},
+    {title:t('Prayer & Care','Oración y Cuidado'),desc:t('Prayer, testimony and pastoral care','Oración, testimonio y cuidado pastoral'),href:'/prayer',Icon:HandHeart},
+    {title:t('Serve','Servir'),desc:t('Ministries, teams and opportunities','Ministerios, equipos y oportunidades'),href:'/serve',Icon:BriefcaseBusiness},
+    {title:t('Church Directory','Directorio'),desc:t('Stay connected to your church family','Mantente conectado con tu familia de iglesia'),href:'/directory',Icon:Church},
+  ]
 
-  <section className="card" style={{padding:20,marginBottom:16,border:'1px solid rgba(125,211,252,.34)',display:'flex',justifyContent:'space-between',alignItems:'center',gap:18,flexWrap:'wrap'}}><div><div className="pill">{t('TODAY','HOY')}</div><h2 style={{margin:'7px 0'}}>{t('What needs my attention?','¿Qué necesita mi atención?')}</h2><p className="muted" style={{margin:0}}>{t('Assignments, classes, notifications and your next step—all in one simple daily view.','Asignaciones, clases, notificaciones y tu próximo paso, todo en una vista sencilla.')}</p></div><Link className="btn" href={l('/today')}>{t('Open My Today','Abrir Mi Día')} <ArrowRight size={15}/></Link></section>
+  return <main className={styles.page} style={{'--church-accent':accent} as CSSProperties}>
+    <div className={styles.shell}>
+      <header className={styles.topbar}>
+        <div className={styles.identity}>
+          <div className={styles.mark}><Crown/></div>
+          <div className={styles.brand}><strong>ONE KINGDOM</strong><span>{t('Church OS','Sistema para Iglesias')}</span></div>
+        </div>
+        <div className={styles.topActions}>
+          <Link className={styles.iconLink} href={es?'/?lang=en':'/?lang=es'}><span>{es?'English':'Español'}</span></Link>
+          <div className={styles.iconLink}><NotificationBell userId={userId}/></div>
+          <Link className={styles.profileLink} href={l('/profile')}><UserRound/><span>{t('Profile','Perfil')}</span></Link>
+        </div>
+      </header>
 
-  <section className="card" style={{padding:18,marginBottom:18,display:'flex',justifyContent:'space-between',alignItems:'center',gap:18,flexWrap:'wrap'}}><div><div className="pill">{t('MY NEXT STEP','MI PRÓXIMO PASO')}</div><h2 style={{margin:'7px 0'}}>{nextStep.title}</h2><p className="muted" style={{margin:0}}>{nextStep.body}</p></div><div className="row"><Link className="btn secondary" href={l(nextStep.href)}>{nextStep.action}</Link><Link className="ghost" href={l('/journey')}>{t('View My Journey','Ver Mi Camino')}</Link></div></section>
+      <section className={styles.hero}>
+        <div className={styles.heroMain}>
+          <div className={styles.eyebrow}><Sparkles/> {t('YOUR CHURCH. CLEARLY CONNECTED.','TU IGLESIA. CLARAMENTE CONECTADA.')}</div>
+          <h1>{t(`Welcome back, ${firstName}.`,`Bienvenido, ${firstName}.`)}</h1>
+          <p>{t('One place to know what matters today, see your next step, stay connected, and serve with purpose.','Un solo lugar para saber qué importa hoy, ver tu próximo paso, mantenerte conectado y servir con propósito.')}</p>
+          <div className={styles.promise}><span/>{t('Know every person.','Conoce a cada persona.')}<span/>{t('Clarify every next step.','Aclara cada próximo paso.')}<span/>{t('Let nobody be forgotten.','Que nadie sea olvidado.')}</div>
+        </div>
+        <aside className={styles.churchCard}>
+          <div>
+            <div className={styles.churchTop}>
+              {churchLogo?<img className={styles.churchLogo} src={churchLogo} alt={`${church?.name??t('Church','Iglesia')} logo`}/>:<div className={styles.churchFallback}><Church/></div>}
+              <div><div className={styles.churchName}>{church?.name??t('Your Church','Tu Iglesia')}</div><div className={styles.location}>{[church?.city,church?.state].filter(Boolean).join(', ')||t('Church community','Comunidad de iglesia')}</div></div>
+            </div>
+            <p className={styles.churchMessage}>{church?.welcome_message||t('Grow, connect, serve and walk with God together.','Crece, conéctate, sirve y camina con Dios junto a tu iglesia.')}</p>
+          </div>
+          <div className={styles.rolePill}><ShieldCheck/> {roleName}</div>
+        </aside>
+      </section>
 
-  <UpcomingSnapshot churchId={membership.church_id} userId={userId} lang={lang}/><FeaturedEvents churchId={membership.church_id} lang={lang}/>
+      <section className={styles.priorityGrid}>
+        <article className={`${styles.priority} ${styles.priorityBlue}`}>
+          <div className={styles.priorityHead}><div><div className={styles.label}>{t('MY TODAY','MI DÍA')}</div></div><div className={styles.priorityIcon}><Bell/></div></div>
+          <h2>{t('What needs my attention?','¿Qué necesita mi atención?')}</h2>
+          <p>{t('See today’s assignments, classes, alerts, follow-ups and upcoming responsibilities in one focused view.','Mira las asignaciones, clases, alertas, seguimientos y responsabilidades de hoy en una sola vista.')}</p>
+          <div className={styles.actionRow}><Link className={styles.primaryButton} href={l('/today')}>{t('Open My Today','Abrir Mi Día')} <ArrowRight/></Link></div>
+        </article>
 
-  <section style={{margin:'22px 0'}}><div className="pill" style={{marginBottom:12}}>{t('EVERYDAY','DÍA A DÍA')}</div><section className="module-grid">{everyday.map(({title,desc,Icon,href})=>{const smartLearning=href==='/learning'&&learningResume;const target=smartLearning?learningResume.href:href;const smartDesc=smartLearning&&learningResumeDesc?learningResumeDesc:desc;return <Link className="module card module-link" href={l(target)} key={href}><Icon size={22}/><strong>{title}</strong><span>{smartDesc}</span><small>{smartLearning?t('Resume','Continuar'):t('Open','Abrir')}</small></Link>})}</section></section>
+        <article className={`${styles.priority} ${styles.priorityGold}`}>
+          <div className={styles.priorityHead}><div><div className={styles.label}>{t('MY NEXT STEP','MI PRÓXIMO PASO')}</div></div><div className={styles.priorityIcon}><Sparkles/></div></div>
+          <h2>{nextStep.title}</h2>
+          <p>{nextStep.body}</p>
+          <div className={styles.actionRow}><Link className={styles.primaryButton} href={l(nextStep.href)}>{nextStep.action} <ArrowRight/></Link><Link className={styles.secondaryButton} href={l('/journey')}>{t('My Journey','Mi Camino')}</Link></div>
+        </article>
+      </section>
 
-  <details className="card" style={{padding:18,marginBottom:22}}><summary style={{cursor:'pointer',fontWeight:700,fontSize:'1.05rem'}}>{t('Explore more Kingdom Network tools','Explora más herramientas de Kingdom Network')}</summary><p className="small muted">{t('These are here when you need them. You do not need to learn everything at once.','Están aquí cuando las necesites. No tienes que aprender todo a la vez.')}</p><section className="module-grid" style={{marginTop:14}}>{explore.map(({title,desc,Icon,href})=><Link className="module card module-link" href={l(href)} key={href}><Icon size={22}/><strong>{title}</strong><span>{desc}</span><small>{t('Open','Abrir')}</small></Link>)}{isAdmin&&<Link className="module card module-link" href={l('/outreach')}><Megaphone size={22}/><strong>{t('Outreach','Evangelismo')}</strong><span>{t('Guests, Bible studies & follow-up','Invitados, estudios bíblicos y seguimiento')}</span><small>{t('Open','Abrir')}</small></Link>}</section></details>
+      {isAdmin&&<section className={styles.leadership}>
+        <div className={styles.leadershipHead}>
+          <div className={styles.leadershipTitle}><div className={styles.leadershipBadge}><Crown/></div><div><h2>{leadershipNeeds>0?t(`${leadershipNeeds} leadership item${leadershipNeeds===1?'':'s'} need attention`,`${leadershipNeeds} asunto${leadershipNeeds===1?'':'s'} de liderazgo necesita${leadershipNeeds===1?'':'n'} atención`):t('Leadership queue is clear','La cola de liderazgo está al día')}</h2><p>{t('Care, follow-up, approvals and people who may need a leader’s attention.','Cuidado, seguimiento, aprobaciones y personas que pueden necesitar atención de liderazgo.')}</p></div></div>
+          <div className={styles.leadershipLinks}><Link className={styles.darkLink} href={l('/church/leadership')}><ShieldCheck/> {t('Leadership','Liderazgo')}</Link><Link className={styles.darkLink} href={l('/church')}><Church/> {t('Admin Center','Centro Admin')}</Link></div>
+        </div>
+      </section>}
 
-  <section className="card" style={{padding:18,marginBottom:22,display:'flex',justifyContent:'space-between',alignItems:'center',gap:14,flexWrap:'wrap'}}><div style={{display:'flex',gap:12,alignItems:'center'}}><MessageSquareWarning size={22}/><div><strong>{t('Help us improve Kingdom Network','Ayúdanos a mejorar Kingdom Network')}</strong><div className="small muted">{t('Something confusing, broken, useful or missing? Tell us.','¿Algo es confuso, no funciona, te ayuda o hace falta? Dinos.')}</div></div></div><Link className="ghost" href={l('/feedback')}>{t('Share feedback →','Compartir comentarios →')}</Link></section>
+      <section className={styles.section}>
+        <div className={styles.sectionHead}><div><h2>{t('Your One Kingdom','Tu One Kingdom')}</h2><p>{t('The tools you use most, organized around church life instead of software menus.','Las herramientas que más usas, organizadas alrededor de la vida de la iglesia.')}</p></div><Link className={styles.textLink} href={l('/guide')}>{t('Find anything','Encontrar algo')} →</Link></div>
+        <div className={styles.toolGrid}>{coreTools.map(({title,desc,href,Icon})=><Link className={styles.tool} href={l(href)} key={href}><div className={styles.toolIcon}><Icon/></div><strong>{title}</strong><span>{desc}</span><div className={styles.toolArrow}><ArrowRight/></div></Link>)}</div>
+      </section>
 
-  <OfficialUpdates churchId={membership.church_id} lang={lang}/><div className="content-grid"><CommunityFeed churchId={membership.church_id} userId={userId} lang={lang}/><aside><div className="card side"><div className="pill">{t('NEED HELP?','¿NECESITAS AYUDA?')}</div><h3>{t('Not sure where something is?','¿No sabes dónde encontrar algo?')}</h3><p className="muted">{t('Start with My Today for what matters now, or use Kingdom Guide to find the right place.','Comienza con Mi Día para ver lo importante ahora, o usa Kingdom Guide para encontrar el lugar correcto.')}</p><div style={{display:'grid',gap:8}}><Link className="btn" href={l('/today')}>{t('Open My Today','Abrir Mi Día')}</Link><Link className="ghost" href={l('/guide')}>{t('Open Kingdom Guide','Abrir Kingdom Guide')}</Link></div></div></aside></div></main>
+      <UpcomingSnapshot churchId={churchId} userId={userId} lang={lang}/>
+      <FeaturedEvents churchId={churchId} lang={lang}/>
+
+      {isLeader&&<section className={styles.section}>
+        <div className={styles.sectionHead}><div><h2>{t('Leader workspace','Espacio de liderazgo')}</h2><p>{t('Lead people and ministries without losing sight of follow-through.','Lidera personas y ministerios sin perder de vista el seguimiento.')}</p></div></div>
+        <div className={styles.toolGrid}>
+          <Link className={styles.tool} href={l('/rosters')}><div className={styles.toolIcon}><Users/></div><strong>{t('Leader Rosters','Listas de Líder')}</strong><span>{t('People you are responsible for','Personas bajo tu responsabilidad')}</span><div className={styles.toolArrow}><ArrowRight/></div></Link>
+          <Link className={styles.tool} href={l('/calendar/shared')}><div className={styles.toolIcon}><CalendarDays/></div><strong>{t('Shared Schedules','Horarios Compartidos')}</strong><span>{t('Coordinate teams and service','Coordina equipos y servicio')}</span><div className={styles.toolArrow}><ArrowRight/></div></Link>
+          <Link className={styles.tool} href={l('/outreach')}><div className={styles.toolIcon}><Megaphone/></div><strong>{t('Outreach','Evangelismo')}</strong><span>{t('Guests, Bible studies and follow-up','Invitados, estudios bíblicos y seguimiento')}</span><div className={styles.toolArrow}><ArrowRight/></div></Link>
+          <Link className={styles.tool} href={l('/learning')}><div className={styles.toolIcon}><BookOpen/></div><strong>{t('Training','Capacitación')}</strong><span>{t('Learning and verified progress','Aprendizaje y progreso verificado')}</span><div className={styles.toolArrow}><ArrowRight/></div></Link>
+        </div>
+      </section>}
+    </div>
+  </main>
 }
