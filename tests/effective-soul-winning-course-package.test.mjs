@@ -13,6 +13,7 @@ const certificatePage=read('src/app/learning/[courseId]/certificate/page.tsx')
 const certificateButton=read('src/app/learning/[courseId]/certificate/print-button.tsx')
 const coursePage=read('src/app/learning/[courseId]/page.tsx')
 const learningCss=read('src/app/learning/learning.css')
+const bulkPublishMigration=read('supabase/migrations/20260928050000_learning_bulk_publish_ready_assessments.sql')
 
 test('Effective Soul Winning package keeps the verified six-lesson mastery structure',()=>{
   assert.equal(pkg.one_kingdom_package_version,1)
@@ -107,4 +108,19 @@ test('earned ESW credential unlocks a personalized printable One Kingdom certifi
   assert.match(certificateButton,/window\.print\(\)/)
   assert.match(learningCss,/@media print/)
   assert.match(learningCss,/\.learning-certificate/)
+})
+
+
+test('required ESW assessments can be verified and published together without partial state',()=>{
+  assert.match(actions,/publishReadyRequiredAssessments/)
+  assert.match(actions,/publish_ready_course_assessments/)
+  assert.match(page,/Publish Ready Required Tests/)
+  assert.match(page,/If one fails, none are published/)
+  assert.match(bulkPublishMigration,/publish_ready_course_assessments/)
+  assert.match(bulkPublishMigration,/Required tests are not ready/)
+  assert.match(bulkPublishMigration,/protected answer key/)
+  assert.match(bulkPublishMigration,/question_count<20 or q\.question_count>25/)
+  assert.match(bulkPublishMigration,/question_count<5 or q\.question_count>10/)
+  assert.match(bulkPublishMigration,/Learner history exists/)
+  assert.match(bulkPublishMigration,/update public\.course_assessments[\s\S]*set published=true/)
 })
