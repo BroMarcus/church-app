@@ -249,3 +249,67 @@ export async function reviewFiveSpotRequest(formData:FormData){
   }
   refresh();redirect(manageUrl(lang,`&schedule=${scheduleId}&five_spot_saved=1`))
 }
+
+
+export async function assignCleaningGroup(formData:FormData){
+  const lang=langOf(formData),{supabase,actor:person}=await actor(lang)
+  const scheduleId=text(formData,'schedule_id'),itemId=text(formData,'schedule_item_id'),groupId=text(formData,'group_id')
+  if(!scheduleId||!itemId||!groupId)redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'Choose a Friendship Group.','Escoge un Grupo de Amistad.'))))
+  await requireSchedule(supabase,person,scheduleId,lang)
+  const [{data:schedule},{data:item},{data:group},{data:existing}]=await Promise.all([
+    supabase.from('church_schedules').select('schedule_type').eq('id',scheduleId).eq('church_id',person.churchId).maybeSingle(),
+    supabase.from('schedule_items').select('id').eq('id',itemId).eq('schedule_id',scheduleId).eq('church_id',person.churchId).maybeSingle(),
+    supabase.from('groups').select('id').eq('id',groupId).eq('church_id',person.churchId).eq('group_type','friendship').eq('active',true).maybeSingle(),
+    supabase.from('cleaning_assignments').select('id,group_id').eq('schedule_item_id',itemId).eq('church_id',person.churchId).maybeSingle()
+  ])
+  if(schedule?.schedule_type!=='cleaning'||!item||!group)redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'Cleaning assignments require an active Friendship Group and cleaning schedule date.','Las asignaciones de limpieza requieren un Grupo de Amistad activo y una fecha de limpieza.'))))
+
+  let cleaningId=existing?.id??null
+  if(existing){
+    const groupChanged=existing.group_id!==groupId
+    const {error}=await supabase.from('cleaning_assignments').update({
+      group_id:groupId,
+      ...(groupChanged?{status:'assigned',claimed_for_at:null,claimed_by:null,claimed_at:null,completed_by:null,completed_at:null,completion_notes:null}:{}),
+      updated_at:new Date().toISOString()
+    }).eq('id',existing.id).eq('church_id',person.churchId)
+    if(error){
+      console.error('assignCleaningGroup update failed',{itemId,groupId,code:error.code,message:error.message})
+      redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'We could not update that cleaning rotation.','No pudimos actualizar esa rotación de limpieza.'))))
+    }
+    if(groupChanged)await supabase.from('cleaning_checklist_items').update({completed_by:null,completed_at:null,updated_at:new Date().toISOString()}).eq('cleaning_assignment_id',existing.id).eq('church_id',person.churchId)
+  }else{
+    const {data:created,error}=await supabase.from('cleaning_assignments').insert({schedule_item_id:itemId,church_id:person.churchId,group_id:groupId,status:'assigned',created_by:person.userId}).select('id').single()
+    if(error||!created){
+      console.error('assignCleaningGroup insert failed',{itemId,groupId,code:error?.code,message:error?.message})
+      redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'We could not assign that Friendship Group.','No pudimos asignar ese Grupo de Amistad.'))))
+    }
+    cleaningId=created.id
+  }
+
+  if(cleaningId){
+    const {count}=await supabase.from('cleaning_checklist_items').select('id',{count:'exact',head:true}).eq('cleaning_assignment_id',cleaningId)
+    if((count??0)===0){
+      const labels=['Sanctuary / main room','Lobby / entry','Restrooms','Floors','Trash & supplies']
+      const {error}=await supabase.from('cleaning_checklist_items').insert(labels.map((label,index)=>({cleaning_assignment_id:cleaningId,church_id:person.churchId,label,sort_order:index+1,required:true,created_by:person.userId})))
+      if(error)console.error('seedCleaningChecklist failed',{cleaningId,code:error.code,message:error.message})
+    }
+  }
+
+  refresh();revalidatePath('/calendar/cleaning');redirect(manageUrl(lang,`&schedule=${scheduleId}&cleaning_saved=1`))
+}
+
+export async function addCleaningChecklistItem(formData:FormData){
+  const lang=langOf(formData),{supabase,actor:person}=await actor(lang)
+  const scheduleId=text(formData,'schedule_id'),cleaningId=text(formData,'cleaning_assignment_id'),label=text(formData,'label')
+  if(!scheduleId||!cleaningId||!label)redirect(manageUrl(lang))
+  await requireSchedule(supabase,person,scheduleId,lang)
+  const {data:cleaning}=await supabase.from('cleaning_assignments').select('id,schedule_item_id').eq('id',cleaningId).eq('church_id',person.churchId).maybeSingle()
+  if(!cleaning)redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'Cleaning assignment not found.','No se encontró la asignación de limpieza.'))))
+  const {count}=await supabase.from('cleaning_checklist_items').select('id',{count:'exact',head:true}).eq('cleaning_assignment_id',cleaningId)
+  const {error}=await supabase.from('cleaning_checklist_items').insert({cleaning_assignment_id:cleaningId,church_id:person.churchId,label:label.slice(0,180),sort_order:(count??0)+1,required:checked(formData,'required'),created_by:person.userId})
+  if(error){
+    console.error('addCleaningChecklistItem failed',{cleaningId,code:error.code,message:error.message})
+    redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'We could not add that checklist item.','No pudimos agregar ese elemento a la lista.'))))
+  }
+  refresh();revalidatePath('/calendar/cleaning');redirect(manageUrl(lang,`&schedule=${scheduleId}&cleaning_saved=1`))
+}
