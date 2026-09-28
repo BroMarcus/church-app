@@ -5,6 +5,7 @@ import {readFileSync} from 'node:fs'
 const migration=readFileSync(new URL('../supabase/migrations/20260928031500_learning_publish_guards.sql',import.meta.url),'utf8')
 const adminActions=readFileSync(new URL('../src/app/learning/admin/actions.ts',import.meta.url),'utf8')
 const adminPage=readFileSync(new URL('../src/app/learning/admin/page.tsx',import.meta.url),'utf8')
+const builderPage=readFileSync(new URL('../src/app/learning/admin/course-builder/[courseId]/page.tsx',import.meta.url),'utf8')
 
 test('required assessments cannot publish outside the 5-10 checkpoint / 20-25 final standards',()=>{
   assert.match(migration,/Required final exams must contain 20 to 25 questions/)
@@ -25,4 +26,12 @@ test('legacy Learning Studio creates assessments as drafts instead of publish-no
   assert.doesNotMatch(adminPage,/Publish now/)
   assert.match(adminPage,/Create draft assessment/)
   assert.match(adminPage,/5–10 checkpoint or 20–25 final questions/)
+})
+
+test('Course Builder shows actionable publish blockers instead of a misleading active button',()=>{
+  assert.match(builderPage,/publishBlockers/)
+  assert.match(builderPage,/publishReady/)
+  assert.match(builderPage,/Before publishing:/)
+  assert.match(builderPage,/disabled=\{!course\.published&&!publishReady\}/)
+  assert.match(migration,/at least one lesson before it can be published/)
 })
