@@ -15,6 +15,9 @@ const coursePage=read('src/app/learning/[courseId]/page.tsx')
 const learningCss=read('src/app/learning/learning.css')
 const bulkPublishMigration=read('supabase/migrations/20260928050000_learning_bulk_publish_ready_assessments.sql')
 const readinessMigration=read('supabase/migrations/20260928051500_learning_course_builder_readiness.sql')
+const engagementMigration=read('supabase/migrations/20260928053000_learning_resource_engagement.sql')
+const resourceEngagement=read('src/app/learning/[courseId]/lesson/[moduleId]/source/resource-engagement.tsx')
+const learningActions=read('src/app/learning/actions.ts')
 
 test('Effective Soul Winning package keeps the verified six-lesson mastery structure',()=>{
   assert.equal(pkg.one_kingdom_package_version,1)
@@ -138,4 +141,22 @@ test('Course Builder Training Check blocks publish until ESW is truly ready',()=
   assert.match(readinessMigration,/Publish %s required assessment/)
   assert.match(readinessMigration,/protected assessment answer keys/)
   assert.match(readinessMigration,/Name the completion certificate \/ credential/)
+})
+
+
+test('resource-backed ESW lessons use verified active reading time instead of self-completion',()=>{
+  assert.match(engagementMigration,/course_resource_engagement/)
+  assert.match(engagementMigration,/least\(15,coalesce\(p_active_seconds,0\)\)/)
+  assert.match(engagementMigration,/page_count.*\*30/s)
+  assert.match(engagementMigration,/Learner-safe resource link is not connected/)
+  assert.match(engagementMigration,/course_module_progress/)
+  assert.match(engagementMigration,/refresh_my_course_completion/)
+  assert.match(resourceEngagement,/document\.visibilityState==='visible'/)
+  assert.match(resourceEngagement,/document\.hasFocus\(\)/)
+  assert.match(resourceEngagement,/p_active_seconds:delta/)
+  assert.match(resourceEngagement,/Timer pauses if this tab is hidden/)
+  assert.match(lessonPage,/hasTrackedResources/)
+  assert.match(lessonPage,/One Kingdom will complete this lesson automatically/)
+  assert.match(learningActions,/trackedResources/)
+  assert.match(learningActions,/One Kingdom completes this lesson automatically after all required materials are verified/)
 })
