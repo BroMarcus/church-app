@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { usePathname } from 'next/navigation'
-import { Bell,BookOpen,BriefcaseBusiness,CalendarDays,Church,ClipboardList,FileText,GraduationCap,HandHeart,Home,Menu,MessageCircle,Megaphone,MessageSquareText,Settings2,Sparkles,UserRound,Users,X } from 'lucide-react'
+import { Bell,BookOpen,BriefcaseBusiness,CalendarDays,Church,ClipboardList,FileText,GraduationCap,HandHeart,Home,Menu,MessageCircle,Megaphone,MessageSquareText,Settings2,Smartphone,Sparkles,UserRound,Users,X } from 'lucide-react'
 import styles from './mobile-nav.module.css'
 
 export type MobileNavAccess={
@@ -24,7 +24,7 @@ type Section={label:string;items:Entry[]}
 const main:Entry[]=[['/','Home',Home],['/learning','Learn',GraduationCap],['/groups','Groups',Users],['/calendar','Calendar',CalendarDays]]
 const personal:Entry[]=[['/journey','My Journey',Sparkles],['/profile','Profile',UserRound],['/documents','Documents',FileText,'documents'],['/notifications','Alerts',Bell]]
 const church:Entry[]=[['/guide','Kingdom Guide',BookOpen],['/prayer','Prayer & Testimony',HandHeart,'prayer'],['/messages','Messages',MessageCircle,'messages'],['/serve','Serve',HandHeart,'serve'],['/teams','My Teams',BriefcaseBusiness,'serve'],['/directory','Directory',Church,'directory'],['/updates','Official Updates',MessageSquareText,'updates'],['/help','Private Care',HandHeart,'private_care'],['/library','Library',BookOpen,'library']]
-const settings:Entry[]=[['/account/notifications','Alert Settings',Bell],['/account/privacy','Privacy',UserRound],['/account/security','Security',UserRound],['/account/data','My Data',FileText]]
+const settings:Entry[]=[['/install','Add to Phone',Smartphone],['/account/notifications','Alert Settings',Bell],['/account/privacy','Privacy',UserRound],['/account/security','Security',UserRound],['/account/data','My Data',FileText]]
 
 export function MobileNav({access}:{access:MobileNavAccess}){
   const pathname=usePathname(),[openPath,setOpenPath]=useState<string|null>(null),open=openPath===pathname
