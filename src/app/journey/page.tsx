@@ -67,7 +67,7 @@ export default async function JourneyPage({searchParams}:{searchParams:Promise<{
     configuredJourney=addJourneyAttention((stepRows??[]).map((step:any)=>resolveJourneyStep(step as JourneyStepDefinition,{
       milestones:m,
       enrollments:enrollments??[],
-      groupCount:(groupMemberships??[]).length,
+      groupCount:(groupMemberships??[]).filter((row:any)=>gm.get(row.group_id)?.group_type==='friendship').length,
       ministryApplicationCount:(applications??[]).filter((row:any)=>row.status==='accepted').length,
       ministryAssignmentCount:(assignments??[]).length,
       trackingByStep:tracking
@@ -82,7 +82,7 @@ export default async function JourneyPage({searchParams}:{searchParams:Promise<{
   const baptized=m.baptized===true
   const holyGhost=m.holy_ghost_received===true
   const foundation=m.first_steps_status==='completed'
-  const connection=(groupMemberships??[]).length>0
+  const connection=(groupMemberships??[]).some((row:any)=>gm.get(row.group_id)?.group_type==='friendship')
   const outreach=m.soul_winning_status==='completed'||m.bible_study_teacher_status==='approved'
   const serving=(applications??[]).some((a:any)=>a.status==='accepted')||(assignments??[]).length>0
   const stages=[
