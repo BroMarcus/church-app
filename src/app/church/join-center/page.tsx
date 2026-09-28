@@ -4,8 +4,7 @@ import { CheckCircle2,ExternalLink,MailPlus,QrCode,ShieldCheck,Users } from 'luc
 import { createClient } from '@/lib/supabase/server'
 import { CopyJoinLink } from './copy-join-link'
 import { JoinQr } from './join-qr'
-
-const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
+import { PUBLIC_APP_ORIGIN } from '@/lib/public-app-origin'
 
 export default async function JoinCenterPage({searchParams}:{searchParams:Promise<{lang?:string}>}){
   const params=await searchParams,es=params.lang==='es'
@@ -19,7 +18,7 @@ export default async function JoinCenterPage({searchParams}:{searchParams:Promis
   if(!slug)redirect(l('/church/settings'))
   const {data:statusData}=await supabase.rpc('get_public_signup_status_for_church',{p_church_slug:slug})
   const status:any=Array.isArray(statusData)?statusData[0]:statusData
-  const joinUrl=`${siteUrl}/join/${slug}`
+  const joinUrl=`${PUBLIC_APP_ORIGIN}/join/${slug}`
   const joinUrlEs=`${joinUrl}?lang=es`
   return <main className="shell">
     <header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??'Church'} • {es?'Centro de Ingreso':'Join Center'}</div></div><div className="row"><Link className="ghost" href="/church/join-center?lang=en">English</Link><Link className="ghost" href="/church/join-center?lang=es">Español</Link><Link className="ghost" href={l('/church')}>{es?'← Administración':'← Church Admin'}</Link></div></header>
