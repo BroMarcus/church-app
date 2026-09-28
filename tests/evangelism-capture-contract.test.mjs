@@ -87,3 +87,12 @@ test('interaction return path is constrained to Outreach routes',()=>{
   const detail=fs.readFileSync(new URL('../src/app/outreach/[contactId]/page.tsx', import.meta.url),'utf8')
   assert.match(detail,/returnTo=\{\x60\/outreach\/\$\{contactId\}\x60\}/)
 })
+
+
+test('quick add is hidden from users without outreach manage authority',()=>{
+  assert.match(page,/current_user_has_church_permission/)
+  assert.match(page,/p_permission_key:'manage_outreach'/)
+  assert.match(page,/const canManageOutreach=/)
+  assert.match(page,/Only the people assigned to you/)
+  assert.match(page,/canManageOutreach\?<section className="card create-outreach"/)
+})
