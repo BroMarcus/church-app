@@ -39,3 +39,24 @@ comment on column public.outreach_interactions.source_type is
 
 comment on column public.outreach_interactions.source_label is
   'Optional human-readable source detail retained with the interaction history.';
+
+
+alter table public.outreach_contacts
+  add column if not exists create_request_key uuid;
+
+create unique index if not exists outreach_contacts_create_request_key_unique_idx
+  on public.outreach_contacts(create_request_key)
+  where create_request_key is not null;
+
+alter table public.outreach_interactions
+  add column if not exists request_key uuid;
+
+create unique index if not exists outreach_interactions_request_key_unique_idx
+  on public.outreach_interactions(request_key)
+  where request_key is not null;
+
+comment on column public.outreach_contacts.create_request_key is
+  'Retry/idempotency key for manual Quick Add creation. Re-submitting the same form must not create a second contact.';
+
+comment on column public.outreach_interactions.request_key is
+  'Retry/idempotency key for one logged interaction. Network retry/double-submit must not create a duplicate history entry.';
