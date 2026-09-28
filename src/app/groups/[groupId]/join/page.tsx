@@ -4,8 +4,7 @@ import { QrCode,ShieldCheck,Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { JoinQr } from '@/app/church/join-center/join-qr'
 import { CopyJoinLink } from '@/app/church/join-center/copy-join-link'
-
-const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
+import { PUBLIC_APP_ORIGIN } from '@/lib/public-app-origin'
 
 export default async function GroupJoinQrPage({params,searchParams}:{params:Promise<{groupId:string}>;searchParams:Promise<{lang?:string}>}){
   const [{groupId},query]=await Promise.all([params,searchParams])
@@ -22,7 +21,7 @@ export default async function GroupJoinQrPage({params,searchParams}:{params:Prom
   if(!allowed)redirect(l(`/groups/${groupId}`))
   const church:any=Array.isArray(membership.churches)?membership.churches[0]:membership.churches
   if(!church?.slug)redirect(l('/groups'))
-  const joinUrl=`${siteUrl}/join/${church.slug}/group/${group.id}`
+  const joinUrl=`${PUBLIC_APP_ORIGIN}/join/${church.slug}/group/${group.id}`
   return <main className="shell">
     <header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??'Church'} • {group.name} • {es?'QR de Ingreso':'Join QR'}</div></div><div className="row"><Link className="ghost" href={`/groups/${groupId}/join?lang=en`}>English</Link><Link className="ghost" href={`/groups/${groupId}/join?lang=es`}>Español</Link><Link className="ghost" href={l(`/groups/${groupId}`)}>{es?'← Grupo':'← Group'}</Link></div></header>
     <section className="card" style={{padding:24,marginBottom:16}}><div className="pill"><QrCode size={11}/> {es?'QR DEL GRUPO DE AMISTAD':'FRIENDSHIP GROUP QR'}</div><h1>{group.name}</h1><p className="muted">{es?'Muestra este código en la reunión, una cena, picnic o Matthew party. La persona crea su cuenta normal de New Life, pero Kingdom Network recuerda que llegó por medio de este grupo y dirige el seguimiento al líder del grupo.':'Show this code at the meeting, dinner, picnic or Matthew party. The person creates the normal New Life account, but Kingdom Network remembers that they came through this group and routes follow-up to the group leader.'}</p></section>
