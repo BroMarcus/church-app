@@ -134,7 +134,7 @@ export async function createAssessment(formData:FormData){
   if(!course)redirect('/learning/admin?error='+encodeURIComponent('Course not found.'))
   const moduleId=text(formData,'module_id')||null
   const maxRaw=text(formData,'max_attempts');const maxAttempts=maxRaw?Math.max(1,Number(maxRaw)):null
-  const {error}=await supabase.from('course_assessments').insert({course_id:courseId,module_id:moduleId,title,assessment_type:text(formData,'assessment_type')||'lesson_quiz',passing_score:Math.max(0,Math.min(100,num(formData,'passing_score',80))),max_attempts:maxAttempts,required:formData.get('required')==='on',published:formData.get('published')==='on',created_by:userId})
+  const {error}=await supabase.from('course_assessments').insert({course_id:courseId,module_id:moduleId,title,assessment_type:text(formData,'assessment_type')||'lesson_quiz',passing_score:Math.max(0,Math.min(100,num(formData,'passing_score',80))),max_attempts:maxAttempts,required:formData.get('required')==='on',published:false,created_by:userId})
   if(error)redirect('/learning/admin?error='+encodeURIComponent(error.message))
   revalidatePath('/learning/admin');revalidatePath(`/learning/${courseId}`);redirect('/learning/admin?assessment=1')
 }
