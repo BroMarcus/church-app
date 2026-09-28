@@ -126,3 +126,17 @@ test('Outreach forms expose a slow-network pending state',()=>{
   assert.match(detail,/pending=\{t\('Saving…','Guardando…'\)\}/)
   assert.match(history,/pending=\{es\?'Guardando…':'Saving…'\}/)
 })
+
+
+test('follow-up queue supports simple search and attention filters',()=>{
+  const css=fs.readFileSync(new URL('../src/app/outreach/outreach.css', import.meta.url),'utf8')
+  assert.match(page,/name="q"/)
+  assert.match(page,/name="view"/)
+  assert.match(page,/value="overdue"/)
+  assert.match(page,/value="unassigned"/)
+  assert.match(page,/value="bible_study"/)
+  assert.match(page,/value="first_steps"/)
+  assert.match(page,/const visibleRows=rows\.filter/)
+  assert.match(page,/No follow-up matches this search/)
+  assert.match(css,/\.outreach-filter/)
+})
