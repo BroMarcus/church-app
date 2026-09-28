@@ -1,0 +1,670 @@
+{
+  "one_kingdom_package_version": 1,
+  "course": {
+    "title": "Effective Soul Winning",
+    "description": "Six-lesson Apostolic Bible study training covering Scripture foundations, repentance, the oneness of God, the saving work of Christ, apostolic authority, baptism and the Holy Ghost, the New Birth, holiness, and readiness for Christ’s return.",
+    "language": "en",
+    "delivery_mode": "hybrid",
+    "progression_mode": "mastery",
+    "passing_score": 80
+  },
+  "lessons": [
+    {
+      "number": 1,
+      "title": "The Old and the New Testament",
+      "required": true,
+      "session_count": 1,
+      "resources": [
+        {
+          "source_path": "ESW & Supplements 2024 - FINAL.pdf",
+          "kind": "teacher_guide",
+          "audience": "teacher",
+          "label": "Teacher Recommendations & Soul-Winning Rules",
+          "page_start": 30,
+          "page_end": 32,
+          "page_count": 3
+        },
+        {
+          "source_path": "ESW & Supplements 2024 - FINAL.pdf",
+          "kind": "student_handout",
+          "audience": "student",
+          "label": "Lesson 1 — The Old and the New Testament",
+          "page_start": 33,
+          "page_end": 33,
+          "page_count": 1
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "title": "What Is Repentance?",
+      "required": true,
+      "session_count": 1,
+      "resources": [
+        {
+          "source_path": "ESW & Supplements 2024 - FINAL.pdf",
+          "kind": "student_handout",
+          "audience": "student",
+          "label": "Lesson 2 — What Is Repentance?",
+          "page_start": 34,
+          "page_end": 36,
+          "page_count": 3
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "title": "There Is Only One God",
+      "required": true,
+      "session_count": 1,
+      "resources": [
+        {
+          "source_path": "ESW & Supplements 2024 - FINAL.pdf",
+          "kind": "student_handout",
+          "audience": "student",
+          "label": "Lesson 3 — There Is Only One God",
+          "page_start": 37,
+          "page_end": 39,
+          "page_count": 3
+        },
+        {
+          "source_path": "ESW & Supplements 2024 - FINAL.pdf",
+          "kind": "student_handout",
+          "audience": "student",
+          "label": "Matthew 28:19 Supplement",
+          "page_start": 40,
+          "page_end": 46,
+          "page_count": 7
+        },
+        {
+          "source_path": "ESW & Supplements 2024 - FINAL.pdf",
+          "kind": "student_handout",
+          "audience": "student",
+          "label": "Oneness / Trinity Comparison Supplement",
+          "page_start": 47,
+          "page_end": 51,
+          "page_count": 5
+        },
+        {
+          "source_path": "ESW & Supplements 2024 - FINAL.pdf",
+          "kind": "printable",
+          "audience": "student",
+          "label": "Matthew 28:19 Questionnaires",
+          "page_start": 52,
+          "page_end": 62,
+          "page_count": 11
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "title": "Man of Sorrows",
+      "required": true,
+      "session_count": 1,
+      "resources": [
+        {
+          "source_path": "ESW & Supplements 2024 - FINAL.pdf",
+          "kind": "student_handout",
+          "audience": "student",
+          "label": "Lesson 4 — Man of Sorrows",
+          "page_start": 63,
+          "page_end": 65,
+          "page_count": 3
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "title": "Apostolic Authority",
+      "required": true,
+      "session_count": 1,
+      "resources": [
+        {
+          "source_path": "ESW & Supplements 2024 - FINAL.pdf",
+          "kind": "student_handout",
+          "audience": "student",
+          "label": "Lesson 5 — Apostolic Authority",
+          "page_start": 66,
+          "page_end": 68,
+          "page_count": 3
+        },
+        {
+          "source_path": "ESW & Supplements 2024 - FINAL.pdf",
+          "kind": "student_handout",
+          "audience": "student",
+          "label": "Baptism in Jesus’ Name Supplement",
+          "page_start": 69,
+          "page_end": 73,
+          "page_count": 5
+        }
+      ]
+    },
+    {
+      "number": 6,
+      "title": "The New Birth",
+      "required": true,
+      "session_count": 1,
+      "resources": [
+        {
+          "source_path": "ESW & Supplements 2024 - FINAL.pdf",
+          "kind": "student_handout",
+          "audience": "student",
+          "label": "Lesson 6 — The New Birth & Holiness",
+          "page_start": 74,
+          "page_end": 77,
+          "page_count": 4
+        },
+        {
+          "source_path": "ESW & Supplements 2024 - FINAL.pdf",
+          "kind": "student_handout",
+          "audience": "student",
+          "label": "The Rapture of the Church",
+          "page_start": 78,
+          "page_end": 79,
+          "page_count": 2
+        }
+      ]
+    }
+  ],
+  "assessments": [
+    {
+      "type": "checkpoint",
+      "lesson_number": 2,
+      "title": "Checkpoint 1 — Foundations and Repentance",
+      "passing_score": 80,
+      "required": true,
+      "published": true,
+      "instructions": "Complete this checkpoint before continuing in Mastery mode.",
+      "questions": [
+        {
+          "question_id": "esw_c1_q1",
+          "prompt": "How many books are in the Old Testament?",
+          "options": [
+            "27",
+            "39",
+            "46",
+            "66"
+          ],
+          "answer": "39",
+          "source_ref": "ESW Lesson 1, p.33"
+        },
+        {
+          "question_id": "esw_c1_q2",
+          "prompt": "How many books are in the New Testament?",
+          "options": [
+            "27",
+            "39",
+            "52",
+            "66"
+          ],
+          "answer": "27",
+          "source_ref": "ESW Lesson 1, p.33"
+        },
+        {
+          "question_id": "esw_c1_q3",
+          "prompt": "According to Lesson 1, what problem entered the world after Adam and Eve disobeyed God?",
+          "options": [
+            "Sin",
+            "Famine",
+            "War",
+            "Illiteracy"
+          ],
+          "answer": "Sin",
+          "source_ref": "ESW Lesson 1, pp.33-34"
+        },
+        {
+          "question_id": "esw_c1_q4",
+          "prompt": "What first step does Lesson 1 point to for getting right with God?",
+          "options": [
+            "Repentance",
+            "Travel",
+            "Education",
+            "Fasting only"
+          ],
+          "answer": "Repentance",
+          "source_ref": "ESW Lesson 1, p.33"
+        },
+        {
+          "question_id": "esw_c1_q5",
+          "prompt": "In Lesson 2, what does the word “gospel” mean?",
+          "options": [
+            "Good news",
+            "A law code",
+            "A song",
+            "A prophecy chart"
+          ],
+          "answer": "Good news",
+          "source_ref": "ESW Lesson 2, p.34"
+        },
+        {
+          "question_id": "esw_c1_q6",
+          "prompt": "Which choice best matches Lesson 2’s explanation of repentance?",
+          "options": [
+            "A genuine change of heart and direction toward God",
+            "Only feeling embarrassed",
+            "Joining a church without changing",
+            "Memorizing more verses"
+          ],
+          "answer": "A genuine change of heart and direction toward God",
+          "source_ref": "ESW Lesson 2, pp.34-36"
+        }
+      ]
+    },
+    {
+      "type": "checkpoint",
+      "lesson_number": 4,
+      "title": "Checkpoint 2 — One God and the Work of Christ",
+      "passing_score": 80,
+      "required": true,
+      "published": true,
+      "instructions": "Complete this checkpoint before continuing in Mastery mode.",
+      "questions": [
+        {
+          "question_id": "esw_c2_q1",
+          "prompt": "What central truth does Lesson 3 emphasize about God?",
+          "options": [
+            "There is one God",
+            "There are three separate gods",
+            "God cannot be known",
+            "God changes identity over time"
+          ],
+          "answer": "There is one God",
+          "source_ref": "ESW Lesson 3, pp.37-39"
+        },
+        {
+          "question_id": "esw_c2_q2",
+          "prompt": "According to the lesson’s Matthew 28:19 supplement, what name is identified with the Son?",
+          "options": [
+            "Jesus",
+            "Moses",
+            "Elijah",
+            "Peter"
+          ],
+          "answer": "Jesus",
+          "source_ref": "ESW supplement, Matthew 28:19"
+        },
+        {
+          "question_id": "esw_c2_q3",
+          "prompt": "Which statement best reflects the lesson’s use of John 4:24?",
+          "options": [
+            "God is Spirit",
+            "God is only material",
+            "God is an angel",
+            "God is many spirits"
+          ],
+          "answer": "God is Spirit",
+          "source_ref": "ESW Lesson 3 supplement"
+        },
+        {
+          "question_id": "esw_c2_q4",
+          "prompt": "What major theme does Lesson 4 teach through Isaiah 53?",
+          "options": [
+            "The suffering and saving work of Christ",
+            "The building of the temple",
+            "The reign of David",
+            "The journey of Abraham"
+          ],
+          "answer": "The suffering and saving work of Christ",
+          "source_ref": "ESW Lesson 4, pp.63-65"
+        },
+        {
+          "question_id": "esw_c2_q5",
+          "prompt": "According to Lesson 4, what happened after Jesus died?",
+          "options": [
+            "He rose again",
+            "He remained in the grave forever",
+            "His disciples replaced Him",
+            "He returned to Egypt"
+          ],
+          "answer": "He rose again",
+          "source_ref": "ESW Lesson 4, pp.63-65"
+        },
+        {
+          "question_id": "esw_c2_q6",
+          "prompt": "What does Lesson 4 present as the answer to the sorrow and death brought by sin?",
+          "options": [
+            "The saving work and resurrection of Jesus Christ",
+            "Human achievement",
+            "Political reform",
+            "Old Testament sacrifices alone"
+          ],
+          "answer": "The saving work and resurrection of Jesus Christ",
+          "source_ref": "ESW Lesson 4, pp.63-65"
+        }
+      ]
+    },
+    {
+      "type": "checkpoint",
+      "lesson_number": 6,
+      "title": "Checkpoint 3 — Apostolic Authority and the New Birth",
+      "passing_score": 80,
+      "required": true,
+      "published": true,
+      "instructions": "Complete this checkpoint after Lessons 5–6 before the final exam.",
+      "questions": [
+        {
+          "question_id": "esw_c3_q1",
+          "prompt": "What command is central to the Great Commission material in Lesson 5?",
+          "options": [
+            "Go and teach all nations",
+            "Build a temple",
+            "Avoid all outsiders",
+            "Return to Egypt"
+          ],
+          "answer": "Go and teach all nations",
+          "source_ref": "ESW Lesson 5, PDF pp.66–68"
+        },
+        {
+          "question_id": "esw_c3_q2",
+          "prompt": "What major event does Lesson 5 connect with Acts 2?",
+          "options": [
+            "The Day of Pentecost",
+            "The flood",
+            "The exile",
+            "The birth of Moses"
+          ],
+          "answer": "The Day of Pentecost",
+          "source_ref": "ESW Lesson 5, PDF pp.66–68"
+        },
+        {
+          "question_id": "esw_c3_q3",
+          "prompt": "According to the baptism examples used in Lesson 5, in whose name were people baptized?",
+          "options": [
+            "Jesus Christ",
+            "Moses",
+            "Abraham",
+            "Caesar"
+          ],
+          "answer": "Jesus Christ",
+          "source_ref": "ESW Lesson 5 and baptism supplement, PDF pp.68–73"
+        },
+        {
+          "question_id": "esw_c3_q4",
+          "prompt": "What sign does the Lesson 5 material highlight with receiving the Holy Ghost in Acts?",
+          "options": [
+            "Speaking with other tongues",
+            "Physical wealth",
+            "A temple sacrifice",
+            "Military victory"
+          ],
+          "answer": "Speaking with other tongues",
+          "source_ref": "ESW Lesson 5, PDF p.68"
+        },
+        {
+          "question_id": "esw_c3_q5",
+          "prompt": "Which contrast is used in Lesson 6 to teach the New Birth and Christian living?",
+          "options": [
+            "Works of the flesh and fruit of the Spirit",
+            "Rich and poor nations",
+            "Kings and prophets",
+            "Old and young churches"
+          ],
+          "answer": "Works of the flesh and fruit of the Spirit",
+          "source_ref": "ESW Lesson 6, PDF pp.74–75"
+        },
+        {
+          "question_id": "esw_c3_q6",
+          "prompt": "What future event does Lesson 6 present as a reason for believers to remain ready?",
+          "options": [
+            "The rapture / Christ’s return",
+            "The rebuilding of Noah’s ark",
+            "A new Roman empire",
+            "The birth of another Messiah"
+          ],
+          "answer": "The rapture / Christ’s return",
+          "source_ref": "ESW Lesson 6, PDF pp.78–79"
+        }
+      ]
+    },
+    {
+      "type": "final",
+      "title": "Final Assessment — Effective Soul Winning",
+      "passing_score": 80,
+      "required": true,
+      "published": true,
+      "instructions": "Complete the final after all required checkpoints are passed.",
+      "questions": [
+        {
+          "question_id": "esw_f_q1",
+          "prompt": "How many total books are in the Bible according to Lesson 1?",
+          "options": [
+            "66",
+            "27",
+            "39",
+            "72"
+          ],
+          "answer": "66",
+          "source_ref": "ESW Lesson 1, p.33"
+        },
+        {
+          "question_id": "esw_f_q2",
+          "prompt": "What event does Lesson 1 connect with sin entering the human story?",
+          "options": [
+            "Adam and Eve disobeying God",
+            "The flood",
+            "The exodus",
+            "The building of Babel"
+          ],
+          "answer": "Adam and Eve disobeying God",
+          "source_ref": "ESW Lesson 1, pp.33-34"
+        },
+        {
+          "question_id": "esw_f_q3",
+          "prompt": "What is the first response Lesson 1 points to for getting right with God?",
+          "options": [
+            "Repentance",
+            "Circumcision",
+            "Pilgrimage",
+            "Political action"
+          ],
+          "answer": "Repentance",
+          "source_ref": "ESW Lesson 1, p.33"
+        },
+        {
+          "question_id": "esw_f_q4",
+          "prompt": "What does “gospel” mean in Lesson 2?",
+          "options": [
+            "Good news",
+            "Secret wisdom",
+            "Religious law",
+            "A judgment only"
+          ],
+          "answer": "Good news",
+          "source_ref": "ESW Lesson 2, p.34"
+        },
+        {
+          "question_id": "esw_f_q5",
+          "prompt": "Which choice best reflects the source lesson’s definition of repentance?",
+          "options": [
+            "Turning from sin toward God with a changed heart",
+            "Feeling sorry without change",
+            "Changing churches only",
+            "Learning religious vocabulary"
+          ],
+          "answer": "Turning from sin toward God with a changed heart",
+          "source_ref": "ESW Lesson 2, pp.34-36"
+        },
+        {
+          "question_id": "esw_f_q6",
+          "prompt": "What central doctrine is emphasized in Lesson 3?",
+          "options": [
+            "There is one God",
+            "There are multiple gods",
+            "God cannot reveal Himself",
+            "The apostles replaced God"
+          ],
+          "answer": "There is one God",
+          "source_ref": "ESW Lesson 3, pp.37-39"
+        },
+        {
+          "question_id": "esw_f_q7",
+          "prompt": "What name does the lesson identify with the Son?",
+          "options": [
+            "Jesus",
+            "Abraham",
+            "David",
+            "John"
+          ],
+          "answer": "Jesus",
+          "source_ref": "ESW Matthew 28:19 supplement"
+        },
+        {
+          "question_id": "esw_f_q8",
+          "prompt": "Which statement does the lesson draw from John 4:24?",
+          "options": [
+            "God is Spirit",
+            "God is flesh only",
+            "God is an angel",
+            "God is unknowable"
+          ],
+          "answer": "God is Spirit",
+          "source_ref": "ESW Lesson 3 supplement"
+        },
+        {
+          "question_id": "esw_f_q9",
+          "prompt": "What Old Testament chapter is central to Lesson 4’s teaching about the suffering Messiah?",
+          "options": [
+            "Isaiah 53",
+            "Psalm 1",
+            "Genesis 12",
+            "Exodus 20"
+          ],
+          "answer": "Isaiah 53",
+          "source_ref": "ESW Lesson 4"
+        },
+        {
+          "question_id": "esw_f_q10",
+          "prompt": "What does Lesson 4 teach happened after Jesus’ death?",
+          "options": [
+            "He rose again",
+            "He was forgotten",
+            "He stayed dead",
+            "He became an angel"
+          ],
+          "answer": "He rose again",
+          "source_ref": "ESW Lesson 4"
+        },
+        {
+          "question_id": "esw_f_q11",
+          "prompt": "What command is central to Lesson 5’s Great Commission material?",
+          "options": [
+            "Go and teach all nations",
+            "Build a temple",
+            "Avoid all outsiders",
+            "Return to Egypt"
+          ],
+          "answer": "Go and teach all nations",
+          "source_ref": "ESW Lesson 5, Great Commission"
+        },
+        {
+          "question_id": "esw_f_q12",
+          "prompt": "What major event does Lesson 5 connect with Acts 2?",
+          "options": [
+            "The Day of Pentecost",
+            "The flood",
+            "The exile",
+            "The birth of Moses"
+          ],
+          "answer": "The Day of Pentecost",
+          "source_ref": "ESW Lesson 5, pp.66-68"
+        },
+        {
+          "question_id": "esw_f_q13",
+          "prompt": "According to the source’s apostolic baptism teaching, in whose name were people baptized in Acts?",
+          "options": [
+            "Jesus Christ",
+            "Moses",
+            "Abraham",
+            "Caesar"
+          ],
+          "answer": "Jesus Christ",
+          "source_ref": "ESW Lesson 5 / Acts examples"
+        },
+        {
+          "question_id": "esw_f_q14",
+          "prompt": "What sign does the source highlight as accompanying the first recorded outpouring of the Holy Ghost?",
+          "options": [
+            "Speaking with other tongues",
+            "Physical wealth",
+            "A temple sacrifice",
+            "Military victory"
+          ],
+          "answer": "Speaking with other tongues",
+          "source_ref": "ESW Lesson 5 / Acts 2"
+        },
+        {
+          "question_id": "esw_f_q15",
+          "prompt": "What major Christian-life theme is emphasized in Lesson 6?",
+          "options": [
+            "The New Birth",
+            "Civil government",
+            "Temple architecture",
+            "Genealogies"
+          ],
+          "answer": "The New Birth",
+          "source_ref": "ESW Lesson 6, pp.74-79"
+        },
+        {
+          "question_id": "esw_f_q16",
+          "prompt": "Which contrast appears in Lesson 6’s teaching on Christian living?",
+          "options": [
+            "Works of the flesh and fruit of the Spirit",
+            "Rich and poor nations",
+            "Kings and prophets",
+            "Old and young churches"
+          ],
+          "answer": "Works of the flesh and fruit of the Spirit",
+          "source_ref": "ESW Lesson 6"
+        },
+        {
+          "question_id": "esw_f_q17",
+          "prompt": "What kind of life does Lesson 6 call the believer to pursue?",
+          "options": [
+            "A holy life pleasing to God",
+            "A life without accountability",
+            "A life focused only on possessions",
+            "A life separated from prayer"
+          ],
+          "answer": "A holy life pleasing to God",
+          "source_ref": "ESW Lesson 6"
+        },
+        {
+          "question_id": "esw_f_q18",
+          "prompt": "What future event does Lesson 6 discuss as a reason for readiness?",
+          "options": [
+            "The rapture / Christ’s return",
+            "The rebuilding of Noah’s ark",
+            "A new Roman empire",
+            "The birth of another Messiah"
+          ],
+          "answer": "The rapture / Christ’s return",
+          "source_ref": "ESW Lesson 6"
+        },
+        {
+          "question_id": "esw_f_q19",
+          "prompt": "What does the ESW recommendation page say about moving to the next lesson?",
+          "options": [
+            "Do not proceed until the listener understands the current lesson",
+            "Always move on after a fixed time",
+            "Skip difficult material",
+            "Let the listener choose randomly"
+          ],
+          "answer": "Do not proceed until the listener understands the current lesson",
+          "source_ref": "ESW Recommendations, p.30"
+        },
+        {
+          "question_id": "esw_f_q20",
+          "prompt": "Which practice is listed in the ESW “Do’s and Don’ts” for soul winning?",
+          "options": [
+            "Be courteous and ask questions",
+            "Argue until the listener agrees",
+            "Criticize other churches",
+            "Show off Bible knowledge"
+          ],
+          "answer": "Be courteous and ask questions",
+          "source_ref": "ESW Do’s and Don’ts, p.31"
+        }
+      ]
+    }
+  ]
+}
