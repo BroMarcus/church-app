@@ -40,3 +40,10 @@ test('actionable follow-up schema is additive and bounded',()=>{
   assert.match(migration,/add column if not exists next_action text/)
   assert.match(migration,/char_length\(next_action\) <= 500/)
 })
+
+
+test('outreach person can update only the next action without rewriting unrelated contact fields',()=>{
+  assert.match(actions,/export async function updateOutreachNextAction/)
+  assert.match(actions,/update\(\{next_action:nextAction,follow_up_due_at:followUp,updated_at:/)
+  assert.doesNotMatch(actions,/updateOutreachNextAction[\s\S]{0,1600}service_count:/)
+})
