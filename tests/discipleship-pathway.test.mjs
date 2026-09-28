@@ -13,17 +13,31 @@ test('discipleship pathway schema is church configurable and tenant scoped',()=>
   assert.match(sql,/completion_source text not null/)
   assert.match(sql,/member_journey_pathway_assignments/)
   assert.match(sql,/member_journey_step_tracking/)
+  assert.match(sql,/due_on date/)
   assert.match(sql,/enable row level security/)
+  assert.match(sql,/set search_path=public,private,pg_temp\nas \$\$/)
+})
+
+test('journey source keys and responsible leaders are constrained at the database boundary',()=>{
+  const sql=read('supabase/migrations/20260928021500_discipleship_pathway_engine.sql')
+  assert.match(sql,/Unsupported boolean milestone key/)
+  assert.match(sql,/Unsupported status milestone key/)
+  assert.match(sql,/Course journey step must reference a course in the same church/)
+  assert.match(sql,/Responsible journey leader must hold an active leadership role in the same church/)
+  assert.match(sql,/cm\.role in \('group_leader','ministry_leader','minister','pastor','church_admin'\)/)
+  assert.doesNotMatch(sql,/evidence_note text/)
 })
 
 test('canonical progress cannot be manually overwritten by journey tracking',()=>{
   const sql=read('supabase/migrations/20260928021500_discipleship_pathway_engine.sql')
   assert.match(sql,/Canonical journey steps cannot be manually completed/)
   assert.match(sql,/v_source<>'manual'/)
-  assert.match(sql,/Responsible journey leader must be an active member of the same church/)
+  const followup=read('src/app/journey/follow-up/actions.ts')
+  assert.match(followup,/rawStep\?\.completion_source==='manual'/)
+  assert.match(followup,/update\.manual_status=requestedStatus/)
 })
 
-test('member journey consumes canonical records and fails soft before pathway rollout',()=>{
+test('member journey consumes canonical records and falls back safely before pathway rollout',()=>{
   const page=read('src/app/journey/page.tsx')
   assert.match(page,/member_milestones/)
   assert.match(page,/course_enrollments/)
@@ -35,9 +49,10 @@ test('member journey consumes canonical records and fails soft before pathway ro
   assert.match(page,/configuredJourney\.length\?/)
   assert.match(page,/Who is helping me\?/)
   assert.match(page,/Not assigned yet/)
+  assert.match(page,/group_type==='friendship'/)
 })
 
-test('journey resolver detects inactivity overdue followup and missing leaders without duplicating progress',()=>{
+test('journey resolver detects stuck conditions without duplicating canonical progress',()=>{
   const helper=read('src/lib/discipleship-pathway.ts')
   assert.match(helper,/30\*24\*60\*60\*1000/)
   assert.match(helper,/attention\.includes\('inactive'\)/)
@@ -45,17 +60,56 @@ test('journey resolver detects inactivity overdue followup and missing leaders w
   assert.match(helper,/leader_missing/)
   assert.match(helper,/next_step_unstarted/)
   assert.match(helper,/credential_earned/)
+  assert.match(helper,/ctx\.milestones\.updated_at/)
   assert.match(helper,/groupCount/)
   assert.match(helper,/ministryAssignmentCount/)
 })
 
-test('leaders and church health surface journey attention using the same tracking records',()=>{
+test('church admins can configure a pathway without exposing raw completion keys',()=>{
+  const page=read('src/app/church/journey-pathway/page.tsx')
+  const actions=read('src/app/church/journey-pathway/actions.ts')
+  assert.match(page,/CONFIGURABLE PATHWAY/)
+  assert.match(page,/Specific course/)
+  assert.match(page,/Custom\/manual step/)
+  assert.match(actions,/const presets=/)
+  assert.match(actions,/first_steps_status/)
+  assert.match(actions,/bible_study_teacher_status/)
+  assert.match(actions,/completion_source:preset\.source/)
+  assert.doesNotMatch(page,/name="completion_key"/)
+})
+
+test('pastor dashboard resolves the actual current step and can assign owner plus follow-up date',()=>{
   const leadership=read('src/app/church/leadership/page.tsx')
+  const actions=read('src/app/church/leadership/actions.ts')
+  assert.match(leadership,/addJourneyAttention/)
+  assert.match(leadership,/currentJourney/)
+  assert.match(leadership,/Responsible leader/)
+  assert.match(leadership,/name="due_on"/)
+  assert.match(leadership,/NEXT STEP NOT STARTED/)
+  assert.match(actions,/saveJourneyFollowup/)
+  assert.match(actions,/responsible_leader_id/)
+})
+
+test('leader follow-up is scoped to assignments and rechecks canonical completion',()=>{
+  const page=read('src/app/journey/follow-up/page.tsx')
+  const actions=read('src/app/journey/follow-up/actions.ts')
+  assert.match(page,/\.eq\('responsible_leader_id',userId\)/)
+  assert.match(page,/resolveJourneyStep/)
+  assert.match(page,/if\(step\.completed\)return null/)
+  assert.match(actions,/tracking\.responsible_leader_id!==actorId/)
+  assert.match(actions,/\.eq\('responsible_leader_id',actorId\)/)
+})
+
+test('My Today and Church Health use the configured journey and canonical stuck detection',()=>{
+  const today=read('src/app/today/page.tsx')
   const health=read('src/app/church/health/page.tsx')
-  assert.match(leadership,/member_journey_step_tracking/)
-  assert.match(leadership,/Journey follow-ups overdue/)
-  assert.match(leadership,/without leader/)
-  assert.match(health,/member_journey_step_tracking/)
-  assert.match(health,/journey follow-ups overdue/)
-  assert.match(health,/tracked steps without an assigned leader/)
+  assert.match(today,/member_journey_pathway_assignments/)
+  assert.match(today,/configuredNext/)
+  assert.match(today,/journey\/follow-up/)
+  assert.match(today,/resolveJourneyStep/)
+  assert.match(health,/addJourneyAttention/)
+  assert.match(health,/current\.attention\.includes\('overdue'\)/)
+  assert.match(health,/current\.attention\.includes\('leader_missing'\)/)
+  assert.match(health,/current\.attention\.includes\('inactive'\)/)
+  assert.match(health,/next_step_unstarted/)
 })
