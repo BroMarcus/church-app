@@ -93,6 +93,26 @@ export async function updateOutreachContact(formData:FormData){
   revalidateOutreach();redirect(href(formData,'saved','1'))
 }
 
+export async function updateOutreachNextAction(formData:FormData){
+  const {supabase}=await auth()
+  const contactId=text(formData,'contact_id')
+  if(!contactId)redirect(href(formData,'error',msg(formData,'Outreach contact not found.','No se encontró la persona de evangelismo.')))
+  const {data:contact,error:contactError}=await supabase.from('outreach_contacts').select('church_id').eq('id',contactId).maybeSingle()
+  if(contactError||!contact?.church_id)redirect(href(formData,'error',msg(formData,'Outreach contact not found or not available to you.','No se encontró el contacto o no está disponible para usted.')))
+  let followUp:string|null=null
+  try{followUp=await localToUtc(supabase,contact.church_id,text(formData,'follow_up_due_at'))}catch(e:any){
+    redirect(`/outreach/${contactId}?${isSpanish(formData)?'lang=es&':''}error=${encodeURIComponent(e.message||msg(formData,'Invalid follow-up time.','La hora de seguimiento no es válida.'))}`)
+  }
+  const nextAction=nullable(formData,'next_action')
+  if(nextAction&&nextAction.length>500){
+    redirect(`/outreach/${contactId}?${isSpanish(formData)?'lang=es&':''}error=${encodeURIComponent(msg(formData,'Next action is too long.','La próxima acción es demasiado larga.'))}`)
+  }
+  const {error}=await supabase.from('outreach_contacts').update({next_action:nextAction,follow_up_due_at:followUp,updated_at:new Date().toISOString()}).eq('id',contactId)
+  if(error)redirect(`/outreach/${contactId}?${isSpanish(formData)?'lang=es&':''}error=${encodeURIComponent(error.message)}`)
+  revalidateOutreach();revalidatePath(`/outreach/${contactId}`)
+  redirect(`/outreach/${contactId}?${isSpanish(formData)?'lang=es&':''}saved=1`)
+}
+
 export async function logOutreachInteraction(formData:FormData){
   const {supabase,userId}=await auth()
   const contactId=text(formData,'contact_id'),type=text(formData,'interaction_type'),summary=text(formData,'summary')
