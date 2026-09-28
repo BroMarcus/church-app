@@ -28,7 +28,7 @@ create table if not exists public.discipleship_pathway_steps(
   )),
   completion_key text,
   completion_value text,
-  suggested_href text,
+  suggested_href text check(suggested_href is null or (suggested_href like '/%' and suggested_href not like '//%')),
   sort_order integer not null default 0,
   required boolean not null default true,
   active boolean not null default true,
@@ -130,9 +130,50 @@ create table if not exists public.member_journey_step_tracking(
     references public.discipleship_pathway_steps(id,church_id) on delete cascade,
   constraint member_journey_step_tracking_member_church_fkey foreign key(church_id,user_id)
     references public.church_memberships(church_id,user_id) on delete cascade,
-  constraint member_journey_step_tracking_leader_church_fkey foreign key(church_id,responsible_leader_id)
-    references public.church_memberships(church_id,user_id) on delete set null
+  constraint member_journey_step_tracking_responsible_leader_fkey foreign key(responsible_leader_id)
+    references public.profiles(id) on delete set null
 );
+
+create or replace function private.enforce_member_journey_step_tracking()
+returns trigger
+language plpgsql
+security definer
+set search_path=public,private,pg_temp
+as $
+declare v_source text;
+begin
+  select s.completion_source into v_source
+  from public.discipleship_pathway_steps s
+  where s.id=new.step_id and s.church_id=new.church_id;
+  if not found then raise exception 'Journey step must belong to the same church'; end if;
+
+  if new.responsible_leader_id is not null and not exists(
+    select 1 from public.church_memberships cm
+    where cm.church_id=new.church_id
+      and cm.user_id=new.responsible_leader_id
+      and cm.status='active'
+  ) then raise exception 'Responsible journey leader must be an active member of the same church'; end if;
+
+  if new.manual_status is not null and v_source<>'manual' then
+    raise exception 'Canonical journey steps cannot be manually completed';
+  end if;
+
+  if v_source='manual' and new.manual_status in ('completed','waived') and new.manual_completed_at is null then
+    new.manual_completed_at=now();
+  elsif v_source='manual' and coalesce(new.manual_status,'not_started') not in ('completed','waived') then
+    new.manual_completed_at=null;
+  end if;
+
+  new.updated_at=now();
+  new.last_activity_at=coalesce(new.last_activity_at,now());
+  return new;
+end $;
+
+drop trigger if exists member_journey_step_tracking_guard on public.member_journey_step_tracking;
+create trigger member_journey_step_tracking_guard
+before insert or update of church_id,user_id,step_id,responsible_leader_id,manual_status,manual_completed_at,last_activity_at
+on public.member_journey_step_tracking
+for each row execute function private.enforce_member_journey_step_tracking();
 
 create index if not exists member_journey_step_tracking_user_idx
   on public.member_journey_step_tracking(church_id,user_id);
