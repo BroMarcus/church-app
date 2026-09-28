@@ -80,7 +80,7 @@ test('shared scheduling has conflict detection and documented intentional overri
   assert.match(source,/schedule_conflict_summary/)
 })
 
-test('leader control screens follow the simple roster then schedule workflow',async()=>{
+test('leader control screens follow the calendar-first roster then schedule workflow',async()=>{
   const teams=await read('src/app/teams/manage/page.tsx')
   const schedules=await read('src/app/calendar/manage/page.tsx')
   const shared=await read('src/app/calendar/shared/page.tsx')
@@ -88,8 +88,9 @@ test('leader control screens follow the simple roster then schedule workflow',as
   assert.match(teams,/Teams, roles and people/)
   assert.match(teams,/Open schedules/)
   assert.match(schedules,/1 • PICK A SCHEDULE/)
-  assert.match(schedules,/2 • ADD A DATE \/ SERVICE/)
-  assert.match(schedules,/3 • WHO IS DOING WHAT/)
+  assert.match(schedules,/2 • PICK A DATE/)
+  assert.match(schedules,/3 • QUICK ASSIGN/)
+  assert.match(schedules,/Click the date\. Choose the person\. Save\./)
   assert.match(shared,/See the whole lineup together/)
   assert.match(shared,/assignment_status','scheduled'/)
   assert.match(rosterHub,/Rosters without the paperwork/)
