@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { randomUUID } from 'node:crypto'
 import { redirect } from 'next/navigation'
-import { AlertTriangle,BookOpen,CalendarClock,Mail,Phone,UserPlus,ArrowRight } from 'lucide-react'
+import { AlertTriangle,BookOpen,CalendarClock,Mail,Phone,ArrowRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { formatChurchDate,toChurchDateTimeLocal } from '@/lib/church-time'
 import { createOutreachContact,updateOutreachContact } from './actions'
