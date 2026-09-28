@@ -1,7 +1,8 @@
 import { NextRequest,NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { PUBLIC_APP_ORIGIN } from '@/lib/public-app-origin'
 
-const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
+const siteUrl=PUBLIC_APP_ORIGIN
 
 function allowedAuthDestination(path:string){
   return path==='/start'||path.startsWith('/start?')||path.startsWith('/join/')||path==='/auth/update-password'||path.startsWith('/auth/update-password?')
