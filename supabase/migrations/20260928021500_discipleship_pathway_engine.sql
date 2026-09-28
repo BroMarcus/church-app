@@ -57,6 +57,23 @@ begin
   if new.completion_source in ('milestone_boolean','milestone_status','course') and nullif(btrim(coalesce(new.completion_key,'')),'') is null then
     raise exception 'This completion source requires a completion key';
   end if;
+  if new.completion_source='milestone_boolean' and new.completion_key not in ('baptized','holy_ghost_received','covenant_current') then
+    raise exception 'Unsupported boolean milestone key';
+  end if;
+  if new.completion_source='milestone_status' and new.completion_key not in (
+    'first_steps_status','salt_series_status','soul_winning_status','bible_study_teacher_status',
+    'timothys_status','school_pastors_status','child_abuse_training_status','sexual_harassment_training_status'
+  ) then
+    raise exception 'Unsupported status milestone key';
+  end if;
+  if new.completion_source='milestone_status' and coalesce(new.completion_value,'') not in ('completed','approved','current') then
+    raise exception 'Unsupported milestone completion value';
+  end if;
+  if new.completion_source='course' and not exists(
+    select 1 from public.courses c where c.id::text=new.completion_key and c.church_id=new.church_id
+  ) then
+    raise exception 'Course journey step must reference a course in the same church';
+  end if;
   return new;
 end $$;
 
@@ -118,7 +135,6 @@ create table if not exists public.member_journey_step_tracking(
   due_on date,
   manual_status text check(manual_status is null or manual_status in ('not_started','in_progress','completed','waived')),
   manual_completed_at timestamptz,
-  evidence_note text,
   evidence_source_type text,
   evidence_source_id uuid,
   last_activity_at timestamptz,
@@ -152,7 +168,8 @@ begin
     where cm.church_id=new.church_id
       and cm.user_id=new.responsible_leader_id
       and cm.status='active'
-  ) then raise exception 'Responsible journey leader must be an active member of the same church'; end if;
+      and cm.role in ('group_leader','ministry_leader','minister','pastor','church_admin')
+  ) then raise exception 'Responsible journey leader must hold an active leadership role in the same church'; end if;
 
   if new.manual_status is not null and v_source<>'manual' then
     raise exception 'Canonical journey steps cannot be manually completed';
