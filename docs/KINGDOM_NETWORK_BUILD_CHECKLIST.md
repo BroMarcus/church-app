@@ -9,6 +9,25 @@ Core operating rule: **Enter information once. Update every authorized place tha
 
 Founder-locked working method: follow `docs/ONE_KINGDOM_ROUTE_ACCEPTANCE_WORKFLOW.md` for route-by-route human walkthroughs, screenshot/visual acceptance, small-batch fixes, final inspection, regression protection, LOCK, and exact-next-route handoff.
 
+## Canonical App + Implementation Status Rule
+
+**Current product source:** Base44 app `6a8b3494945c37375d00b91c`. GitHub application code is legacy/supporting reference unless Marcus explicitly starts a migration/reconciliation task.
+
+Before new implementation, inspect the canonical Base44 app for existing disconnected capability and connect/reuse solid work before creating replacements.
+
+Every meaningful feature must be labeled with one of these statuses from `docs/ONE_KINGDOM_IMPLEMENTATION_STATUS_STANDARD.md`:
+
+- **PLANNED**
+- **EXISTS / NOT CONNECTED**
+- **CONNECTED / NEEDS VERIFICATION**
+- **VERIFIED / LOCKED**
+
+A backend function, entity, component, route, or branch by itself is **not** implementation completion. If a real user cannot naturally reach and complete the workflow against canonical data with correct permissions, the status is **EXISTS / NOT CONNECTED**.
+
+**Standing product rule: written code is inventory; connected workflow is product.**
+
+---
+
 ## Standing Final Inspection Gate
 
 A page or workflow is **not VERIFIED / locked** until the final inspection clears all of these together:
