@@ -13,10 +13,14 @@ export default async function SessionRosterPage({params,searchParams}:{params:Pr
   const {data:claims}=await supabase.auth.getClaims()
   const actorId=claims?.claims?.sub
   if(!actorId)redirect('/login')
-  const {data:session}=await supabase.from('course_sessions').select('id,course_id,church_id,session_date,starts_at,title,instructor_name,module_ids,courses(title)').eq('id',sessionId).single()
+  const {data:session}=await supabase.from('course_sessions').select('id,course_id,church_id,session_date,starts_at,title,instructor_user_id,instructor_name,module_ids,courses(title)').eq('id',sessionId).single()
   if(!session)redirect('/learning')
   const {data:membership}=await supabase.from('church_memberships').select('role').eq('church_id',session.church_id).eq('user_id',actorId).eq('status','active').single()
-  if(!membership||!['minister','pastor','church_admin'].includes(membership.role))redirect('/learning')
+  if(!membership)redirect('/learning')
+  const {data:customLearningAccess}=await supabase.rpc('current_user_has_church_permission',{p_church_id:session.church_id,p_permission_key:'manage_learning'})
+  const canManage=['minister','pastor','church_admin'].includes(membership.role)||Boolean(customLearningAccess)
+  const assignedTeacher=session.instructor_user_id===actorId
+  if(!canManage&&!assignedTeacher)redirect('/learning')
 
   const linkedModuleIds=Array.isArray(session.module_ids)?session.module_ids.filter(Boolean):[]
   let linkedModules:any[]=[];let linkedAssets:any[]=[]
