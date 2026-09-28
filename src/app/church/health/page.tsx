@@ -21,7 +21,7 @@ export default async function ChurchHealthPage({searchParams}:{searchParams:Prom
   if(!['pastor','church_admin'].includes(membership.role)&&!leadershipPerm.data&&!memberPerm.data)redirect('/')
   const [{data:metrics,error},{data:journeyTracking}]=await Promise.all([
     supabase.rpc('church_health_snapshot',{p_church_id:membership.church_id,p_days:days}),
-    supabase.from('member_journey_step_tracking').select('user_id,due_at,responsible_leader_id,manual_status').eq('church_id',membership.church_id)
+    supabase.from('member_journey_step_tracking').select('user_id,due_on,responsible_leader_id,manual_status').eq('church_id',membership.church_id)
   ])
   if(error)throw new Error(error.message)
   const church:any=Array.isArray(membership.churches)?membership.churches[0]:membership.churches
@@ -30,7 +30,7 @@ export default async function ChurchHealthPage({searchParams}:{searchParams:Prom
   const byKey=new Map((metrics??[]).map((m:any)=>[m.metric_key,m]))
   const members=Number((byKey.get('formal_members') as any)?.value||0),guests=Number((byKey.get('guest_accounts') as any)?.value||0),attendees=Number((byKey.get('regular_attendees') as any)?.value||0),overdue=Number((byKey.get('overdue_followup') as any)?.value||0),firstSteps=Number((byKey.get('first_steps_complete') as any)?.value||0),newBirth=Number((byKey.get('new_birth_complete') as any)?.value||0)
   const now=Date.now()
-  const journeyDue=(journeyTracking??[]).filter((row:any)=>row.due_at&&new Date(row.due_at).getTime()<now&&!['completed','waived'].includes(String(row.manual_status||''))).length
+  const journeyDue=(journeyTracking??[]).filter((row:any)=>row.due_on&&new Date(`${row.due_on}T23:59:59Z`).getTime()<now&&!['completed','waived'].includes(String(row.manual_status||''))).length
   const journeyUnassigned=(journeyTracking??[]).filter((row:any)=>!row.responsible_leader_id&&!['completed','waived'].includes(String(row.manual_status||''))).length
   return <main className="shell">
     <header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??'Church'} • {es?'Salud de la Iglesia':'Church Health'}</div></div><div className="row"><Languages size={14}/><Link className="ghost" href={`/church/health?days=${days}&lang=en`}>English</Link><Link className="ghost" href={`/church/health?days=${days}&lang=es`}>Español</Link><Link className="ghost" href={l('/church/group-growth')}>{es?'Crecimiento de Grupos':'Group Growth'}</Link><Link className="ghost" href="/">{es?'← Inicio':'← Home'}</Link></div></header>
