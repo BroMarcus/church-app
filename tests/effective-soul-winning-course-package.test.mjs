@@ -7,6 +7,8 @@ const pkg=JSON.parse(read('docs/curriculum/effective-soul-winning/course-package
 const migration=read('supabase/migrations/20260928043000_learning_course_package_import.sql')
 const actions=read('src/app/learning/admin/course-builder/[courseId]/actions.ts')
 const page=read('src/app/learning/admin/course-builder/[courseId]/page.tsx')
+const lessonPage=read('src/app/learning/[courseId]/lesson/[moduleId]/page.tsx')
+const sourceViewer=read('src/app/learning/[courseId]/lesson/[moduleId]/source/page.tsx')
 
 test('Effective Soul Winning package keeps the verified six-lesson mastery structure',()=>{
   assert.equal(pkg.one_kingdom_package_version,1)
@@ -65,4 +67,20 @@ test('database publish readiness enforces real checkpoint and final counts',()=>
   assert.match(migration,/Publish every required assessment before publishing the course/)
   assert.match(migration,/Required checkpoint tests need 5-10 questions and final exams need 20-25 questions/)
   assert.match(migration,/Tested courses require a passing score of at least 80/)
+})
+
+
+test('ESW lesson resources stay inside the authenticated One Kingdom viewer',()=>{
+  assert.match(lessonPage,/LESSON MATERIALS/)
+  assert.match(lessonPage,/Open in One Kingdom/)
+  assert.match(lessonPage,/module\.content\?\.resources/)
+  assert.match(sourceViewer,/getClaims/)
+  assert.match(sourceViewer,/course_enrollments/)
+  assert.match(sourceViewer,/church_memberships/)
+  assert.match(sourceViewer,/ONE KINGDOM VIEWER/)
+  assert.match(sourceViewer,/drive\.google\.com/)
+  assert.match(sourceViewer,/docs\.google\.com/)
+  assert.match(sourceViewer,/dropbox\.com/)
+  assert.match(sourceViewer,/raw','1'/)
+  assert.match(sourceViewer,/resource\?\.page_start/)
 })
