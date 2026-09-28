@@ -115,7 +115,7 @@ create table if not exists public.member_journey_step_tracking(
   user_id uuid not null references public.profiles(id) on delete cascade,
   step_id uuid not null,
   responsible_leader_id uuid references public.profiles(id) on delete set null,
-  due_at timestamptz,
+  due_on date,
   manual_status text check(manual_status is null or manual_status in ('not_started','in_progress','completed','waived')),
   manual_completed_at timestamptz,
   evidence_note text,
@@ -178,11 +178,11 @@ for each row execute function private.enforce_member_journey_step_tracking();
 create index if not exists member_journey_step_tracking_user_idx
   on public.member_journey_step_tracking(church_id,user_id);
 create index if not exists member_journey_step_tracking_leader_idx
-  on public.member_journey_step_tracking(church_id,responsible_leader_id,due_at)
+  on public.member_journey_step_tracking(church_id,responsible_leader_id,due_on)
   where responsible_leader_id is not null;
 create index if not exists member_journey_step_tracking_due_idx
-  on public.member_journey_step_tracking(church_id,due_at)
-  where due_at is not null;
+  on public.member_journey_step_tracking(church_id,due_on)
+  where due_on is not null;
 
 alter table public.discipleship_pathways enable row level security;
 alter table public.discipleship_pathway_steps enable row level security;
