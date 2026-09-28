@@ -211,6 +211,31 @@ export async function deleteBuilderQuestion(formData:FormData){
   success(courseId,language,language==='es'?'Pregunta eliminada.':'Question deleted.')
 }
 
+export async function importCoursePackage(formData:FormData){
+  const courseId=text(formData,'course_id'),language=lang(formData)
+  if(!courseId)safeError('missing',language)
+  const upload=formData.get('course_package')
+  if(!(upload instanceof File)||!upload.name)safeError(courseId,language,language==='es'?'Selecciona un paquete JSON de One Kingdom.':'Choose a One Kingdom JSON course package.')
+  if(upload.size>2_000_000)safeError(courseId,language,language==='es'?'El paquete es demasiado grande. Usa un archivo JSON menor de 2 MB.':'The package is too large. Use a JSON file smaller than 2 MB.')
+  let coursePackage:any
+  try{
+    coursePackage=JSON.parse(await upload.text())
+  }catch{
+    safeError(courseId,language,language==='es'?'Ese archivo no contiene JSON válido.':'That file does not contain valid JSON.')
+  }
+  if(Number(coursePackage?.one_kingdom_package_version)!==1)safeError(courseId,language,language==='es'?'Este paquete no usa One Kingdom Course Package v1.':'This package is not a One Kingdom Course Package v1 file.')
+  const {supabase}=await manager(courseId)
+  const {data,error}=await supabase.rpc('import_course_package_v1',{p_course_id:courseId,p_package:coursePackage})
+  if(error){
+    console.error('course package import failed',{courseId,file:upload.name,message:error.message})
+    safeError(courseId,language,error.message)
+  }
+  const lessons=Number(data?.lessons_created??0),tests=Number(data?.assessments_created??0),questions=Number(data?.questions_created??0)
+  success(courseId,language,language==='es'
+    ?`Paquete importado como borrador: ${lessons} lecciones, ${tests} pruebas y ${questions} preguntas. Revisa las pruebas antes de publicarlas.`
+    :`Package imported as a draft: ${lessons} lessons, ${tests} assessments, and ${questions} questions. Review the assessments before publishing them.`)
+}
+
 export async function saveBuilderCourse(formData:FormData){
   const courseId=text(formData,'course_id'),language=lang(formData)
   if(!courseId)safeError('missing',language)
