@@ -57,6 +57,20 @@ function buildExtractionPlan(source:string){
   return {version:1,method:'source_text_structure',lessons,assessment:{title:'Course Final Review',passing_score:80,required:true},notes:'Draft structure only. Leadership must compare every lesson and assessment against the approved source before publishing.'}
 }
 
+
+function sourceProvider(raw:string){
+  if(!raw)return null
+  let url:URL
+  try{url=new URL(raw)}catch{return null}
+  if(url.protocol!=='https:')return null
+  const host=url.hostname.toLowerCase()
+  if(host==='dropbox.com'||host.endsWith('.dropbox.com'))return 'dropbox'
+  if(host==='drive.google.com'||host==='docs.google.com')return 'google_drive'
+  if(host==='1drv.ms'||host.endsWith('.onedrive.com'))return 'onedrive'
+  if(host.endsWith('.sharepoint.com'))return 'sharepoint'
+  return 'web'
+}
+
 function parseQuestion(formData:FormData){
   const type=text(formData,'question_type')||'multiple_choice'
   const prompt=text(formData,'prompt')
@@ -264,4 +278,26 @@ export async function applyExtractionPlan(formData:FormData){
   }
   await supabase.from('church_setup_uploads').update({extraction_status:'applied',extraction_applied_at:new Date().toISOString()}).eq('id',source!.id)
   success(courseId,language,language==='es'?'Propuesta aplicada como borrador.':'Proposal applied as drafts.')
+}
+
+export async function saveCourseSourceLink(formData:FormData){
+  const courseId=text(formData,'course_id'),language=lang(formData),rawUrl=text(formData,'source_url'),label=text(formData,'source_label')
+  if(!courseId)safeError('missing',language)
+  const provider=sourceProvider(rawUrl)
+  if(rawUrl&&!provider)safeError(courseId,language,language==='es'?'Usa un enlace HTTPS válido de Dropbox, Google Drive, OneDrive, SharePoint u otro sitio web.':'Use a valid HTTPS link from Dropbox, Google Drive, OneDrive, SharePoint, or another website.')
+  const {supabase}=await manager(courseId)
+  const {error}=await supabase.rpc('set_course_source_link_builder',{p_course_id:courseId,p_source_provider:provider,p_source_url:rawUrl||null,p_source_label:label||null})
+  if(error){console.error('course builder source link failed',{courseId,message:error.message});safeError(courseId,language)}
+  success(courseId,language,rawUrl?(language==='es'?'Fuente del curso conectada.':'Course source connected.'):(language==='es'?'Fuente del curso eliminada.':'Course source removed.'))
+}
+
+export async function saveLessonSourceLink(formData:FormData){
+  const courseId=text(formData,'course_id'),moduleId=text(formData,'module_id'),language=lang(formData),rawUrl=text(formData,'source_url'),label=text(formData,'source_label')
+  if(!courseId||!moduleId)safeError(courseId||'missing',language)
+  const provider=sourceProvider(rawUrl)
+  if(rawUrl&&!provider)safeError(courseId,language,language==='es'?'Usa un enlace HTTPS válido para la fuente de esta lección.':'Use a valid HTTPS source link for this lesson.')
+  const {supabase}=await manager(courseId)
+  const {error}=await supabase.rpc('set_course_module_source_link_builder',{p_module_id:moduleId,p_source_provider:provider,p_source_url:rawUrl||null,p_source_label:label||null})
+  if(error){console.error('lesson source link failed',{courseId,moduleId,message:error.message});safeError(courseId,language)}
+  success(courseId,language,rawUrl?(language==='es'?'Fuente de la lección conectada.':'Lesson source connected.'):(language==='es'?'Fuente de la lección eliminada.':'Lesson source removed.'))
 }
