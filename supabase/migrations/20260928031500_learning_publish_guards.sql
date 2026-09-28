@@ -61,6 +61,10 @@ begin
     return new;
   end if;
 
+  if not exists(select 1 from public.course_modules m where m.course_id=new.id) then
+    raise exception 'A course must contain at least one lesson before it can be published';
+  end if;
+
   select count(*) into v_required_finals
   from public.course_assessments a
   where a.course_id=new.id and a.required=true and a.assessment_type='final_exam';
