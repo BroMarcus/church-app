@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { CalendarDays,Clock,MapPin,ShieldCheck,Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { formatChurchDate,formatChurchTime } from '@/lib/church-time'
-import { addCleaningChecklistItem,archiveScheduleAssignment,assignCleaningGroup,createSchedule,createScheduleAssignment,createScheduleItem,reviewFiveSpotRequest,saveScheduleMonthPlan,updateSchedule,updateScheduleAssignment,updateScheduleItem } from './actions'
+import { addCleaningChecklistItem,archiveScheduleAssignment,assignCleaningGroup,createSchedule,createScheduleAssignment,createScheduleItem,createScheduleSeries,deactivateScheduleSeries,extendScheduleSeries,reviewFiveSpotRequest,saveScheduleMonthPlan,updateSchedule,updateScheduleAssignment,updateScheduleItem } from './actions'
 import '../calendar.css'
 
 type ChurchRow={name:string|null;timezone:string|null}
@@ -15,7 +15,7 @@ type TeamMemberRow={ministry_id:string;user_id:string;role_label:string;is_leade
 type ChurchMemberRow={user_id:string}
 type ProfileRow={id:string;display_name:string|null;first_name:string|null;last_name:string|null}
 type ScheduleRow={id:string;name:string;schedule_type:string;description:string|null;ministry_id:string|null;group_id:string|null;active:boolean}
-type ScheduleItemRow={id:string;schedule_id:string;title:string;starts_at:string;ends_at:string|null;location:string|null;notes:string|null;status:string}
+type ScheduleItemRow={id:string;schedule_id:string;title:string;starts_at:string;ends_at:string|null;location:string|null;notes:string|null;status:string;series_id:string|null;series_occurrence_date:string|null;series_detached:boolean}
 type AssignmentRow={id:string;schedule_item_id:string|null;assigned_user_id:string;title:string;role_label:string|null;call_time:string|null;notes:string|null;assignment_status:string;schedule_override:boolean;schedule_conflict_summary:string|null}
 type ResponseRow={assignment_id:string;response:string;note:string|null}
 type MonthPlanRow={id:string;schedule_id:string;month_start:string;theme:string|null;scripture:string|null;notes:string|null}
@@ -23,7 +23,8 @@ type FiveSpotRow={id:string;requester_user_id:string;scripture:string;title_idea
 type YearAssignmentRow={schedule_item_id:string|null;role_label:string|null;title:string;assignment_status:string}
 type CleaningAssignmentRow={id:string;schedule_item_id:string;group_id:string;status:string;claimed_for_at:string|null;claimed_by:string|null;completed_by:string|null;completed_at:string|null;completion_notes:string|null}
 type CleaningChecklistRow={id:string;cleaning_assignment_id:string;label:string;sort_order:number;required:boolean;completed_at:string|null}
-type Query={lang?:string;schedule?:string;ministry?:string;month?:string;date?:string;schedule_created?:string;schedule_saved?:string;item_created?:string;item_saved?:string;assignment_created?:string;assignment_saved?:string;month_plan_saved?:string;five_spot_saved?:string;cleaning_saved?:string;error?:string}
+type ScheduleSeriesRow={id:string;title:string;frequency:string;interval_count:number;weekday:number|null;month_day:number|null;start_date:string;end_date:string|null;local_start_time:string;duration_minutes:number|null;location:string|null;notes:string|null;active:boolean}
+type Query={lang?:string;schedule?:string;ministry?:string;month?:string;date?:string;schedule_created?:string;schedule_saved?:string;item_created?:string;item_saved?:string;assignment_created?:string;assignment_saved?:string;month_plan_saved?:string;five_spot_saved?:string;cleaning_saved?:string;series_saved?:string;error?:string}
 
 const broadRoles=new Set(['ministry_leader','minister','pastor','church_admin'])
 
@@ -126,7 +127,7 @@ export default async function ScheduleManagementPage({searchParams}:{searchParam
 
   let items:ScheduleItemRow[]=[],assignments:AssignmentRow[]=[],responses:ResponseRow[]=[]
   if(selected&&monthStartUtc&&monthEndUtc){
-    const {data:itemData}=await supabase.from('schedule_items').select('id,schedule_id,title,starts_at,ends_at,location,notes,status').eq('schedule_id',selected.id).eq('church_id',churchId).gte('starts_at',monthStartUtc).lt('starts_at',monthEndUtc).order('starts_at').limit(180)
+    const {data:itemData}=await supabase.from('schedule_items').select('id,schedule_id,title,starts_at,ends_at,location,notes,status,series_id,series_occurrence_date,series_detached').eq('schedule_id',selected.id).eq('church_id',churchId).gte('starts_at',monthStartUtc).lt('starts_at',monthEndUtc).order('starts_at').limit(180)
     items=(itemData??[]) as ScheduleItemRow[]
     const itemIds=items.map(item=>item.id)
     if(itemIds.length){
@@ -138,6 +139,12 @@ export default async function ScheduleManagementPage({searchParams}:{searchParam
         responses=(responseData??[]) as ResponseRow[]
       }
     }
+  }
+
+  let scheduleSeries:ScheduleSeriesRow[]=[]
+  if(selected){
+    const {data:seriesData}=await supabase.from('schedule_series').select('id,title,frequency,interval_count,weekday,month_day,start_date,end_date,local_start_time,duration_minutes,location,notes,active').eq('schedule_id',selected.id).eq('church_id',churchId).order('active',{ascending:false}).order('start_date')
+    scheduleSeries=(seriesData??[]) as ScheduleSeriesRow[]
   }
 
   let cleaningAssignments:CleaningAssignmentRow[]=[],cleaningChecklist:CleaningChecklistRow[]=[]
@@ -165,7 +172,7 @@ export default async function ScheduleManagementPage({searchParams}:{searchParam
     monthPlans=(planResult.data??[]) as MonthPlanRow[]
     fiveSpotRequests=(fiveSpotResult.data??[]) as FiveSpotRow[]
     if(yearStartResult.data&&yearEndResult.data){
-      const {data:yearItemData}=await supabase.from('schedule_items').select('id,schedule_id,title,starts_at,ends_at,location,notes,status').eq('schedule_id',selected.id).eq('church_id',churchId).gte('starts_at',yearStartResult.data as string).lt('starts_at',yearEndResult.data as string).order('starts_at').limit(500)
+      const {data:yearItemData}=await supabase.from('schedule_items').select('id,schedule_id,title,starts_at,ends_at,location,notes,status,series_id,series_occurrence_date,series_detached').eq('schedule_id',selected.id).eq('church_id',churchId).gte('starts_at',yearStartResult.data as string).lt('starts_at',yearEndResult.data as string).order('starts_at').limit(500)
       yearItems=(yearItemData??[]) as ScheduleItemRow[]
       const yearItemIds=yearItems.map(item=>item.id)
       if(yearItemIds.length){
@@ -211,7 +218,7 @@ export default async function ScheduleManagementPage({searchParams}:{searchParam
 
     <section className="calendar-hero card"><div><div className="pill">{t('CALENDAR-FIRST SCHEDULING','PROGRAMACIÓN DESDE EL CALENDARIO')}</div><h1>{t('Click the date. Choose the person. Save.','Toca la fecha. Escoge la persona. Guarda.')}</h1><p className="muted">{t('One shared scheduling engine for preaching, worship, cleaning, groups and ministry assignments.','Un solo motor de horarios para predicación, alabanza, limpieza, grupos y asignaciones ministeriales.')}</p></div><div className="hero-stat"><strong>{manageableSchedules.length}</strong><span>{t('shared schedules','horarios compartidos')}</span></div></section>
 
-    {query.schedule_created&&<div className="notice success">{t('Schedule created.','Horario creado.')}</div>}{query.schedule_saved&&<div className="notice success">{t('Schedule settings saved.','Configuración guardada.')}</div>}{query.item_created&&<div className="notice success">{t('Schedule date added.','Fecha agregada al horario.')}</div>}{query.item_saved&&<div className="notice success">{t('Schedule date updated.','Fecha actualizada.')}</div>}{query.assignment_created&&<div className="notice success">{t('Person assigned.','Persona asignada.')}</div>}{query.assignment_saved&&<div className="notice success">{t('Assignment updated.','Asignación actualizada.')}</div>}{query.month_plan_saved&&<div className="notice success">{t('Monthly preaching plan saved.','Plan mensual de predicación guardado.')}</div>}{query.five_spot_saved&&<div className="notice success">{t('5 Spot workflow updated.','Flujo de 5 Spot actualizado.')}</div>}{query.cleaning_saved&&<div className="notice success">{t('Cleaning rotation saved.','Rotación de limpieza guardada.')}</div>}{query.error&&<div className="notice error">{query.error}</div>}
+    {query.schedule_created&&<div className="notice success">{t('Schedule created.','Horario creado.')}</div>}{query.schedule_saved&&<div className="notice success">{t('Schedule settings saved.','Configuración guardada.')}</div>}{query.item_created&&<div className="notice success">{t('Schedule date added.','Fecha agregada al horario.')}</div>}{query.item_saved&&<div className="notice success">{t('Schedule date updated.','Fecha actualizada.')}</div>}{query.assignment_created&&<div className="notice success">{t('Person assigned.','Persona asignada.')}</div>}{query.assignment_saved&&<div className="notice success">{t('Assignment updated.','Asignación actualizada.')}</div>}{query.month_plan_saved&&<div className="notice success">{t('Monthly preaching plan saved.','Plan mensual de predicación guardado.')}</div>}{query.five_spot_saved&&<div className="notice success">{t('5 Spot workflow updated.','Flujo de 5 Spot actualizado.')}</div>}{query.cleaning_saved&&<div className="notice success">{t('Cleaning rotation saved.','Rotación de limpieza guardada.')}</div>}{query.series_saved&&<div className="notice success">{t('Recurring schedule saved.','Horario recurrente guardado.')}</div>}{query.error&&<div className="notice error">{query.error}</div>}
 
     <section className="card" style={{padding:18,marginBottom:18}}><div className="pill">{t('1 • PICK A SCHEDULE','1 • ESCOGE UN HORARIO')}</div><div className="row" style={{marginTop:12,flexWrap:'wrap'}}>{manageableSchedules.map(schedule=><Link key={schedule.id} className={selected?.id===schedule.id?'btn':'ghost'} href={l(`/calendar/manage?schedule=${schedule.id}`)}>{schedule.name}</Link>)}</div>{!manageableSchedules.length&&<p className="muted">{t('No schedules yet. Create the first one below.','Todavía no hay horarios. Crea el primero abajo.')}</p>}</section>
 
@@ -247,9 +254,34 @@ export default async function ScheduleManagementPage({searchParams}:{searchParam
       <datalist id="schedule-role-suggestions">{roleSuggestions.map(role=><option value={role} key={role}/>)}</datalist>
     </section>
 
+    <details className="card" style={{padding:18,marginBottom:18}}><summary style={{fontWeight:800,cursor:'pointer'}}>{t('Advanced: recurring dates','Avanzado: fechas recurrentes')}</summary>
+      <div style={{marginTop:14}}>
+        <p className="small muted">{t('Create the repeating pattern once. One-off edits or cancellations stay as exceptions and do not rewrite the whole series.','Crea el patrón repetitivo una vez. Los cambios o cancelaciones de una sola fecha quedan como excepciones y no reescriben toda la serie.')}</p>
+        <form action={createScheduleSeries}><input type="hidden" name="lang" value={lang}/><input type="hidden" name="schedule_id" value={selected.id}/>
+          <label className="field"><span>{t('Service / meeting name','Nombre del servicio / reunión')}</span><input name="title" required maxLength={160}/></label>
+          <div className="row" style={{alignItems:'flex-end',flexWrap:'wrap'}}>
+            <label className="field" style={{flex:'1 1 160px',margin:0}}><span>{t('Repeats','Se repite')}</span><select name="frequency" defaultValue="weekly"><option value="weekly">{t('Weekly','Semanal')}</option><option value="monthly">{t('Monthly','Mensual')}</option></select></label>
+            <label className="field" style={{flex:'1 1 120px',margin:0}}><span>{t('Every','Cada')}</span><input name="interval_count" type="number" min="1" max="12" defaultValue="1"/></label>
+            <label className="field" style={{flex:'1 1 160px',margin:0}}><span>{t('Weekday (weekly)','Día (semanal)')}</span><select name="weekday" defaultValue="0"><option value="0">{t('Sunday','Domingo')}</option><option value="1">{t('Monday','Lunes')}</option><option value="2">{t('Tuesday','Martes')}</option><option value="3">{t('Wednesday','Miércoles')}</option><option value="4">{t('Thursday','Jueves')}</option><option value="5">{t('Friday','Viernes')}</option><option value="6">{t('Saturday','Sábado')}</option></select></label>
+            <label className="field" style={{flex:'1 1 140px',margin:0}}><span>{t('Day of month (monthly)','Día del mes (mensual)')}</span><input name="month_day" type="number" min="1" max="31"/></label>
+          </div>
+          <div className="row" style={{alignItems:'flex-end',flexWrap:'wrap',marginTop:10}}>
+            <label className="field" style={{flex:'1 1 160px',margin:0}}><span>{t('Start date','Fecha inicial')}</span><input name="start_date" type="date" required/></label>
+            <label className="field" style={{flex:'1 1 160px',margin:0}}><span>{t('End date (optional)','Fecha final (opcional)')}</span><input name="end_date" type="date"/></label>
+            <label className="field" style={{flex:'1 1 140px',margin:0}}><span>{t('Start time','Hora inicial')}</span><input name="local_start_time" type="time" required/></label>
+            <label className="field" style={{flex:'1 1 140px',margin:0}}><span>{t('Minutes','Minutos')}</span><input name="duration_minutes" type="number" min="1" max="1440"/></label>
+          </div>
+          <label className="field"><span>{t('Location','Lugar')}</span><input name="location"/></label>
+          <label className="field"><span>{t('Notes','Notas')}</span><textarea name="notes" rows={2}/></label>
+          <button className="ghost">{t('Create recurring dates','Crear fechas recurrentes')}</button>
+        </form>
+        {!!scheduleSeries.length&&<div style={{display:'grid',gap:9,marginTop:16}}>{scheduleSeries.map(series=><div className="quick-assignment" key={series.id}><div className="quick-assignment-context"><div><strong>{series.title}</strong><div className="small muted">{series.frequency==='weekly'?t('Weekly','Semanal'):t('Monthly','Mensual')} • {series.start_date}{series.end_date?` → ${series.end_date}`:''} • {series.local_start_time.slice(0,5)}</div></div><span className="pill">{series.active?t('ACTIVE','ACTIVA'):t('STOPPED','DETENIDA')}</span></div>{series.active&&<div className="row" style={{gap:8,flexWrap:'wrap',marginTop:8}}><form action={extendScheduleSeries} className="row" style={{gap:6,alignItems:'flex-end',flexWrap:'wrap'}}><input type="hidden" name="lang" value={lang}/><input type="hidden" name="schedule_id" value={selected.id}/><input type="hidden" name="series_id" value={series.id}/><label className="field" style={{margin:0}}><span>{t('Generate through','Generar hasta')}</span><input name="through_date" type="date" required defaultValue={series.end_date??`${planYear+1}-12-31`}/></label><button className="ghost">{t('Extend','Extender')}</button></form><form action={deactivateScheduleSeries}><input type="hidden" name="lang" value={lang}/><input type="hidden" name="schedule_id" value={selected.id}/><input type="hidden" name="series_id" value={series.id}/><button className="ghost">{t('Stop future generation','Detener generación futura')}</button></form></div>}</div>)}</div>}
+      </div>
+    </details>
+
     <details className="card" style={{padding:18,marginBottom:18}}><summary style={{fontWeight:800,cursor:'pointer'}}>{t('Advanced: add a date manually','Avanzado: agregar fecha manualmente')}</summary><form action={createScheduleItem} style={{marginTop:12}}><input type="hidden" name="lang" value={lang}/><input type="hidden" name="schedule_id" value={selected.id}/><label className="field"><span>{t('Service / meeting name','Nombre del servicio / reunión')}</span><input name="title" required maxLength={160}/></label><div className="row" style={{alignItems:'flex-end',flexWrap:'wrap'}}><label className="field" style={{flex:'1 1 220px',margin:0}}><span>{t('Starts','Empieza')}</span><input name="starts_at" type="datetime-local" required/></label><label className="field" style={{flex:'1 1 220px',margin:0}}><span>{t('Ends','Termina')}</span><input name="ends_at" type="datetime-local"/></label><label className="field" style={{flex:'1 1 200px',margin:0}}><span>{t('Location','Lugar')}</span><input name="location"/></label></div><label className="field"><span>{t('Notes','Notas')}</span><textarea name="notes" rows={2}/></label><button className="ghost">{t('Add to schedule','Agregar al horario')}</button></form></details>
 
-    <section style={{display:'grid',gap:16}}>{items.map(item=>{const itemAssignments=assignments.filter(assignment=>assignment.schedule_item_id===item.id);return <article className="card" key={item.id} style={{padding:18,opacity:item.status==='cancelled'?.65:1}}><div className="row" style={{justifyContent:'space-between',alignItems:'flex-start',gap:14}}><div><div className="pill">{item.status==='cancelled'?t('CANCELLED','CANCELADO'):t('SCHEDULED','PROGRAMADO')}</div><h2 style={{margin:'8px 0 5px'}}>{item.title}</h2><div className="small muted"><CalendarDays size={12}/> {formatChurchDate(item.starts_at,timeZone,{weekday:'long',month:'short',day:'numeric',year:'numeric'})} • <Clock size={12}/> {formatChurchTime(item.starts_at,timeZone)}{item.ends_at?` – ${formatChurchTime(item.ends_at,timeZone)}`:''}{item.location&&<> • <MapPin size={12}/> {item.location}</>}</div>{item.notes&&<p className="muted">{item.notes}</p>}</div><div className="hero-stat"><strong>{itemAssignments.length}</strong><span>{t('people assigned','personas asignadas')}</span></div></div>
+    <section style={{display:'grid',gap:16}}>{items.map(item=>{const itemAssignments=assignments.filter(assignment=>assignment.schedule_item_id===item.id);return <article className="card" key={item.id} style={{padding:18,opacity:item.status==='cancelled'?.65:1}}><div className="row" style={{justifyContent:'space-between',alignItems:'flex-start',gap:14}}><div><div className="row" style={{gap:6,flexWrap:'wrap'}}><div className="pill">{item.status==='cancelled'?t('CANCELLED','CANCELADO'):t('SCHEDULED','PROGRAMADO')}</div>{item.series_id&&<div className="pill">{item.series_detached?t('RECURRING EXCEPTION','EXCEPCIÓN RECURRENTE'):t('RECURRING','RECURRENTE')}</div>}</div><h2 style={{margin:'8px 0 5px'}}>{item.title}</h2><div className="small muted"><CalendarDays size={12}/> {formatChurchDate(item.starts_at,timeZone,{weekday:'long',month:'short',day:'numeric',year:'numeric'})} • <Clock size={12}/> {formatChurchTime(item.starts_at,timeZone)}{item.ends_at?` – ${formatChurchTime(item.ends_at,timeZone)}`:''}{item.location&&<> • <MapPin size={12}/> {item.location}</>}</div>{item.notes&&<p className="muted">{item.notes}</p>}</div><div className="hero-stat"><strong>{itemAssignments.length}</strong><span>{t('people assigned','personas asignadas')}</span></div></div>
 
       <details style={{marginTop:12}}><summary className="ghost" style={{cursor:'pointer',display:'inline-flex'}}>{t('Edit date / cancel','Editar fecha / cancelar')}</summary><form action={updateScheduleItem} style={{marginTop:10}}><input type="hidden" name="lang" value={lang}/><input type="hidden" name="schedule_id" value={selected.id}/><input type="hidden" name="schedule_item_id" value={item.id}/><label className="field"><span>{t('Title','Título')}</span><input name="title" required defaultValue={item.title}/></label><div className="row" style={{flexWrap:'wrap'}}><label className="field" style={{flex:1}}><span>{t('Starts','Empieza')}</span><input type="datetime-local" name="starts_at" required defaultValue={localInput(item.starts_at,timeZone)}/></label><label className="field" style={{flex:1}}><span>{t('Ends','Termina')}</span><input type="datetime-local" name="ends_at" defaultValue={localInput(item.ends_at,timeZone)}/></label></div><label className="field"><span>{t('Location','Lugar')}</span><input name="location" defaultValue={item.location??''}/></label><label className="field"><span>{t('Notes','Notas')}</span><textarea name="notes" rows={2} defaultValue={item.notes??''}/></label><label className="field"><span>{t('Status','Estado')}</span><select name="status" defaultValue={item.status}><option value="scheduled">{t('Scheduled','Programado')}</option><option value="cancelled">{t('Cancelled — keep history','Cancelado — conservar historial')}</option></select></label><button className="ghost">{t('Save date','Guardar fecha')}</button></form></details>
 
