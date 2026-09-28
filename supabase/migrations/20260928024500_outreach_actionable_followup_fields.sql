@@ -18,3 +18,24 @@ comment on column public.outreach_contacts.first_steps_interest is
 
 comment on column public.outreach_contacts.next_action is
   'Plain-language next human follow-up action for this person. Due timing remains in follow_up_due_at.';
+
+
+alter table public.outreach_interactions
+  add column if not exists source_type text,
+  add column if not exists source_label text;
+
+alter table public.outreach_interactions
+  drop constraint if exists outreach_interactions_source_type_check;
+
+alter table public.outreach_interactions
+  add constraint outreach_interactions_source_type_check
+  check (
+    source_type is null
+    or source_type in ('church_service','friendship_group','outreach','event','leader_entry')
+  );
+
+comment on column public.outreach_interactions.source_type is
+  'Optional source category for a logged visit/attendance/follow-up interaction.';
+
+comment on column public.outreach_interactions.source_label is
+  'Optional human-readable source detail retained with the interaction history.';
