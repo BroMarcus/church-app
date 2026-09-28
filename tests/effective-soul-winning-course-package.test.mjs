@@ -83,4 +83,7 @@ test('ESW lesson resources stay inside the authenticated One Kingdom viewer',()=
   assert.match(sourceViewer,/dropbox\.com/)
   assert.match(sourceViewer,/raw','1'/)
   assert.match(sourceViewer,/resource\?\.page_start/)
+  assert.match(sourceViewer,/const rawSource=resource\?\.source_url\|\|module\.source_url\|\|''/)
+  assert.doesNotMatch(sourceViewer,/rawSource=resource\?\.source_url\|\|module\.source_url\|\|course\.source_url/)
+  assert.match(sourceViewer,/master course file is not exposed to learners automatically/)
 })
