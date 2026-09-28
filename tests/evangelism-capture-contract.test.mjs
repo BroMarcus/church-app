@@ -96,3 +96,20 @@ test('quick add is hidden from users without outreach manage authority',()=>{
   assert.match(page,/Only the people assigned to you/)
   assert.match(page,/canManageOutreach\?<section className="card create-outreach"/)
 })
+
+
+test('new guests receive a useful next action without extra capture steps',()=>{
+  assert.match(actions,/const defaultNextAction=/)
+  assert.match(actions,/Schedule Bible study/)
+  assert.match(actions,/Invite to First Steps/)
+  assert.match(actions,/Thank them and invite them back/)
+  assert.match(actions,/next_action:nullable\(formData,'next_action'\)\|\|defaultNextAction/)
+})
+
+test('Bible study and First Steps interest drive the recommended person next step',()=>{
+  const detail=fs.readFileSync(new URL('../src/app/outreach/[contactId]/page.tsx', import.meta.url),'utf8')
+  assert.match(detail,/contact\.bible_study_interest/)
+  assert.match(detail,/Schedule the Bible study/)
+  assert.match(detail,/contact\.first_steps_interest/)
+  assert.match(detail,/Invite them to First Steps/)
+})
