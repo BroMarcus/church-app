@@ -142,3 +142,53 @@ for each row execute function private.notify_cleaning_rotation();
 revoke all on function private.notify_team_assignment_change() from public,anon,authenticated;
 revoke all on function private.notify_five_spot_change() from public,anon,authenticated;
 revoke all on function private.notify_cleaning_rotation() from public,anon,authenticated;
+
+
+create or replace function private.notify_schedule_item_change()
+returns trigger
+language plpgsql
+security definer
+set search_path=public,private,pg_temp
+as $$
+declare
+  v_recipient uuid;
+  v_title text;
+  v_body text;
+begin
+  if not (
+    old.status is distinct from new.status
+    or old.location is distinct from new.location
+    or old.title is distinct from new.title
+    or old.ends_at is distinct from new.ends_at
+  ) then return new; end if;
+
+  if old.status is distinct from new.status and new.status='cancelled' then
+    v_title='Scheduled service cancelled';
+    v_body=new.title||' was cancelled.';
+  else
+    v_title='Scheduled service changed';
+    v_body=new.title||' has updated service details.';
+  end if;
+
+  for v_recipient in
+    select distinct ta.assigned_user_id
+    from public.team_assignments ta
+    where ta.schedule_item_id=new.id
+      and ta.assignment_status='scheduled'
+      and ta.assigned_user_id is not null
+  loop
+    insert into public.notifications(church_id,user_id,notification_type,title,body,href,source_type,source_id)
+    values(new.church_id,v_recipient,'team_assignment',v_title,v_body,'/calendar/my','schedule_item_changed',new.id)
+    on conflict do nothing;
+  end loop;
+
+  return new;
+end $$;
+
+drop trigger if exists schedule_items_attention_notifications on public.schedule_items;
+create trigger schedule_items_attention_notifications
+after update of status,location,title,ends_at
+on public.schedule_items
+for each row execute function private.notify_schedule_item_change();
+
+revoke all on function private.notify_schedule_item_change() from public,anon,authenticated;
