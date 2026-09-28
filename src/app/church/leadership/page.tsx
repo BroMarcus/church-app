@@ -22,7 +22,7 @@ export default async function LeadershipDevelopmentPage({searchParams}:{searchPa
     supabase.from('member_milestones').select('*').eq('church_id',churchId),
     supabase.from('leadership_development_reviews').select('*').eq('church_id',churchId).eq('leadership_track','friendship_group'),
     supabase.from('courses').select('*',{count:'exact',head:true}).eq('church_id',churchId).or('title.ilike.%timothy%,slug.ilike.%timothy%'),
-    supabase.from('member_journey_step_tracking').select('user_id,responsible_leader_id,due_at,manual_status,last_activity_at,discipleship_pathway_steps(title)').eq('church_id',churchId)
+    supabase.from('member_journey_step_tracking').select('user_id,responsible_leader_id,due_on,manual_status,last_activity_at,discipleship_pathway_steps(title)').eq('church_id',churchId)
   ])
   const ids=(members??[]).map((m:any)=>m.user_id)
   let profiles:any[]=[]
@@ -56,7 +56,7 @@ export default async function LeadershipDevelopmentPage({searchParams}:{searchPa
     const ready=objectiveComplete&&pastoralGates.every(([,ok])=>ok)
     const missingObjective=objectiveGates.filter(([,ok])=>!ok).map(([label])=>label)
     const journeyRows=trackingByUser.get(member.user_id)??[]
-    const journeyDue=journeyRows.filter((item:any)=>item.due_at&&new Date(item.due_at).getTime()<now&&!['completed','waived'].includes(String(item.manual_status||'')))
+    const journeyDue=journeyRows.filter((item:any)=>item.due_on&&new Date(`${item.due_on}T23:59:59Z`).getTime()<now&&!['completed','waived'].includes(String(item.manual_status||'')))
     const journeyUnassigned=journeyRows.filter((item:any)=>!item.responsible_leader_id&&!['completed','waived'].includes(String(item.manual_status||'')))
     const recommendation=missingObjective.length
       ? `Next measurable requirement: ${missingObjective[0]}.`
