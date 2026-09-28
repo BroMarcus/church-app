@@ -66,7 +66,7 @@ export function resolveJourneyStep(step:JourneyStepDefinition,ctx:JourneyResolut
     if(enrollment){
       const earned=enrollment.credential_earned===true
       const progress=Number(enrollment.progress_percent??0)
-      status=earned||progress>=100?'completed':progress>0?'in_progress':'not_started'
+      status=earned||progress>=100?'completed':'in_progress'
       lastActivityAt=String(enrollment.updated_at??enrollment.completed_at??lastActivityAt??'')||null
     }
   }else if(step.completion_source==='friendship_group'){
