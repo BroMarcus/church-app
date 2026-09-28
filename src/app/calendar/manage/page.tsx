@@ -18,7 +18,7 @@ type ScheduleRow={id:string;name:string;schedule_type:string;description:string|
 type ScheduleItemRow={id:string;schedule_id:string;title:string;starts_at:string;ends_at:string|null;location:string|null;notes:string|null;status:string}
 type AssignmentRow={id:string;schedule_item_id:string|null;assigned_user_id:string;title:string;role_label:string|null;call_time:string|null;notes:string|null;assignment_status:string;schedule_override:boolean;schedule_conflict_summary:string|null}
 type ResponseRow={assignment_id:string;response:string;note:string|null}
-type Query={lang?:string;schedule?:string;ministry?:string;schedule_created?:string;schedule_saved?:string;item_created?:string;item_saved?:string;assignment_created?:string;assignment_saved?:string;error?:string}
+type Query={lang?:string;schedule?:string;ministry?:string;month?:string;date?:string;schedule_created?:string;schedule_saved?:string;item_created?:string;item_saved?:string;assignment_created?:string;assignment_saved?:string;error?:string}
 
 const broadRoles=new Set(['ministry_leader','minister','pastor','church_admin'])
 
@@ -28,6 +28,33 @@ function localInput(iso:string|null,timeZone:string){
   const get=(type:string)=>parts.find(part=>part.type===type)?.value??''
   const hour=get('hour')==='24'?'00':get('hour')
   return `${get('year')}-${get('month')}-${get('day')}T${hour}:${get('minute')}`
+}
+
+function localDateKey(value:Date|string,timeZone:string){
+  const parts=new Intl.DateTimeFormat('en-US',{timeZone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(typeof value==='string'?new Date(value):value)
+  const get=(type:string)=>parts.find(part=>part.type===type)?.value??''
+  return `${get('year')}-${get('month')}-${get('day')}`
+}
+
+function shiftMonth(monthKey:string,delta:number){
+  const [year,month]=monthKey.split('-').map(Number)
+  const date=new Date(Date.UTC(year,month-1+delta,1))
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth()+1).padStart(2,'0')}`
+}
+
+function monthGrid(monthKey:string){
+  const [year,month]=monthKey.split('-').map(Number)
+  const first=new Date(Date.UTC(year,month-1,1))
+  const count=new Date(Date.UTC(year,month,0)).getUTCDate()
+  const cells:(string|null)[]=Array(first.getUTCDay()).fill(null)
+  for(let day=1;day<=count;day++)cells.push(`${monthKey}-${String(day).padStart(2,'0')}`)
+  while(cells.length%7)cells.push(null)
+  return cells
+}
+
+function monthLabel(monthKey:string,lang:string){
+  const [year,month]=monthKey.split('-').map(Number)
+  return new Intl.DateTimeFormat(lang==='es'?'es-US':'en-US',{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(Date.UTC(year,month-1,1)))
 }
 
 export default async function ScheduleManagementPage({searchParams}:{searchParams:Promise<Query>}){
@@ -79,10 +106,22 @@ export default async function ScheduleManagementPage({searchParams}:{searchParam
   const ministryDefault=query.ministry&&ministries.some(ministry=>ministry.id===query.ministry)?query.ministry:''
   const selectedId=requested??manageableSchedules[0]?.id??null
   const selected=selectedId?manageableSchedules.find(schedule=>schedule.id===selectedId)??null:null
+  const todayKey=localDateKey(new Date(),timeZone)
+  const requestedMonth=/^\d{4}-(0[1-9]|1[0-2])$/.test(query.month??'')?String(query.month):todayKey.slice(0,7)
+  const selectedDate=/^\d{4}-(0[1-9]|1[0-2])-([0-2]\d|3[01])$/.test(query.date??'')?String(query.date):(todayKey.startsWith(requestedMonth)?todayKey:null)
+  const previousMonth=shiftMonth(requestedMonth,-1),nextMonth=shiftMonth(requestedMonth,1)
+  const gridDays=monthGrid(requestedMonth)
+  const monthStartLocal=`${requestedMonth}-01T00:00`,monthEndLocal=`${nextMonth}-01T00:00`
+  const [monthStartResult,monthEndResult]=await Promise.all([
+    supabase.rpc('church_local_datetime_to_utc',{p_church_id:churchId,p_local_datetime:monthStartLocal}),
+    supabase.rpc('church_local_datetime_to_utc',{p_church_id:churchId,p_local_datetime:monthEndLocal})
+  ])
+  const monthStartUtc=monthStartResult.data as string|null
+  const monthEndUtc=monthEndResult.data as string|null
 
   let items:ScheduleItemRow[]=[],assignments:AssignmentRow[]=[],responses:ResponseRow[]=[]
-  if(selected){
-    const {data:itemData}=await supabase.from('schedule_items').select('id,schedule_id,title,starts_at,ends_at,location,notes,status').eq('schedule_id',selected.id).eq('church_id',churchId).gte('starts_at',new Date(Date.now()-14*24*60*60*1000).toISOString()).order('starts_at').limit(120)
+  if(selected&&monthStartUtc&&monthEndUtc){
+    const {data:itemData}=await supabase.from('schedule_items').select('id,schedule_id,title,starts_at,ends_at,location,notes,status').eq('schedule_id',selected.id).eq('church_id',churchId).gte('starts_at',monthStartUtc).lt('starts_at',monthEndUtc).order('starts_at').limit(180)
     items=(itemData??[]) as ScheduleItemRow[]
     const itemIds=items.map(item=>item.id)
     if(itemIds.length){
@@ -109,11 +148,17 @@ export default async function ScheduleManagementPage({searchParams}:{searchParam
   const groupById=new Map(groups.map(group=>[group.id,group.name]))
   const rosterOrder=new Map(selectedRoster.map((member,index)=>[member.user_id,index]))
   const memberOptions=churchMembers.map(member=>({id:member.user_id,name:nameOf(member.user_id),rosterOrder:rosterOrder.get(member.user_id)??99999})).sort((a,b)=>a.rosterOrder-b.rosterOrder||a.name.localeCompare(b.name))
+  const itemsByDate=new Map<string,ScheduleItemRow[]>()
+  for(const item of items){const key=localDateKey(item.starts_at,timeZone);const rows=itemsByDate.get(key)??[];rows.push(item);itemsByDate.set(key,rows)}
+  const assignmentsByItem=new Map<string,AssignmentRow[]>()
+  for(const assignment of assignments){if(!assignment.schedule_item_id)continue;const rows=assignmentsByItem.get(assignment.schedule_item_id)??[];rows.push(assignment);assignmentsByItem.set(assignment.schedule_item_id,rows)}
+  const selectedDateItems=selectedDate?(itemsByDate.get(selectedDate)??[]):[]
+  const roleSuggestions=selected?.schedule_type==='preaching'?['Main Message','5 Spot','Testimony','Other']:selected?.schedule_type==='worship'?['Worship Leader','Vocals','Keys','Guitar','Bass','Drums','Media']:selected?.schedule_type==='friendship_group'?['Leader','Assistant','Host','Lesson','Other']:['Lead','Serve','Support','Other']
 
   return <main className="shell">
     <header className="topbar"><div><Link href={l('/')} className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??t('Your Church','Tu Iglesia')} • {t('Shared Scheduling','Horarios Compartidos')}</div></div><div className="row"><Link className="ghost" href="/calendar/manage?lang=en">English</Link><Link className="ghost" href="/calendar/manage?lang=es">Español</Link><Link className="ghost" href={l('/teams/manage')}><Users size={14}/>{t('Teams & rosters','Equipos y listas')}</Link><Link className="ghost" href={l('/calendar/my')}>{t('My Schedule','Mi Horario')}</Link><Link className="ghost" href={l('/calendar')}>← {t('Calendar','Calendario')}</Link></div></header>
 
-    <section className="calendar-hero card"><div><div className="pill">{t('LEADER SCHEDULING','PROGRAMACIÓN DE LIDERAZGO')}</div><h1>{t('One schedule everyone can understand.','Un horario que todos pueden entender.')}</h1><p className="muted">{t('Pick a schedule, add the service or meeting, then place each person in their role underneath it.','Escoge un horario, agrega el servicio o reunión y coloca a cada persona en su función debajo.')}</p></div><div className="hero-stat"><strong>{manageableSchedules.length}</strong><span>{t('shared schedules','horarios compartidos')}</span></div></section>
+    <section className="calendar-hero card"><div><div className="pill">{t('CALENDAR-FIRST SCHEDULING','PROGRAMACIÓN DESDE EL CALENDARIO')}</div><h1>{t('Click the date. Choose the person. Save.','Toca la fecha. Escoge la persona. Guarda.')}</h1><p className="muted">{t('One shared scheduling engine for preaching, worship, cleaning, groups and ministry assignments.','Un solo motor de horarios para predicación, alabanza, limpieza, grupos y asignaciones ministeriales.')}</p></div><div className="hero-stat"><strong>{manageableSchedules.length}</strong><span>{t('shared schedules','horarios compartidos')}</span></div></section>
 
     {query.schedule_created&&<div className="notice success">{t('Schedule created.','Horario creado.')}</div>}{query.schedule_saved&&<div className="notice success">{t('Schedule settings saved.','Configuración guardada.')}</div>}{query.item_created&&<div className="notice success">{t('Schedule date added.','Fecha agregada al horario.')}</div>}{query.item_saved&&<div className="notice success">{t('Schedule date updated.','Fecha actualizada.')}</div>}{query.assignment_created&&<div className="notice success">{t('Person assigned.','Persona asignada.')}</div>}{query.assignment_saved&&<div className="notice success">{t('Assignment updated.','Asignación actualizada.')}</div>}{query.error&&<div className="notice error">{query.error}</div>}
 
@@ -123,7 +168,24 @@ export default async function ScheduleManagementPage({searchParams}:{searchParam
 
     {selected&&<><section className="card" style={{padding:18,marginBottom:18}}><div className="row" style={{justifyContent:'space-between',alignItems:'flex-start',gap:14}}><div><div className="pill">{t('CURRENT SCHEDULE','HORARIO ACTUAL')}</div><h2 style={{margin:'8px 0 4px'}}>{selected.name}</h2><p className="small muted" style={{margin:0}}>{selected.ministry_id?ministryById.get(selected.ministry_id):selected.group_id?groupById.get(selected.group_id):t('Whole church','Toda la iglesia')} • {selected.schedule_type.replaceAll('_',' ')}</p></div><ShieldCheck size={22}/></div><details style={{marginTop:12}}><summary className="ghost" style={{cursor:'pointer',display:'inline-flex'}}>{t('Edit schedule settings','Editar configuración')}</summary><form action={updateSchedule} style={{marginTop:10}}><input type="hidden" name="lang" value={lang}/><input type="hidden" name="schedule_id" value={selected.id}/><label className="field"><span>{t('Name','Nombre')}</span><input name="name" required maxLength={120} defaultValue={selected.name}/></label><label className="field"><span>{t('Type','Tipo')}</span><input name="schedule_type" required maxLength={60} defaultValue={selected.schedule_type}/></label><label className="field"><span>{t('Description','Descripción')}</span><textarea name="description" rows={3} defaultValue={selected.description??''}/></label><label className="row small"><input type="checkbox" name="active" defaultChecked={selected.active}/> {t('Schedule is active','Horario activo')}</label><button className="ghost">{t('Save settings','Guardar configuración')}</button></form></details></section>
 
-    <section className="card" style={{padding:18,marginBottom:18}}><div className="pill">{t('2 • ADD A DATE / SERVICE','2 • AGREGA FECHA / SERVICIO')}</div><form action={createScheduleItem} style={{marginTop:12}}><input type="hidden" name="lang" value={lang}/><input type="hidden" name="schedule_id" value={selected.id}/><label className="field"><span>{t('Service / meeting name','Nombre del servicio / reunión')}</span><input name="title" required maxLength={160} placeholder={t('Sunday Morning Service','Servicio del Domingo por la Mañana')}/></label><div className="row" style={{alignItems:'flex-end',flexWrap:'wrap'}}><label className="field" style={{flex:'1 1 220px',margin:0}}><span>{t('Starts','Empieza')}</span><input name="starts_at" type="datetime-local" required/></label><label className="field" style={{flex:'1 1 220px',margin:0}}><span>{t('Ends (optional)','Termina (opcional)')}</span><input name="ends_at" type="datetime-local"/></label><label className="field" style={{flex:'1 1 200px',margin:0}}><span>{t('Location','Lugar')}</span><input name="location"/></label></div><label className="field"><span>{t('Notes (optional)','Notas (opcional)')}</span><textarea name="notes" rows={2}/></label><p className="small muted">{t(`Times are entered in ${timeZone.replaceAll('_',' ')}.`,`Las horas se ingresan en ${timeZone.replaceAll('_',' ')}.`)}</p><button className="btn">{t('Add to schedule','Agregar al horario')}</button></form></section>
+    <section className="card schedule-month" style={{padding:18,marginBottom:18}}>
+      <div className="schedule-month-head"><div><div className="pill">{t('2 • PICK A DATE','2 • ESCOGE UNA FECHA')}</div><h2 style={{margin:'8px 0 0',textTransform:'capitalize'}}>{monthLabel(requestedMonth,lang)}</h2></div><div className="row schedule-month-nav"><Link className="ghost" href={l(`/calendar/manage?schedule=${selected.id}&month=${previousMonth}`)}>‹ {t('Previous','Anterior')}</Link><Link className="ghost" href={l(`/calendar/manage?schedule=${selected.id}&month=${todayKey.slice(0,7)}&date=${todayKey}`)}>{t('Today','Hoy')}</Link><Link className="ghost" href={l(`/calendar/manage?schedule=${selected.id}&month=${nextMonth}`)}>{t('Next','Siguiente')} ›</Link></div></div>
+      <div className="schedule-weekdays" aria-hidden="true">{(es?['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']:['Sun','Mon','Tue','Wed','Thu','Fri','Sat']).map(day=><span key={day}>{day}</span>)}</div>
+      <div className="schedule-grid">{gridDays.map((date,index)=>{if(!date)return <span className="schedule-day empty" key={`empty-${index}`}/>;const dayItems=itemsByDate.get(date)??[];const assignmentCount=dayItems.reduce((total,item)=>total+(assignmentsByItem.get(item.id)?.length??0),0);const active=selectedDate===date;return <Link href={l(`/calendar/manage?schedule=${selected.id}&month=${requestedMonth}&date=${date}#selected-date`)} className={`schedule-day${active?' active':''}${date===todayKey?' today':''}`} key={date}><strong>{Number(date.slice(-2))}</strong>{dayItems.slice(0,2).map(item=><small key={item.id}>{item.title}</small>)}{dayItems.length>2&&<small>+{dayItems.length-2} {t('more','más')}</small>}{assignmentCount>0&&<span className="schedule-count">{assignmentCount}</span>}</Link>})}</div>
+      {!monthStartUtc||!monthEndUtc?<div className="notice error" style={{marginTop:12}}>{t('We could not load this month in the church timezone.','No pudimos cargar este mes en la zona horaria de la iglesia.')}</div>:null}
+    </section>
+
+    <section className="card" id="selected-date" style={{padding:18,marginBottom:18}}>
+      <div className="pill">{t('3 • QUICK ASSIGN','3 • ASIGNACIÓN RÁPIDA')}</div>
+      {!selectedDate&&<p className="muted">{t('Choose a date on the calendar to schedule someone.','Escoge una fecha en el calendario para programar a alguien.')}</p>}
+      {selectedDate&&<><h2 style={{margin:'8px 0 4px'}}>{formatChurchDate(`${selectedDate}T12:00:00Z`, 'UTC',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</h2>
+        {selectedDateItems.map(item=>{const itemAssignments=assignmentsByItem.get(item.id)??[];return <article className="quick-assignment" key={item.id}><div className="quick-assignment-context"><div><strong>{item.title}</strong><div className="small muted"><Clock size={12}/> {formatChurchTime(item.starts_at,timeZone)}{item.ends_at?` – ${formatChurchTime(item.ends_at,timeZone)}`:''}{item.location&&<> • <MapPin size={12}/> {item.location}</>}</div></div><span className="pill">{itemAssignments.length} {t('assigned','asignados')}</span></div>{item.status==='scheduled'&&<form action={createScheduleAssignment} className="quick-assignment-form"><input type="hidden" name="lang" value={lang}/><input type="hidden" name="schedule_id" value={selected.id}/><input type="hidden" name="schedule_item_id" value={item.id}/><label className="field"><span>{t('Who','Quién')}</span><select name="assigned_user_id" required defaultValue=""><option value="" disabled>{t('Choose person','Escoger persona')}</option>{memberOptions.map(member=><option key={member.id} value={member.id}>{member.name}{member.rosterOrder<99999?t(' • team',' • equipo'):''}</option>)}</select></label><label className="field"><span>{t('Assignment','Asignación')}</span><input name="role_label" list="schedule-role-suggestions" required maxLength={80} placeholder={selected.schedule_type==='preaching'?t('Main Message, 5 Spot…','Mensaje Principal, 5 Spot…'):t('Choose or type assignment','Escoge o escribe asignación')}/></label><details><summary className="small" style={{cursor:'pointer',fontWeight:800}}>{t('Optional details','Detalles opcionales')}</summary><label className="field"><span>{t('Call time','Hora de llegada')}</span><input name="call_time" type="datetime-local"/></label><label className="field"><span>{t('Notes','Notas')}</span><input name="notes"/></label><label className="row small"><input type="checkbox" name="schedule_override"/> {t('Leadership intentionally approves a conflict','Liderazgo aprueba intencionalmente un conflicto')}</label><label className="field"><span>{t('Conflict override reason','Razón de anulación')}</span><input name="schedule_override_reason" maxLength={500}/></label></details><button className="btn">{t('Save assignment','Guardar asignación')}</button></form>}</article>})}
+        {!selectedDateItems.length&&<div className="quick-assignment"><h3>{t('No service or meeting on this date yet.','Todavía no hay servicio o reunión en esta fecha.')}</h3><p className="small muted">{t('Add the date once, then future assignments use the fast person → assignment → save flow.','Agrega la fecha una vez; después las asignaciones usan el flujo rápido persona → asignación → guardar.')}</p><form action={createScheduleItem}><input type="hidden" name="lang" value={lang}/><input type="hidden" name="schedule_id" value={selected.id}/><label className="field"><span>{t('Service / meeting','Servicio / reunión')}</span><input name="title" required maxLength={160} placeholder={t('Sunday Morning Service','Servicio del Domingo por la Mañana')}/></label><div className="row" style={{alignItems:'flex-end',flexWrap:'wrap'}}><label className="field" style={{flex:'1 1 220px',margin:0}}><span>{t('Starts','Empieza')}</span><input name="starts_at" type="datetime-local" required defaultValue={`${selectedDate}T09:00`}/></label><label className="field" style={{flex:'1 1 220px',margin:0}}><span>{t('Ends','Termina')}</span><input name="ends_at" type="datetime-local"/></label><label className="field" style={{flex:'1 1 200px',margin:0}}><span>{t('Location','Lugar')}</span><input name="location"/></label></div><details><summary className="small" style={{cursor:'pointer'}}>{t('Optional notes','Notas opcionales')}</summary><label className="field"><span>{t('Notes','Notas')}</span><textarea name="notes" rows={2}/></label></details><button className="btn">{t('Add this date','Agregar esta fecha')}</button></form></div>}
+      </>}
+      <datalist id="schedule-role-suggestions">{roleSuggestions.map(role=><option value={role} key={role}/>)}</datalist>
+    </section>
+
+    <details className="card" style={{padding:18,marginBottom:18}}><summary style={{fontWeight:800,cursor:'pointer'}}>{t('Advanced: add a date manually','Avanzado: agregar fecha manualmente')}</summary><form action={createScheduleItem} style={{marginTop:12}}><input type="hidden" name="lang" value={lang}/><input type="hidden" name="schedule_id" value={selected.id}/><label className="field"><span>{t('Service / meeting name','Nombre del servicio / reunión')}</span><input name="title" required maxLength={160}/></label><div className="row" style={{alignItems:'flex-end',flexWrap:'wrap'}}><label className="field" style={{flex:'1 1 220px',margin:0}}><span>{t('Starts','Empieza')}</span><input name="starts_at" type="datetime-local" required/></label><label className="field" style={{flex:'1 1 220px',margin:0}}><span>{t('Ends','Termina')}</span><input name="ends_at" type="datetime-local"/></label><label className="field" style={{flex:'1 1 200px',margin:0}}><span>{t('Location','Lugar')}</span><input name="location"/></label></div><label className="field"><span>{t('Notes','Notas')}</span><textarea name="notes" rows={2}/></label><button className="ghost">{t('Add to schedule','Agregar al horario')}</button></form></details>
 
     <section style={{display:'grid',gap:16}}>{items.map(item=>{const itemAssignments=assignments.filter(assignment=>assignment.schedule_item_id===item.id);return <article className="card" key={item.id} style={{padding:18,opacity:item.status==='cancelled'?.65:1}}><div className="row" style={{justifyContent:'space-between',alignItems:'flex-start',gap:14}}><div><div className="pill">{item.status==='cancelled'?t('CANCELLED','CANCELADO'):t('SCHEDULED','PROGRAMADO')}</div><h2 style={{margin:'8px 0 5px'}}>{item.title}</h2><div className="small muted"><CalendarDays size={12}/> {formatChurchDate(item.starts_at,timeZone,{weekday:'long',month:'short',day:'numeric',year:'numeric'})} • <Clock size={12}/> {formatChurchTime(item.starts_at,timeZone)}{item.ends_at?` – ${formatChurchTime(item.ends_at,timeZone)}`:''}{item.location&&<> • <MapPin size={12}/> {item.location}</>}</div>{item.notes&&<p className="muted">{item.notes}</p>}</div><div className="hero-stat"><strong>{itemAssignments.length}</strong><span>{t('people assigned','personas asignadas')}</span></div></div>
 
