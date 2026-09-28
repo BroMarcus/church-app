@@ -120,8 +120,10 @@ export async function logOutreachInteraction(formData:FormData){
   const {data:contact,error:contactError}=await supabase.from('outreach_contacts').select('church_id,stage,service_count,bible_study_lesson').eq('id',contactId).single()
   if(contactError||!contact?.church_id)redirect(href(formData,'error',msg(formData,'Outreach contact not found or not available to you.','No se encontró el contacto o no está disponible para usted.')))
   const lesson=type==='bible_study'&&text(formData,'bible_study_lesson')?int(formData,'bible_study_lesson'):null
+  const requestedSource=text(formData,'source_type')
+  const interactionSource=sourceTypes.includes(requestedSource as any)?requestedSource:null
   const now=new Date().toISOString()
-  const {error}=await supabase.from('outreach_interactions').insert({contact_id:contactId,church_id:contact.church_id,recorded_by:userId,interaction_type:type,summary,bible_study_lesson:lesson})
+  const {error}=await supabase.from('outreach_interactions').insert({contact_id:contactId,church_id:contact.church_id,recorded_by:userId,interaction_type:type,summary,bible_study_lesson:lesson,source_type:interactionSource,source_label:interactionSource?(nullable(formData,'source_label')||sourceLabel(interactionSource)):null})
   if(error)redirect(href(formData,'error',error.message))
   const updates:any={last_contacted_at:now,updated_at:now}
   if(type==='invitation')updates.stage=laterStage(contact.stage,'invited')
