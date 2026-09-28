@@ -154,6 +154,22 @@ export async function createCourseAssessmentShell(formData:FormData){
   return createBuilderAssessment(formData)
 }
 
+export async function publishReadyRequiredAssessments(formData:FormData){
+  const courseId=text(formData,'course_id'),language=lang(formData)
+  if(!courseId)safeError('missing',language)
+  if(text(formData,'confirm_publish_ready')!=='yes')safeError(courseId,language,language==='es'?'Confirma la publicación de las pruebas listas.':'Confirm publishing the ready required tests.')
+  const {supabase}=await manager(courseId)
+  const {data,error}=await supabase.rpc('publish_ready_course_assessments',{p_course_id:courseId})
+  if(error){
+    console.error('bulk publish ready assessments failed',{courseId,message:error.message})
+    safeError(courseId,language,error.message)
+  }
+  const count=Number(data?.required_published??0)
+  success(courseId,language,language==='es'
+    ?`${count} prueba(s) requerida(s) publicadas después de la verificación del servidor. Ahora ejecuta la revisión final del curso.`
+    :`${count} required assessment(s) published after server verification. Now run the final course readiness review.`)
+}
+
 export async function updateBuilderAssessment(formData:FormData){
   const courseId=text(formData,'course_id'),assessmentId=text(formData,'assessment_id'),language=lang(formData)
   if(!courseId||!assessmentId)safeError(courseId||'missing',language)
