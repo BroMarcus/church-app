@@ -21,7 +21,7 @@ export default async function MyTodayPage({searchParams}:{searchParams:Promise<{
   const now=new Date(),nowIso=now.toISOString(),todayIso=nowIso.slice(0,10),weekIso=new Date(now.getTime()+7*86400000).toISOString()
   const [{data:milestones},{count:groupCount},{data:assignments},{data:enrollments},{data:newConvertCourses},{count:unread},{data:ledGroups},{data:groupRoles},{data:overdueOutreach},{data:assignedOutreach},{data:journeyFollowups}]=await Promise.all([
     supabase.from('member_milestones').select('holy_ghost_received,baptized,first_steps_status,soul_winning_status,bible_study_teacher_status').eq('church_id',membership.church_id).eq('user_id',userId).maybeSingle(),
-    supabase.from('group_memberships').select('*',{count:'exact',head:true}).eq('user_id',userId),
+    supabase.from('group_memberships').select('group_id,groups!inner(group_type)',{count:'exact',head:true}).eq('user_id',userId).eq('groups.group_type','friendship'),
     supabase.from('team_assignments').select('id,title,starts_at,call_time,confirmation_required,ministries(name)').eq('church_id',membership.church_id).eq('assigned_user_id',userId).gte('starts_at',nowIso).lte('starts_at',weekIso).order('starts_at').limit(8),
     supabase.from('course_enrollments').select('course_id,credential_earned,progress_percent,completed_at,updated_at').eq('user_id',userId),
     supabase.from('courses').select('id').eq('church_id',membership.church_id).eq('published',true).eq('pathway_stage','new_convert'),
@@ -47,7 +47,7 @@ export default async function MyTodayPage({searchParams}:{searchParams:Promise<{
       supabase.from('profiles').select('id,display_name,first_name,last_name').in('id',journeyTargetIds),
       supabase.from('member_milestones').select('*').eq('church_id',membership.church_id).in('user_id',journeyTargetIds),
       supabase.from('course_enrollments').select('user_id,course_id,credential_earned,progress_percent,completed_at,updated_at').in('user_id',journeyTargetIds),
-      supabase.from('group_memberships').select('user_id,group_id').in('user_id',journeyTargetIds),
+      supabase.from('group_memberships').select('user_id,group_id,groups!inner(church_id,group_type)').in('user_id',journeyTargetIds).eq('groups.church_id',membership.church_id).eq('groups.group_type','friendship'),
       supabase.from('ministry_applications').select('user_id,status').in('user_id',journeyTargetIds).eq('status','accepted'),
       supabase.from('team_assignments').select('assigned_user_id').eq('church_id',membership.church_id).in('assigned_user_id',journeyTargetIds)
     ])
