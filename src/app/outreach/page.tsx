@@ -41,7 +41,7 @@ export default async function OutreachPage({searchParams}:{searchParams:Promise<
   const rows=[...rawRows].sort((a:any,b:any)=>{const ao=isOverdue(a),bo=isOverdue(b);if(ao!==bo)return ao?-1:1;const ad=a.follow_up_due_at?new Date(a.follow_up_due_at).getTime():Number.MAX_SAFE_INTEGER;const bd=b.follow_up_due_at?new Date(b.follow_up_due_at).getTime():Number.MAX_SAFE_INTEGER;if(ad!==bd)return ad-bd;return new Date(b.updated_at).getTime()-new Date(a.updated_at).getTime()})
   const contactIds=rows.map((c:any)=>c.id)
   let interactions:any[]=[]
-  if(contactIds.length){const r=await supabase.from('outreach_interactions').select('id,contact_id,interaction_type,occurred_at,summary,bible_study_lesson,recorded_by,profiles:recorded_by(display_name,first_name,last_name)').in('contact_id',contactIds).order('occurred_at',{ascending:false});interactions=r.data??[]}
+  if(contactIds.length){const r=await supabase.from('outreach_interactions').select('id,contact_id,interaction_type,occurred_at,summary,bible_study_lesson,source_type,source_label,recorded_by,profiles:recorded_by(display_name,first_name,last_name)').in('contact_id',contactIds).order('occurred_at',{ascending:false});interactions=r.data??[]}
   const interactionMap=new Map<string,any[]>();for(const item of interactions){const list=interactionMap.get(item.contact_id)??[];list.push(item);interactionMap.set(item.contact_id,list)}
   const count=(...keys:string[])=>rows.filter((c:any)=>keys.includes(c.stage)).length
   const overdueCount=rows.filter(isOverdue).length
