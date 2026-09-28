@@ -185,7 +185,6 @@ export default async function ScheduleManagementPage({searchParams}:{searchParam
   const yearAssignmentsByItem=new Map<string,YearAssignmentRow[]>()
   for(const assignment of yearAssignments){if(!assignment.schedule_item_id)continue;const rows=yearAssignmentsByItem.get(assignment.schedule_item_id)??[];rows.push(assignment);yearAssignmentsByItem.set(assignment.schedule_item_id,rows)}
   const yearMonths=Array.from({length:12},(_,index)=>`${planYear}-${String(index+1).padStart(2,'0')}`)
-  const fiveSpotStatuses=['submitted','coaching','ready_for_review','approved','scheduled','completed']
   const fiveSpotChoices=(status:string)=>status==='submitted'?['submitted','coaching']:status==='coaching'?['coaching','ready_for_review']:status==='ready_for_review'?['coaching','ready_for_review','approved']:status==='approved'?['coaching','ready_for_review','approved']:status==='scheduled'?['completed']:['completed']
   const fiveSpotLabel=(status:string)=>({submitted:t('Submitted','Enviado'),coaching:t('Coaching','Coaching'),ready_for_review:t('Ready for Review','Listo para Revisión'),approved:t('Approved','Aprobado'),scheduled:t('Scheduled','Programado'),completed:t('Completed','Completado')} as Record<string,string>)[status]??status
 
