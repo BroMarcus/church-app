@@ -140,3 +140,13 @@ test('follow-up queue supports simple search and attention filters',()=>{
   assert.match(page,/No follow-up matches this search/)
   assert.match(css,/\.outreach-filter/)
 })
+
+
+test('interaction history form stays usable on phone widths',()=>{
+  const history=fs.readFileSync(new URL('../src/app/outreach/outreach-history.tsx', import.meta.url),'utf8')
+  const css=fs.readFileSync(new URL('../src/app/outreach/outreach-history.module.css', import.meta.url),'utf8')
+  assert.match(history,/className=\{styles\.wide\}/)
+  assert.match(css,/\.wide\{grid-column:1\/-2\}/)
+  assert.match(css,/@media\(max-width:800px\)/)
+  assert.match(css,/@media\(max-width:500px\)/)
+})
