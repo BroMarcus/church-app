@@ -12,6 +12,16 @@ const stages=['new_convert','foundation','outreach','teaching','leadership','spe
 const isoDate=/^\d{4}-\d{2}-\d{2}$/
 const addDaysIso=(iso:string,days:number)=>{const [y,m,d]=iso.split('-').map(Number);const dt=new Date(Date.UTC(y,m-1,d+days));return dt.toISOString().slice(0,10)}
 
+
+async function instructorFor(supabase:any,churchId:string,instructorUserId:string,typedName:string){
+  if(!instructorUserId)return {instructor_user_id:null,instructor_name:typedName||null}
+  const {data:membership}=await supabase.from('church_memberships').select('user_id').eq('church_id',churchId).eq('user_id',instructorUserId).eq('status','active').maybeSingle()
+  if(!membership)return null
+  const {data:profile}=await supabase.from('profiles').select('display_name,first_name,last_name').eq('id',instructorUserId).maybeSingle()
+  const name=profile?.display_name||[profile?.first_name,profile?.last_name].filter(Boolean).join(' ')||typedName||'Teacher'
+  return {instructor_user_id:instructorUserId,instructor_name:name}
+}
+
 async function manager(){
   const supabase=await createClient()
   const {data}=await supabase.auth.getClaims()
@@ -75,7 +85,8 @@ export async function createCourseSession(formData:FormData){
   const title=text(formData,'title')
   const sessionDate=text(formData,'session_date')
   const startsAt=text(formData,'starts_at')||null
-  const instructorName=text(formData,'instructor_name')||null
+  const instructorUserId=text(formData,'instructor_user_id')
+  const instructorName=text(formData,'instructor_name')
   const notes=text(formData,'notes')||null
   if(!courseId||!title||!isoDate.test(sessionDate))redirect('/learning/admin?error='+encodeURIComponent('Class name and valid class date are required.'))
   const {data:course}=await supabase.from('courses').select('id').eq('id',courseId).eq('church_id',churchId).single()
@@ -86,7 +97,9 @@ export async function createCourseSession(formData:FormData){
     const {data:owned}=await supabase.from('course_modules').select('id').eq('course_id',courseId).in('id',requested)
     moduleIds=(owned??[]).map((m:any)=>m.id)
   }
-  const {error}=await supabase.from('course_sessions').insert({course_id:courseId,church_id:churchId,session_date:sessionDate,starts_at:startsAt,title,instructor_name:instructorName,module_ids:moduleIds,status:'scheduled',notes})
+  const instructor=await instructorFor(supabase,churchId,instructorUserId,instructorName)
+  if(!instructor)redirect('/learning/admin?error='+encodeURIComponent('Choose an active person from this church as the teacher.'))
+  const {error}=await supabase.from('course_sessions').insert({course_id:courseId,church_id:churchId,session_date:sessionDate,starts_at:startsAt,title,...instructor,module_ids:moduleIds,status:'scheduled',notes})
   if(error)redirect('/learning/admin?error='+encodeURIComponent(error.message))
   revalidatePath('/learning/admin');revalidatePath(`/learning/${courseId}`);redirect(`/learning/admin?session=1#course-${courseId}`)
 }
@@ -96,7 +109,8 @@ export async function createWeeklyCourseSeries(formData:FormData){
   const courseId=text(formData,'course_id')
   const firstDate=text(formData,'first_date')
   const startsAt=text(formData,'starts_at')||null
-  const instructorName=text(formData,'instructor_name')||null
+  const instructorUserId=text(formData,'instructor_user_id')
+  const instructorName=text(formData,'instructor_name')
   if(!courseId||!isoDate.test(firstDate))redirect('/learning/admin?error='+encodeURIComponent('A valid first class date is required.'))
   const {data:course}=await supabase.from('courses').select('id').eq('id',courseId).eq('church_id',churchId).single()
   if(!course)redirect('/learning/admin?error='+encodeURIComponent('Course not found.'))
@@ -105,11 +119,13 @@ export async function createWeeklyCourseSeries(formData:FormData){
   const {data:modules,error:modulesError}=await supabase.from('course_modules').select('id,position,title').eq('course_id',courseId).order('position')
   if(modulesError)redirect('/learning/admin?error='+encodeURIComponent(modulesError.message))
   if(!modules?.length)redirect(`/learning/admin?error=${encodeURIComponent('Add course lessons before generating the weekly series.')}#course-${courseId}`)
+  const instructor=await instructorFor(supabase,churchId,instructorUserId,instructorName)
+  if(!instructor)redirect('/learning/admin?error='+encodeURIComponent('Choose an active person from this church as the teacher.'))
   const skipDates=new Set(text(formData,'skip_dates').split(/[\n,;]+/).map(v=>v.trim()).filter(v=>isoDate.test(v)))
   let date=firstDate
   const rows=modules.map((module:any)=>{
     while(skipDates.has(date))date=addDaysIso(date,7)
-    const row={course_id:courseId,church_id:churchId,session_date:date,starts_at:startsAt,title:`${module.position}. ${module.title}`,instructor_name:instructorName,module_ids:[module.id],status:'scheduled'}
+    const row={course_id:courseId,church_id:churchId,session_date:date,starts_at:startsAt,title:`${module.position}. ${module.title}`,...instructor,module_ids:[module.id],status:'scheduled'}
     date=addDaysIso(date,7)
     return row
   })
