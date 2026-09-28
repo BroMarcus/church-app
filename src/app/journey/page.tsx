@@ -94,7 +94,7 @@ export default async function JourneyPage({searchParams}:{searchParams:Promise<{
     {key:'serving',title:t('Serve','Servir'),done:serving}
   ]
   const firstIncomplete=stages.findIndex(s=>!s.done)
-  const stageClass=(index:number,done:boolean)=>done?'complete':index===firstIncomplete?'active':''
+  const stageClass=(index:number,done:boolean,activeIndex=firstIncomplete)=>done?'complete':index===activeIndex?'active':''
   const church:any=Array.isArray(membership.churches)?membership.churches[0]:membership.churches
   const courseRows=(enrollments??[]).map((e:any)=>({e,c:cm.get(e.course_id)})).filter((x:any)=>x.c)
   const accepted=(applications??[]).filter((a:any)=>a.status==='accepted')
