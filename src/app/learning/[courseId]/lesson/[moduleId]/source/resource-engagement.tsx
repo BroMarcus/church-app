@@ -61,7 +61,7 @@ export function ResourceEngagement({
           ?progress.module_complete?t('This lesson was completed automatically.','Esta lección se completó automáticamente.'):t('This material is complete. Return to the lesson when ready.','Este material está completo. Regresa a la lección cuando estés listo.')
           :remaining>0?t(`About ${remaining} active second${remaining===1?'':'s'} remaining.`,`Aproximadamente ${remaining} segundo${remaining===1?'':'s'} activos restantes.`):t('Verifying completion…','Verificando finalización…')}</div>
       </div>
-      {!progress?.completed&&<span className="small muted">{t('Timer pauses if this tab is hidden.','El tiempo se pausa si esta pestaña está oculta.')}</span>}
+      {!progress?.completed&&<span className="small muted">{busy?t('Saving progress…','Guardando progreso…'):t('Timer pauses if this tab is hidden.','El tiempo se pausa si esta pestaña está oculta.')}</span>}
     </div>
     <div className="progress-track" style={{marginTop:10}}><div className="progress-fill" style={{width:`${pct}%`}}/></div>
     {error&&<div className="notice error" style={{marginTop:10}}>{error}</div>}
