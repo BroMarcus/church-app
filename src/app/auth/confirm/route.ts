@@ -1,6 +1,7 @@
 import { NextRequest,NextResponse } from 'next/server'
+import { PUBLIC_APP_ORIGIN } from '@/lib/public-app-origin'
 
-const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
+const siteUrl=PUBLIC_APP_ORIGIN
 
 function safeNext(raw:string|null){
   if(!raw)return '/'
