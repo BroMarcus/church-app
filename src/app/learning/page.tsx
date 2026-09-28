@@ -22,7 +22,7 @@ export default async function LearningPage({searchParams}:{searchParams:Promise<
   const es=lang==='es',rewardLang=es?'es':'en',t=(en:string,sp:string)=>es?sp:en
   const suffix=es?'?lang=es':''
   const courseHref=(course:any)=>`/learning/${course.id}${(course.language_code??'en')==='es'?'?lang=es':''}`
-  const resumeHref=(href:string)=>{if(!es)return href;const [base,hash]=href.split('#');return `${base}?lang=es${hash?`#${hash}`:''}`}
+  const resumeHref=(href:string,courseLang?:string|null)=>{if(courseLang!=='es')return href;const [base,hash]=href.split('#');return `${base}?lang=es${hash?`#${hash}`:''}`}
   const supabase=await createClient()
   const {data:claimsData}=await supabase.auth.getClaims();const userId=claimsData?.claims?.sub
   if(!userId)redirect('/login')
@@ -30,7 +30,7 @@ export default async function LearningPage({searchParams}:{searchParams:Promise<
   if(!membership?.church_id)redirect('/')
   const [{data:allCourses},{data:enrollments},{data:xpEvents},{data:badgeRows},{data:prerequisites},{data:milestones}]=await Promise.all([
     supabase.from('courses').select('*').eq('published',true).order('pathway_order').order('created_at'),
-    supabase.from('course_enrollments').select('course_id,progress,final_score,completed_at,credential_earned,curriculum_version').eq('user_id',userId),
+    supabase.from('course_enrollments').select('course_id,progress,final_score,completed_at,credential_earned,curriculum_version,updated_at').eq('user_id',userId).order('updated_at',{ascending:false}),
     supabase.from('learning_xp_events').select('points').eq('user_id',userId),
     supabase.from('member_badges').select('badge_id,badges(category)').eq('user_id',userId),
     supabase.from('course_prerequisites').select('course_id,prerequisite_type,required_course_id,milestone_key,required_value,allowed_roles,display_text,hard_block'),
@@ -50,8 +50,8 @@ export default async function LearningPage({searchParams}:{searchParams:Promise<
   const inProgress=visibleEnrollments.filter((e:any)=>!e.credential_earned)
   const completedVisible=visibleEnrollments.filter((e:any)=>e.credential_earned).length
   const availableCount=courses.filter((c:any)=>!em.has(c.id)&&missingFor(c.id).length===0).length
-  const currentEnrollment:any=inProgress[0]??null
-  const currentCourse:any=currentEnrollment?courses.find((c:any)=>c.id===currentEnrollment.course_id):null
+  const currentEnrollment:any=(enrollments??[]).find((e:any)=>!e.credential_earned&&allCourses?.some((c:any)=>c.id===e.course_id))??null
+  const currentCourse:any=currentEnrollment?(allCourses??[]).find((c:any)=>c.id===currentEnrollment.course_id):null
   const currentResume=currentCourse?await getLearningResumeState(supabase,userId,currentCourse):null
   const currentResumeLabel=currentResume?.kind==='lesson'
     ?`${t('Continue','Continuar')}: ${currentResume.moduleTitle??t('Next lesson','Próxima lección')}`
@@ -69,7 +69,7 @@ export default async function LearningPage({searchParams}:{searchParams:Promise<
 
     <section className="learning-hero card"><div><div className="pill">{t('LEARNING CENTER','CENTRO DE APRENDIZAJE')}</div><h1>{t('Keep growing.','Sigue creciendo.')}</h1><p className="muted">{t('Continue what you started, or choose the next course when you are ready.','Continúa lo que empezaste o elige el próximo curso cuando estés listo.')}</p></div><div className="learning-stat"><strong>{completed}</strong><span>{t('credentials earned','credenciales obtenidas')}</span></div></section>
 
-    {currentCourse&&currentResume&&<section className="card" style={{padding:22,marginBottom:18,border:'1px solid rgba(125,211,252,.34)',display:'flex',justifyContent:'space-between',alignItems:'center',gap:18,flexWrap:'wrap'}}><div style={{maxWidth:760}}><div className="pill">{t('CONTINUE LEARNING','CONTINUAR APRENDIENDO')}</div><h2 style={{fontSize:'1.55rem',margin:'9px 0 6px'}}>{currentCourse.title}</h2><div className="progress-track" style={{marginTop:10}}><div className="progress-fill" style={{width:`${Number(currentEnrollment.progress??0)}%`}}/></div><p className="small muted">{Number(currentEnrollment.progress??0)}% {t('complete','completo')}</p><strong>{currentResumeLabel}</strong></div><Link className="btn" href={resumeHref(currentResume.href)}>{currentResume.kind==='lesson'?t('Resume lesson','Continuar lección'):currentResume.kind==='final'?t('Take final exam','Tomar examen final'):t('Open course','Abrir curso')} →</Link></section>}
+    {currentCourse&&currentResume&&<section className="card" style={{padding:22,marginBottom:18,border:'1px solid rgba(125,211,252,.34)',display:'flex',justifyContent:'space-between',alignItems:'center',gap:18,flexWrap:'wrap'}}><div style={{maxWidth:760}}><div className="pill">{t('CONTINUE LEARNING','CONTINUAR APRENDIENDO')}</div><h2 style={{fontSize:'1.55rem',margin:'9px 0 6px'}}>{currentCourse.title}</h2><div className="progress-track" style={{marginTop:10}}><div className="progress-fill" style={{width:`${Number(currentEnrollment.progress??0)}%`}}/></div><p className="small muted">{Number(currentEnrollment.progress??0)}% {t('complete','completo')}</p><strong>{currentResumeLabel}</strong></div><Link className="btn" href={resumeHref(currentResume.href,currentCourse.language_code)}>{currentResume.kind==='lesson'?t('Resume lesson','Continuar lección'):currentResume.kind==='final'?t('Take final exam','Tomar examen final'):t('Open course','Abrir curso')} →</Link></section>}
 
     {!currentCourse&&availableCount>0&&<section className="card" style={{padding:20,marginBottom:18}}><div className="pill">{t('READY WHEN YOU ARE','LISTO CUANDO TÚ ESTÉS')}</div><h2>{t('Choose a course below to begin.','Elige un curso abajo para comenzar.')}</h2><p className="muted">{t('You do not need to take everything at once. Start with the course that matches your next step.','No necesitas tomar todo a la vez. Comienza con el curso que corresponde a tu próximo paso.')}</p></section>}
 
