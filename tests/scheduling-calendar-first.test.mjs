@@ -140,3 +140,52 @@ test('cleaning completion records who and when while retaining checklist history
   assert.match(migration,/completed_by=case when p_completed then v_user else null end/)
   assert.match(migration,/set status='completed',completed_by=v_user,completed_at=now\(\)/)
 })
+
+
+test('scheduling attention states reuse the canonical notification inbox',async()=>{
+  const migration=await read('supabase/migrations/20260928030000_scheduling_attention_notifications.sql')
+  assert.match(migration,/insert into public\.notifications/)
+  assert.match(migration,/team_assignment/)
+  assert.match(migration,/five_spot/)
+  assert.match(migration,/cleaning_assignment/)
+  assert.match(migration,/\/calendar\/my/)
+  assert.match(migration,/\/calendar\/five-spot/)
+  assert.match(migration,/\/calendar\/cleaning/)
+  assert.doesNotMatch(migration,/create table if not exists public\..*notification/i)
+})
+
+test('recurring schedule series materialize canonical occurrences',async()=>{
+  const migration=await read('supabase/migrations/20260928031500_recurring_schedule_series.sql')
+  const actions=await read('src/app/calendar/manage/actions.ts')
+  const page=await read('src/app/calendar/manage/page.tsx')
+  assert.match(migration,/create table if not exists public\.schedule_series/)
+  assert.match(migration,/references public\.church_schedules/)
+  assert.match(migration,/alter table public\.schedule_items/)
+  assert.match(migration,/add column if not exists series_id/)
+  assert.match(migration,/insert into public\.schedule_items/)
+  assert.match(migration,/frequency in \('weekly','monthly'\)/)
+  assert.match(migration,/v_series\.start_date\+interval '2 years'/)
+  assert.match(actions,/createScheduleSeries/)
+  assert.match(actions,/extendScheduleSeries/)
+  assert.match(actions,/deactivateScheduleSeries/)
+  assert.match(page,/Advanced: recurring dates/)
+})
+
+test('one recurring occurrence can become an exception without rewriting its series',async()=>{
+  const migration=await read('supabase/migrations/20260928031500_recurring_schedule_series.sql')
+  const actions=await read('src/app/calendar/manage/actions.ts')
+  const page=await read('src/app/calendar/manage/page.tsx')
+  assert.match(migration,/series_detached boolean not null default false/)
+  assert.match(migration,/unique index if not exists schedule_items_series_occurrence_uidx/)
+  assert.match(migration,/on conflict\(series_id,series_occurrence_date\)/)
+  assert.match(actions,/series_detached:true/)
+  assert.match(page,/RECURRING EXCEPTION/)
+})
+
+test('meaningful scheduling notifications avoid checklist tap noise',async()=>{
+  const migration=await read('supabase/migrations/20260928030000_scheduling_attention_notifications.sql')
+  assert.match(migration,/after insert or update of assigned_user_id,assignment_status,starts_at,call_time,role_label,title,notes/)
+  assert.match(migration,/after update of status,leader_feedback,mentor_user_id/)
+  assert.match(migration,/after insert or update of group_id/)
+  assert.doesNotMatch(migration,/cleaning_checklist_items/)
+})
