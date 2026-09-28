@@ -63,3 +63,28 @@ test('existing accounts preserve invitation and Friendship Group join context',(
   assert.match(groupPage,/mode=signin&next=/)
   assert.match(groupActions,/mode=signin&next=/)
 })
+
+
+test('signed-in Friendship Group invitations reuse the existing account and create a canonical join request',()=>{
+  const page=read('src/app/join/[slug]/group/[groupId]/page.tsx')
+  const actions=read('src/app/join/[slug]/group/[groupId]/actions.ts')
+  assert.match(page,/joinExistingThroughGroup/)
+  assert.match(page,/signedIn/)
+  assert.match(actions,/join_public_church_existing_account/)
+  assert.match(actions,/group_join_requests/)
+  assert.match(actions,/group_memberships/)
+})
+
+test('mobile install path is device aware and captures the Android install event early',()=>{
+  const capture=read('src/components/install-prompt-capture.tsx')
+  const install=read('src/app/install/install-client.tsx')
+  const nav=read('src/components/mobile-nav.tsx')
+  const start=read('src/app/start/page.tsx')
+  assert.match(capture,/beforeinstallprompt/)
+  assert.match(capture,/beforeInteractive/)
+  assert.match(install,/Add to Home Screen/)
+  assert.match(install,/Install One Kingdom/)
+  assert.match(install,/display-mode: standalone/)
+  assert.match(nav,/Add to Phone/)
+  assert.match(start,/\/install/)
+})
