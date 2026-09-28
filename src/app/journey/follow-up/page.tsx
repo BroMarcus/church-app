@@ -19,7 +19,7 @@ export default async function JourneyFollowupPage({searchParams}:{searchParams:P
   if(error)throw new Error(error.message)
 
   const targetIds=Array.from(new Set((trackingRows??[]).map((row:any)=>row.user_id))) as string[]
-  let profiles:any[]=[],milestones:any[]=[],enrollments:any[]=[],groups:any[]=[],applications:any[]=[],assignments:any[]=[]
+  let profiles:any[]=[],milestones:any[]=[],enrollments:any[]=[],groups:any[]=[],applications:any[]=[],assignments:any[]=[],pathAssignments:any[]=[],defaultPathId:string|null=null
   if(targetIds.length){
     const [p,m,e,g,a,s,pa,dp]=await Promise.all([
       supabase.from('profiles').select('id,display_name,first_name,last_name').in('id',targetIds),
@@ -31,12 +31,8 @@ export default async function JourneyFollowupPage({searchParams}:{searchParams:P
       supabase.from('member_journey_pathway_assignments').select('user_id,pathway_id').eq('church_id',churchId).eq('active',true).in('user_id',targetIds),
       supabase.from('discipleship_pathways').select('id').eq('church_id',churchId).eq('active',true).eq('is_default',true).limit(1).maybeSingle()
     ])
-    profiles=p.data??[];milestones=m.data??[];enrollments=e.data??[];groups=g.data??[];applications=a.data??[];assignments=s.data??[]
-    ;(globalThis as any).__journeyPathAssignments=pa.data??[]
-    ;(globalThis as any).__journeyDefaultPath=dp.data?.id??null
+    profiles=p.data??[];milestones=m.data??[];enrollments=e.data??[];groups=g.data??[];applications=a.data??[];assignments=s.data??[];pathAssignments=pa.data??[];defaultPathId=dp.data?.id??null
   }
-  const pathAssignments:any[]=(globalThis as any).__journeyPathAssignments??[]
-  const defaultPathId:string|null=(globalThis as any).__journeyDefaultPath??null
   const assignedPath=new Map(pathAssignments.map((row:any)=>[row.user_id,row.pathway_id]))
   const byUser=(rows:any[],key:string)=>{const map=new Map<string,any[]>();for(const row of rows){const id=row[key];const list=map.get(id)??[];list.push(row);map.set(id,list)}return map}
   const profileMap=new Map(profiles.map((row:any)=>[row.id,row]))
