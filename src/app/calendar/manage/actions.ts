@@ -161,10 +161,17 @@ export async function createScheduleAssignment(formData:FormData){
   const override=checked(formData,'schedule_override'),overrideReason=text(formData,'schedule_override_reason')
   if(conflicts.length&&!override)redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,`Schedule conflict: ${conflicts.join(' • ')}. Use the override only if leadership intends to proceed.`,`Conflicto de horario: ${conflicts.join(' • ')}. Usa la anulación solo si liderazgo desea continuar.`))))
   if(conflicts.length&&override&&overrideReason.length<5)redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'Explain the schedule override with at least 5 characters.','Explica la anulación del horario con al menos 5 caracteres.'))))
-  const {error}=await supabase.from('team_assignments').insert({church_id:person.churchId,ministry_id:scope.ministry_id,assigned_user_id:assignedUserId,created_by:person.userId,title:roleLabel.slice(0,120),role_label:roleLabel.slice(0,80),starts_at:item.starts_at,call_time:callTime,confirmation_required:true,notes:text(formData,'notes')||null,schedule_item_id:itemId,assignment_status:'scheduled',schedule_override:conflicts.length>0&&override,schedule_override_reason:conflicts.length>0&&override?overrideReason:null,schedule_conflict_summary:conflicts.length?conflicts.join(' • '):null})
-  if(error){
-    console.error('createScheduleAssignment failed',{scheduleId,itemId,assignedUserId,code:error.code,message:error.message})
+  const {data:createdAssignment,error}=await supabase.from('team_assignments').insert({church_id:person.churchId,ministry_id:scope.ministry_id,assigned_user_id:assignedUserId,created_by:person.userId,title:roleLabel.slice(0,120),role_label:roleLabel.slice(0,80),starts_at:item.starts_at,call_time:callTime,confirmation_required:true,notes:text(formData,'notes')||null,schedule_item_id:itemId,assignment_status:'scheduled',schedule_override:conflicts.length>0&&override,schedule_override_reason:conflicts.length>0&&override?overrideReason:null,schedule_conflict_summary:conflicts.length?conflicts.join(' • '):null}).select('id').single()
+  if(error||!createdAssignment){
+    console.error('createScheduleAssignment failed',{scheduleId,itemId,assignedUserId,code:error?.code,message:error?.message})
     redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'We could not assign that person.','No pudimos asignar a esa persona.'))))
+  }
+  if(roleLabel.trim().toLowerCase()==='5 spot'){
+    const {data:request}=await supabase.from('five_spot_requests').select('id').eq('church_id',person.churchId).eq('requester_user_id',assignedUserId).eq('status','approved').order('created_at').limit(1).maybeSingle()
+    if(request){
+      const {error:linkError}=await supabase.from('five_spot_requests').update({status:'scheduled',scheduled_assignment_id:createdAssignment.id,updated_at:new Date().toISOString()}).eq('id',request.id).eq('church_id',person.churchId)
+      if(linkError)console.error('linkFiveSpotAssignment failed',{requestId:request.id,assignmentId:createdAssignment.id,code:linkError.code,message:linkError.message})
+    }
   }
   refresh();redirect(manageUrl(lang,`&assignment_created=1&schedule=${scheduleId}`))
 }
@@ -200,4 +207,41 @@ export async function archiveScheduleAssignment(formData:FormData){
     redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'We could not unassign that person.','No pudimos quitar esa asignación.'))))
   }
   refresh();redirect(manageUrl(lang,`&assignment_saved=1&schedule=${scheduleId}`))
+}
+
+
+export async function saveScheduleMonthPlan(formData:FormData){
+  const lang=langOf(formData),{supabase,actor:person}=await actor(lang)
+  const scheduleId=text(formData,'schedule_id'),monthStart=text(formData,'month_start')
+  if(!scheduleId||!/^\d{4}-(0[1-9]|1[0-2])-01$/.test(monthStart))redirect(manageUrl(lang))
+  const scope=await requireSchedule(supabase,person,scheduleId,lang)
+  const {data:schedule}=await supabase.from('church_schedules').select('schedule_type').eq('id',scope.id).eq('church_id',person.churchId).maybeSingle()
+  if(schedule?.schedule_type!=='preaching')redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'Year Plan is only available for preaching schedules.','El Plan Anual solo está disponible para horarios de predicación.'))))
+  const payload={schedule_id:scheduleId,church_id:person.churchId,month_start:monthStart,theme:text(formData,'theme')||null,scripture:text(formData,'scripture')||null,notes:text(formData,'plan_notes')||null,created_by:person.userId,updated_at:new Date().toISOString()}
+  const {error}=await supabase.from('schedule_month_plans').upsert(payload,{onConflict:'schedule_id,month_start'})
+  if(error){
+    console.error('saveScheduleMonthPlan failed',{scheduleId,monthStart,code:error.code,message:error.message})
+    redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'We could not save that month plan.','No pudimos guardar el plan de ese mes.'))))
+  }
+  refresh();redirect(manageUrl(lang,`&schedule=${scheduleId}&month_plan_saved=1`))
+}
+
+export async function reviewFiveSpotRequest(formData:FormData){
+  const lang=langOf(formData),{supabase,actor:person}=await actor(lang)
+  const scheduleId=text(formData,'schedule_id'),requestId=text(formData,'request_id'),status=text(formData,'status')
+  if(!scheduleId||!requestId||!['submitted','coaching','ready_for_review','approved','completed'].includes(status))redirect(manageUrl(lang))
+  await requireSchedule(supabase,person,scheduleId,lang)
+  const mentor=text(formData,'mentor_user_id')||null
+  if(mentor){
+    const {data:member}=await supabase.from('church_memberships').select('user_id').eq('church_id',person.churchId).eq('user_id',mentor).eq('status','active').maybeSingle()
+    if(!member)redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'Choose an active church member as mentor.','Escoge un miembro activo como mentor.'))))
+  }
+  const updates:{status:string;mentor_user_id:string|null;leader_feedback:string|null;updated_at:string;scheduled_assignment_id?:null}={status,mentor_user_id:mentor,leader_feedback:text(formData,'leader_feedback')||null,updated_at:new Date().toISOString()}
+  if(status!=='completed')updates.scheduled_assignment_id=null
+  const {error}=await supabase.from('five_spot_requests').update(updates).eq('id',requestId).eq('church_id',person.churchId)
+  if(error){
+    console.error('reviewFiveSpotRequest failed',{requestId,status,code:error.code,message:error.message})
+    redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'We could not update that 5 Spot request.','No pudimos actualizar esa solicitud de 5 Spot.'))))
+  }
+  refresh();redirect(manageUrl(lang,`&schedule=${scheduleId}&five_spot_saved=1`))
 }
