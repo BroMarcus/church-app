@@ -30,7 +30,7 @@ export default async function MyTodayPage({searchParams}:{searchParams:Promise<{
     supabase.from('group_memberships').select('group_id,role,groups(id,name,active)').eq('user_id',userId).in('role',['leader','assistant']),
     supabase.from('outreach_contacts').select('id,first_name,last_name,stage,follow_up_due_at').eq('church_id',membership.church_id).eq('assigned_to',userId).lt('follow_up_due_at',nowIso).not('stage','in','("inactive","serving")').order('follow_up_due_at').limit(5),
     supabase.from('outreach_contacts').select('id').eq('church_id',membership.church_id).eq('assigned_to',userId).not('stage','in','("inactive","serving")').limit(100),
-    supabase.from('member_journey_step_tracking').select('id,user_id,step_id,responsible_leader_id,due_on,manual_status,manual_completed_at,last_activity_at,updated_at,discipleship_pathway_steps(id,step_key,title,description,completion_source,completion_key,completion_value,suggested_href,sort_order,required)').eq('church_id',membership.church_id).eq('responsible_leader_id',userId).not('due_on','is',null).lte('due_on',todayIso).order('due_on').limit(8)
+    supabase.from('member_journey_step_tracking').select('id,user_id,step_id,responsible_leader_id,due_on,manual_status,manual_completed_at,last_activity_at,updated_at,discipleship_pathway_steps(id,pathway_id,active,step_key,title,description,completion_source,completion_key,completion_value,suggested_href,sort_order,required)').eq('church_id',membership.church_id).eq('responsible_leader_id',userId).not('due_on','is',null).lte('due_on',todayIso).order('due_on').limit(8)
   ])
   const assignmentRows=assignments??[],outreachRows=overdueOutreach??[],assignedContactIds=(assignedOutreach??[]).map((x:any)=>x.id)
   const assignmentIds=assignmentRows.map((a:any)=>a.id),courseIds=(enrollments??[]).filter((e:any)=>!e.credential_earned).map((e:any)=>e.course_id)
@@ -43,22 +43,28 @@ export default async function MyTodayPage({searchParams}:{searchParams:Promise<{
   const journeyTargetIds=Array.from(new Set(journeyRaw.map((row:any)=>row.user_id).filter(Boolean))) as string[]
   let journeyTargetNames=new Map<string,string>(),journeyRows:any[]=[]
   if(journeyTargetIds.length){
-    const [targetsResult,milestoneResult,enrollmentResult,groupResult,applicationResult,assignmentResult]=await Promise.all([
+    const [targetsResult,milestoneResult,enrollmentResult,groupResult,applicationResult,assignmentResult,pathAssignmentResult,defaultPathResult]=await Promise.all([
       supabase.from('profiles').select('id,display_name,first_name,last_name').in('id',journeyTargetIds),
       supabase.from('member_milestones').select('*').eq('church_id',membership.church_id).in('user_id',journeyTargetIds),
       supabase.from('course_enrollments').select('user_id,course_id,credential_earned,progress_percent,completed_at,updated_at').in('user_id',journeyTargetIds),
       supabase.from('group_memberships').select('user_id,group_id,groups!inner(church_id,group_type)').in('user_id',journeyTargetIds).eq('groups.church_id',membership.church_id).eq('groups.group_type','friendship'),
       supabase.from('ministry_applications').select('user_id,status').in('user_id',journeyTargetIds).eq('status','accepted'),
-      supabase.from('team_assignments').select('assigned_user_id').eq('church_id',membership.church_id).in('assigned_user_id',journeyTargetIds)
+      supabase.from('team_assignments').select('assigned_user_id').eq('church_id',membership.church_id).in('assigned_user_id',journeyTargetIds),
+      supabase.from('member_journey_pathway_assignments').select('user_id,pathway_id').eq('church_id',membership.church_id).eq('active',true).in('user_id',journeyTargetIds),
+      supabase.from('discipleship_pathways').select('id').eq('church_id',membership.church_id).eq('active',true).eq('is_default',true).limit(1).maybeSingle()
     ])
     const targets=targetsResult.data??[],targetMilestones=milestoneResult.data??[],targetEnrollments=enrollmentResult.data??[],targetGroups=groupResult.data??[],targetApplications=applicationResult.data??[],targetAssignments=assignmentResult.data??[]
     journeyTargetNames=new Map(targets.map((target:any)=>[target.id,target.display_name||[target.first_name,target.last_name].filter(Boolean).join(' ')||(es?'Miembro':'Member')]))
     const milestoneMap=new Map(targetMilestones.map((row:any)=>[row.user_id,row]))
+    const targetAssignedPath=new Map((pathAssignmentResult.data??[]).map((row:any)=>[row.user_id,row.pathway_id]))
+    const targetDefaultPathId=defaultPathResult.data?.id??null
     const bucket=(rows:any[],key:string)=>{const map=new Map<string,any[]>();for(const row of rows){const id=row[key];const list=map.get(id)??[];list.push(row);map.set(id,list)}return map}
     const enrollmentMap=bucket(targetEnrollments,'user_id'),groupMap=bucket(targetGroups,'user_id'),applicationMap=bucket(targetApplications,'user_id'),assignmentMap=bucket(targetAssignments,'assigned_user_id')
     journeyRows=journeyRaw.filter((track:any)=>{
       const rawStep:any=Array.isArray(track.discipleship_pathway_steps)?track.discipleship_pathway_steps[0]:track.discipleship_pathway_steps
-      if(!rawStep)return false
+      if(!rawStep||rawStep.active!==true)return false
+      const effectivePathId=targetAssignedPath.get(track.user_id)??targetDefaultPathId
+      if(!effectivePathId||rawStep.pathway_id!==effectivePathId)return false
       const resolved=resolveJourneyStep(rawStep as JourneyStepDefinition,{
         milestones:milestoneMap.get(track.user_id)??{},
         enrollments:enrollmentMap.get(track.user_id)??[],
