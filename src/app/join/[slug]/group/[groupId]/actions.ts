@@ -40,7 +40,7 @@ export async function joinThroughGroup(formData:FormData){
     fail(error.message,error.message)
   }
   if(data.user&&Array.isArray(data.user.identities)&&data.user.identities.length===0){
-    redirect(`/login?lang=${lang}&mode=signin&message=${encodeURIComponent(lang==='es'?'Ese correo ya tiene una cuenta. Inicia sesión y tu cuenta existente se conservará.':'That email already has an account. Sign in and your existing account will be kept.')}`)
+    redirect(`/login?lang=${lang}&mode=signin&next=${encodeURIComponent(base)}&message=${encodeURIComponent(lang==='es'?'Ese correo ya tiene una cuenta. Inicia sesión y tu cuenta existente se conservará.':'That email already has an account. Sign in and your existing account will be kept.')}`)
   }
   if(data.session)redirect(startPath)
   redirect(`/login?lang=${lang}&mode=signin&message=${encodeURIComponent(lang==='es'?`Cuenta creada para ${join.church_name} por medio de ${join.group_name}. Revisa tu correo y confirma la cuenta.`:`Account created for ${join.church_name} through ${join.group_name}. Check your email and confirm the account.`)}`)
