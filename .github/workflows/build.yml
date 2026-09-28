@@ -87,4 +87,17 @@ jobs:
             -f context='kingdom-network/release-gate' \
             -f description="$description" \
             -f target_url="$RUN_URL"
-          [ "$overall" = success ]
+      - name: Enforce release gate
+        if: always()
+        env:
+          INSTALL: ${{ steps.install.outcome }}
+          TESTS: ${{ steps.tests.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+        run: |
+          if [ "$INSTALL" = success ] && [ "$TESTS" = success ] && [ "$LINT" = success ] && [ "$BUILD" = success ]; then
+            echo "Release gate passed: install, tests, lint, and build all succeeded."
+            exit 0
+          fi
+          echo "Release gate failed: install=${INSTALL}, tests=${TESTS}, lint=${LINT}, build=${BUILD}"
+          exit 1
