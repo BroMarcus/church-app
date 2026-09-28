@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { Archive,ArrowDown,ArrowUp,BookOpen,CheckCircle2,ClipboardCheck,Eye,EyeOff,FileText,GraduationCap,Languages,Pencil,Plus,RotateCcw,Sparkles,Trash2,WandSparkles } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import {
- addBuilderLesson,addBuilderQuestion,applyExtractionPlan,createBuilderAssessment,createLessonShells,
+ addBuilderLesson,addBuilderQuestion,applyExtractionPlan,createBuilderAssessment,createLessonShells,importCoursePackage,
  deleteBuilderAssessment,deleteBuilderLesson,deleteBuilderQuestion,generateExtractionPlan,moveBuilderLesson,
  moveBuilderQuestion,saveBuilderCourse,saveCourseSourceLink,saveLessonSourceLink,saveSourceText,setBuilderCourseArchived,setBuilderCoursePublished,
  updateBuilderAssessment,updateBuilderLesson,updateBuilderQuestion
@@ -54,6 +54,15 @@ export default async function CourseBuilder({params,searchParams}:{params:Promis
     <p className="muted">{es?'Pega un enlace HTTPS de Dropbox, Google Drive, OneDrive, SharePoint u otra fuente aprobada. Solo guardamos el enlace y el proveedor; no guardamos contraseñas ni tokens del proveedor.':'Paste an HTTPS link from Dropbox, Google Drive, OneDrive, SharePoint, or another approved source. We store only the link and provider metadata—never provider passwords or long-lived access tokens.'}</p>
     {course.source_url&&<div className="notice success"><strong>{es?'Fuente conectada':'Source connected'}:</strong> {course.source_label||course.source_provider||'Web'} • <a href={course.source_url} target="_blank" rel="noreferrer">{es?'Abrir original':'Open original'}</a></div>}
     <form action={saveCourseSourceLink} className="studio-grid" style={{marginTop:10}}>{hidden}{hiddenLang}<label className="wide"><span>{es?'Enlace fuente HTTPS':'HTTPS source link'}</span><input name="source_url" type="url" defaultValue={course.source_url||''} placeholder="https://drive.google.com/..."/></label><label className="wide"><span>{es?'Nombre de la fuente':'Source label'}</span><input name="source_label" defaultValue={course.source_label||''} placeholder={es?'Manual oficial / carpeta del curso':'Official manual / course folder'}/></label><button className="ghost wide">{es?'Guardar fuente':'Save source link'}</button></form>
+  </section>
+
+  <section className="card" style={{padding:20,marginBottom:18}}>
+    <div className="pill"><FileText size={12}/> {es?'PAQUETE DE CURSO':'COURSE PACKAGE'}</div>
+    <h2>{es?'Construye este borrador desde un paquete One Kingdom.':'Build this Draft from a One Kingdom package.'}</h2>
+    <p className="muted">{es?'Un paquete puede traer la estructura de lecciones, referencias a materiales y pruebas nativas. One Kingdom valida todo antes de escribirlo. No publica la clase ni las pruebas automáticamente.':'A package can carry lesson structure, material references, and native assessments. Kingdom Network validates it before writing anything. It never publishes the course or assessments automatically.'}</p>
+    {!historyLocked&&!hasLessons&&!hasAssessment&&!course.published&&!archived
+      ?<form action={importCoursePackage} style={{display:'grid',gap:10}}>{hidden}{hiddenLang}<label><span>{es?'Archivo JSON del paquete':'Package JSON file'}</span><input name="course_package" type="file" accept=".json,application/json" required/></label><button className="btn"><FileText size={14}/> {es?'Importar al borrador':'Import into Draft'}</button><div className="small muted">{es?'Solo funciona en un borrador vacío. Si algo falla, la importación completa se revierte.':'Works only on an empty Draft. If any part fails, the whole import rolls back.'}</div></form>
+      :<div className="notice">{es?'La importación de paquete requiere un borrador vacío y sin historial de alumnos. Crea un nuevo borrador para importar sin mezclar registros.':'Package import requires an empty Draft with no learner history. Create a new Draft to import without mixing records.'}</div>}
   </section>
 
   <section className="stat-grid"><div className="card stat-card"><BookOpen/><div><strong>{modules?.length||0}</strong><span>{es?'Lecciones':'Lessons'}</span></div></div><div className="card stat-card"><ClipboardCheck/><div><strong>{assessments?.length||0}</strong><span>{es?'Pruebas':'Assessments'}</span></div></div><div className="card stat-card"><GraduationCap/><div><strong>{course.badge_name?'✓':'—'}</strong><span>{es?'Certificado / insignia':'Certificate / badge'}</span></div></div><div className="card stat-card"><CheckCircle2/><div><strong>{questions.length}</strong><span>{es?'Preguntas':'Questions'}</span></div></div></section>
