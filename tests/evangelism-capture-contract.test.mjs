@@ -60,3 +60,30 @@ test('follow-up interaction history can retain visit source context',()=>{
   assert.match(migration,/alter table public\.outreach_interactions/)
   assert.match(migration,/add column if not exists source_type text/)
 })
+
+
+test('quick add and interaction logging are retry-safe',()=>{
+  const migration=fs.readFileSync(new URL('../supabase/migrations/20260928024500_outreach_actionable_followup_fields.sql', import.meta.url),'utf8')
+  const history=fs.readFileSync(new URL('../src/app/outreach/outreach-history.tsx', import.meta.url),'utf8')
+  assert.match(migration,/create_request_key uuid/)
+  assert.match(migration,/outreach_contacts_create_request_key_unique_idx/)
+  assert.match(migration,/request_key uuid/)
+  assert.match(migration,/outreach_interactions_request_key_unique_idx/)
+  assert.match(page,/name="request_key" value=\{randomUUID\(\)\}/)
+  assert.match(history,/name="request_key" value=\{randomUUID\(\)\}/)
+  assert.match(actions,/eq\('create_request_key',requestKey\)/)
+  assert.match(actions,/eq\('request_key',requestKey\)/)
+})
+
+test('duplicate guest capture opens one existing record instead of creating another',()=>{
+  assert.match(actions,/email_normalized/)
+  assert.match(actions,/phone_normalized/)
+  assert.match(actions,/duplicate','1'/)
+})
+
+test('interaction return path is constrained to Outreach routes',()=>{
+  assert.match(actions,/safeOutreachReturn/)
+  assert.match(actions,/\^\\\/outreach/)
+  const detail=fs.readFileSync(new URL('../src/app/outreach/[contactId]/page.tsx', import.meta.url),'utf8')
+  assert.match(detail,/returnTo=\{\x60\/outreach\/\$\{contactId\}\x60\}/)
+})
