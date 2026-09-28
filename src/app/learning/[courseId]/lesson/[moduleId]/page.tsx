@@ -31,15 +31,21 @@ export default async function LessonPage({params}:{params:Promise<{courseId:stri
   const currentPosition=Number(module.position??0)
   const priorModuleIds=(modules??[]).filter((m:any)=>Number(m.position)<currentPosition).map((m:any)=>m.id)
   if(priorModuleIds.length){
-    const {data:priorRequired}=await supabase.from('course_assessments').select('id').eq('course_id',courseId).eq('required',true).eq('published',true).in('module_id',priorModuleIds)
+    const [{data:priorRequired},{data:priorProgress}]=await Promise.all([
+      supabase.from('course_assessments').select('id,module_id').eq('course_id',courseId).eq('required',true).eq('published',true).in('module_id',priorModuleIds),
+      supabase.from('course_module_progress').select('module_id,completed').eq('course_id',courseId).eq('user_id',userId).in('module_id',priorModuleIds)
+    ])
     const priorAssessmentIds=(priorRequired??[]).map((a:any)=>a.id)
-    if(priorAssessmentIds.length){
-      const {data:priorPassed}=await supabase.from('assessment_attempts').select('assessment_id').eq('user_id',userId).eq('passed',true).in('assessment_id',priorAssessmentIds)
-      const passedIds=new Set((priorPassed??[]).map((a:any)=>a.assessment_id))
-      if(priorAssessmentIds.some((id:string)=>!passedIds.has(id))){
-        const message=(course.language_code??'en')==='es'?'Completa primero las evaluaciones requeridas de las lecciones anteriores.':'Complete the required tests in earlier lessons before opening this lesson.'
-        redirect(`/learning/${courseId}?error=${encodeURIComponent(message)}`)
-      }
+    let priorPassed:any[]=[]
+    if(priorAssessmentIds.length){const result=await supabase.from('assessment_attempts').select('assessment_id').eq('user_id',userId).eq('passed',true).in('assessment_id',priorAssessmentIds);priorPassed=result.data??[]}
+    const passedIds=new Set(priorPassed.map((a:any)=>a.assessment_id))
+    const completedPriorModules=new Set((priorProgress??[]).filter((p:any)=>p.completed).map((p:any)=>p.module_id))
+    const requiredByModule=new Map<string,string[]>()
+    for(const a of priorRequired??[]){const ids=requiredByModule.get(a.module_id)??[];ids.push(a.id);requiredByModule.set(a.module_id,ids)}
+    const blocked=priorModuleIds.some((id:string)=>{const required=requiredByModule.get(id)??[];return required.length?required.some(assessmentId=>!passedIds.has(assessmentId)):!completedPriorModules.has(id)})
+    if(blocked){
+      const message=(course.language_code??'en')==='es'?'Completa primero las lecciones y evaluaciones requeridas anteriores.':'Complete the earlier required lessons and tests before opening this lesson.'
+      redirect(`/learning/${courseId}?error=${encodeURIComponent(message)}`)
     }
   }
 
