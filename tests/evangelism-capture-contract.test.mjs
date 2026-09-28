@@ -47,3 +47,16 @@ test('outreach person can update only the next action without rewriting unrelate
   assert.match(actions,/update\(\{next_action:nextAction,follow_up_due_at:followUp,updated_at:/)
   assert.doesNotMatch(actions,/updateOutreachNextAction[\s\S]{0,1600}service_count:/)
 })
+
+
+test('follow-up interaction history can retain visit source context',()=>{
+  const history=fs.readFileSync(new URL('../src/app/outreach/outreach-history.tsx', import.meta.url),'utf8')
+  const migration=fs.readFileSync(new URL('../supabase/migrations/20260928024500_outreach_actionable_followup_fields.sql', import.meta.url),'utf8')
+  assert.match(actions,/source_type:interactionSource/)
+  assert.match(actions,/source_label:interactionSource/)
+  assert.match(history,/name="source_type"/)
+  assert.match(history,/name="source_label"/)
+  assert.match(history,/row\.source_label/)
+  assert.match(migration,/alter table public\.outreach_interactions/)
+  assert.match(migration,/add column if not exists source_type text/)
+})
