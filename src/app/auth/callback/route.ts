@@ -1,7 +1,9 @@
 import { NextRequest,NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-const siteUrl=(process.env.NEXT_PUBLIC_SITE_URL||'https://kingdom-network.vercel.app').replace(/\/$/,'')
+// DO-NOT-MERGE phone-QA branch: auth callbacks must stay on the isolated
+// Package 1 preview and must never inherit the production Vercel site URL.
+const siteUrl='https://kingdom-network-git-preview-packa-81e01d-tmak209-6568s-projects.vercel.app'
 
 function allowedAuthDestination(path:string){
   return path==='/start'||path.startsWith('/start?')||path.startsWith('/join/')||path==='/auth/update-password'||path.startsWith('/auth/update-password?')

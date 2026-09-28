@@ -4,8 +4,19 @@ import {readFile} from 'node:fs/promises'
 
 const read=(path)=>readFile(new URL(`../${path}`,import.meta.url),'utf8')
 
-test('Vercel automatic Git deployment stays disabled during release audit',async()=>{
+test('Vercel deployment stays disabled except for the explicit Package 1 phone-QA harness',async()=>{
   const config=JSON.parse(await read('vercel.json'))
+  const previewMarker=await read('docs/PACKAGE_1_PHONE_PREVIEW_DO_NOT_MERGE.md').catch(()=>null)
+  if(previewMarker){
+    const binding=await read('docs/PACKAGE_1_PHONE_PREVIEW_BINDING.md')
+    const supabaseConfig=await read('src/lib/supabase/config.ts')
+    assert.equal(config.git?.deploymentEnabled,true)
+    assert.match(previewMarker,/Do not merge/i)
+    assert.match(binding,/Preview-only/i)
+    assert.match(binding,/54571b2d10a41cf4d189bd9dbe6dd530366a631f/)
+    assert.match(supabaseConfig,/qjalsyzxblaeigevxiro\.supabase\.co/)
+    return
+  }
   assert.equal(config.git?.deploymentEnabled,false)
 })
 
