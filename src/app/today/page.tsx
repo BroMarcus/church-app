@@ -30,7 +30,7 @@ export default async function MyTodayPage({searchParams}:{searchParams:Promise<{
     supabase.from('group_memberships').select('group_id,role,groups(id,name,active)').eq('user_id',userId).in('role',['leader','assistant']),
     supabase.from('outreach_contacts').select('id,first_name,last_name,stage,follow_up_due_at').eq('church_id',membership.church_id).eq('assigned_to',userId).lt('follow_up_due_at',nowIso).not('stage','in','("inactive","serving")').order('follow_up_due_at').limit(5),
     supabase.from('outreach_contacts').select('id').eq('church_id',membership.church_id).eq('assigned_to',userId).not('stage','in','("inactive","serving")').limit(100),
-    supabase.from('member_journey_step_tracking').select('id,user_id,step_id,due_on,discipleship_pathway_steps(title)').eq('church_id',membership.church_id).eq('responsible_leader_id',userId).not('due_on','is',null).lte('due_on',todayIso).order('due_on').limit(8)
+    supabase.from('member_journey_step_tracking').select('id,user_id,step_id,responsible_leader_id,due_on,manual_status,manual_completed_at,last_activity_at,updated_at,discipleship_pathway_steps(id,step_key,title,description,completion_source,completion_key,completion_value,suggested_href,sort_order,required)').eq('church_id',membership.church_id).eq('responsible_leader_id',userId).not('due_on','is',null).lte('due_on',todayIso).order('due_on').limit(8)
   ])
   const assignmentRows=assignments??[],outreachRows=overdueOutreach??[],assignedContactIds=(assignedOutreach??[]).map((x:any)=>x.id)
   const assignmentIds=assignmentRows.map((a:any)=>a.id),courseIds=(enrollments??[]).filter((e:any)=>!e.credential_earned).map((e:any)=>e.course_id)
@@ -39,12 +39,37 @@ export default async function MyTodayPage({searchParams}:{searchParams:Promise<{
     courseIds.length?supabase.from('course_sessions').select('id,course_id,title,session_date,starts_at,courses(title)').eq('church_id',membership.church_id).in('course_id',courseIds).gte('session_date',nowIso.slice(0,10)).lte('session_date',weekIso.slice(0,10)).eq('status','scheduled').order('session_date').limit(8):Promise.resolve({data:[] as any[]}),
     assignedContactIds.length?supabase.from('communication_outbox').select('id,status,contact_id,channel,template_key,error_message,outreach_contacts(first_name,last_name)').in('contact_id',assignedContactIds).in('status',['suppressed','failed']).order('due_at').limit(5):Promise.resolve({data:[] as any[]})
   ])
-  const sessionRows=sessions??[],communicationRows=communicationIssues??[],journeyRows=journeyFollowups??[]
-  const journeyTargetIds=Array.from(new Set(journeyRows.map((row:any)=>row.user_id).filter(Boolean))) as string[]
-  let journeyTargetNames=new Map<string,string>()
+  const sessionRows=sessions??[],communicationRows=communicationIssues??[],journeyRaw=journeyFollowups??[]
+  const journeyTargetIds=Array.from(new Set(journeyRaw.map((row:any)=>row.user_id).filter(Boolean))) as string[]
+  let journeyTargetNames=new Map<string,string>(),journeyRows:any[]=[]
   if(journeyTargetIds.length){
-    const {data:targets}=await supabase.from('profiles').select('id,display_name,first_name,last_name').in('id',journeyTargetIds)
-    journeyTargetNames=new Map((targets??[]).map((target:any)=>[target.id,target.display_name||[target.first_name,target.last_name].filter(Boolean).join(' ')||(es?'Miembro':'Member')]))
+    const [targetsResult,milestoneResult,enrollmentResult,groupResult,applicationResult,assignmentResult]=await Promise.all([
+      supabase.from('profiles').select('id,display_name,first_name,last_name').in('id',journeyTargetIds),
+      supabase.from('member_milestones').select('*').eq('church_id',membership.church_id).in('user_id',journeyTargetIds),
+      supabase.from('course_enrollments').select('user_id,course_id,credential_earned,progress_percent,completed_at,updated_at').in('user_id',journeyTargetIds),
+      supabase.from('group_memberships').select('user_id,group_id').in('user_id',journeyTargetIds),
+      supabase.from('ministry_applications').select('user_id,status').in('user_id',journeyTargetIds).eq('status','accepted'),
+      supabase.from('team_assignments').select('assigned_user_id').eq('church_id',membership.church_id).in('assigned_user_id',journeyTargetIds)
+    ])
+    const targets=targetsResult.data??[],targetMilestones=milestoneResult.data??[],targetEnrollments=enrollmentResult.data??[],targetGroups=groupResult.data??[],targetApplications=applicationResult.data??[],targetAssignments=assignmentResult.data??[]
+    journeyTargetNames=new Map(targets.map((target:any)=>[target.id,target.display_name||[target.first_name,target.last_name].filter(Boolean).join(' ')||(es?'Miembro':'Member')]))
+    const milestoneMap=new Map(targetMilestones.map((row:any)=>[row.user_id,row]))
+    const bucket=(rows:any[],key:string)=>{const map=new Map<string,any[]>();for(const row of rows){const id=row[key];const list=map.get(id)??[];list.push(row);map.set(id,list)}return map}
+    const enrollmentMap=bucket(targetEnrollments,'user_id'),groupMap=bucket(targetGroups,'user_id'),applicationMap=bucket(targetApplications,'user_id'),assignmentMap=bucket(targetAssignments,'assigned_user_id')
+    journeyRows=journeyRaw.filter((track:any)=>{
+      const rawStep:any=Array.isArray(track.discipleship_pathway_steps)?track.discipleship_pathway_steps[0]:track.discipleship_pathway_steps
+      if(!rawStep)return false
+      const resolved=resolveJourneyStep(rawStep as JourneyStepDefinition,{
+        milestones:milestoneMap.get(track.user_id)??{},
+        enrollments:enrollmentMap.get(track.user_id)??[],
+        groupCount:(groupMap.get(track.user_id)??[]).length,
+        ministryApplicationCount:(applicationMap.get(track.user_id)??[]).length,
+        ministryAssignmentCount:(assignmentMap.get(track.user_id)??[]).length,
+        trackingByStep:new Map<string,JourneyStepTracking>([[track.step_id,track]])
+      })
+      track.resolved_step=resolved
+      return !resolved.completed
+    })
   }
   const responded=new Set((responses??[]).map((r:any)=>r.assignment_id)),pending=assignmentRows.filter((a:any)=>a.confirmation_required&&!responded.has(a.id))
   const leaderGroupMap=new Map<string,any>();for(const g of ledGroups??[])leaderGroupMap.set((g as any).id,g);for(const row of groupRoles??[]){const g:any=Array.isArray((row as any).groups)?(row as any).groups[0]:(row as any).groups;if(g?.active)leaderGroupMap.set(g.id,g)}
@@ -96,7 +121,7 @@ export default async function MyTodayPage({searchParams}:{searchParams:Promise<{
   const priority=firstPending?{pill:es?'RESPONDE AHORA':'RESPOND NOW',title:firstPending.title,body:es?'Confirma si puedes cumplir esta asignación.':'Confirm whether you can serve this assignment.',href:l('/teams'),action:es?'Responder':'Respond'}:
     firstGroup?{pill:es?'REPORTE PENDIENTE':'REPORT DUE',title:firstGroup.name,body:es?'Termina el reporte de tu grupo para mantener el seguimiento al día.':'Finish your group report so follow-up stays current.',href:l(`/groups/${firstGroup.id}`),action:es?'Hacer reporte':'Report meeting'}:
     firstOutreach?{pill:es?'SEGUIMIENTO':'FOLLOW-UP',title:[firstOutreach.first_name,firstOutreach.last_name].filter(Boolean).join(' '),body:es?'Esta persona ya pasó su fecha de seguimiento.':'This person is past their follow-up time.',href:l('/outreach'),action:es?'Dar seguimiento':'Follow up'}:
-    firstJourney?{pill:es?'SEGUIMIENTO DE DISCIPULADO':'DISCIPLESHIP FOLLOW-UP',title:journeyTargetNames.get(firstJourney.user_id)||firstJourney.discipleship_pathway_steps?.title||(es?'Próximo paso':'Next step'),body:es?'Tienes un seguimiento de Mi Camino que vence hoy o ya está atrasado.':'A My Journey follow-up assigned to you is due today or overdue.',href:l('/journey/follow-up'),action:es?'Abrir seguimiento':'Open follow-up'}:
+    firstJourney?{pill:es?'SEGUIMIENTO DE DISCIPULADO':'DISCIPLESHIP FOLLOW-UP',title:journeyTargetNames.get(firstJourney.user_id)||firstJourney.resolved_step?.title||(es?'Próximo paso':'Next step'),body:es?'Tienes un seguimiento de Mi Camino que vence hoy o ya está atrasado.':'A My Journey follow-up assigned to you is due today or overdue.',href:l('/journey/follow-up'),action:es?'Abrir seguimiento':'Open follow-up'}:
     firstCommunication?{pill:es?'COMUNICACIÓN NECESITA ATENCIÓN':'COMMUNICATION NEEDS ATTENTION',title:communicationName,body:firstCommunication.status==='failed'?(es?'Un mensaje de seguimiento falló. Revisa el estado y corrige el problema.':'A follow-up message failed. Review the status and correct the problem.'):(es?'Un mensaje automático fue suprimido porque falta permiso o información de contacto.':'An automatic message was suppressed because permission or contact information is missing.'),href:l('/outreach/communications'),action:es?'Revisar comunicación':'Review communication'}:
     {pill:es?'SIGUIENTE PASO':'NEXT STEP',title:nextStep.title,body:nextStep.body,href:l(nextStep.href),action:nextStep.action}
   const urgentCount=pending.length+overdueGroups.length+outreachRows.length+journeyRows.length+communicationRows.length
