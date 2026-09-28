@@ -52,7 +52,12 @@ export default async function OutreachContactPage({params,searchParams}:{params:
     serving:{title:['Keep discipling, not just scheduling','Siga discipulando, no solo programando'],detail:['Maintain relationship, encouragement, learning, and accountability while they serve.','Mantenga relación, ánimo, aprendizaje y responsabilidad mientras sirve.'],href:'/journey',icon:UserCheck},
     inactive:{title:['Decide whether to re-engage','Decida si debe volver a conectarse'],detail:['Reach out personally before treating inactivity as a closed relationship.','Comuníquese personalmente antes de tratar la inactividad como una relación cerrada.'],href:'/outreach',icon:Phone}
   }
-  const next=nextByStage[stage]??nextByStage.new_contact
+  const interestNext=contact.bible_study_interest&&!['bible_study','regular_attendee','baptized','holy_ghost','first_steps','connected','serving'].includes(stage)
+    ?{title:['Schedule the Bible study','Programe el estudio bíblico'],detail:['They have already expressed interest. Give the interest an owner, date, and real next lesson instead of leaving it as a checkbox.','Ya expresó interés. Déle responsable, fecha y el próximo estudio real en vez de dejarlo solo como una casilla.'],href:'/outreach',icon:BookOpen}
+    :contact.first_steps_interest&&!['first_steps','connected','serving'].includes(stage)
+      ?{title:['Invite them to First Steps','Invítelo a Primeros Pasos'],detail:['They have already expressed interest. Connect them to the real First Steps offering and keep the follow-up due date visible here.','Ya expresó interés. Conéctelo con la oferta real de Primeros Pasos y mantenga visible aquí la fecha de seguimiento.'],href:'/learning',icon:Compass}
+      :null
+  const next=interestNext??nextByStage[stage]??nextByStage.new_contact
   const NextIcon=next.icon
 
   return <main className="shell">
