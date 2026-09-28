@@ -15,7 +15,7 @@ test('discipleship pathway schema is church configurable and tenant scoped',()=>
   assert.match(sql,/member_journey_step_tracking/)
   assert.match(sql,/due_on date/)
   assert.match(sql,/enable row level security/)
-  assert.match(sql,/set search_path=public,private,pg_temp\nas \$\$/)
+  assert.match(sql,/private\.enforce_member_journey_step_tracking\(\)[\s\S]*?set search_path=public,private,pg_temp\nas \$\$/)
 })
 
 test('journey source keys and responsible leaders are constrained at the database boundary',()=>{
