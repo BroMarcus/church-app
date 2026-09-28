@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { CheckCircle2,ChevronLeft,ChevronRight,LockKeyhole } from 'lucide-react'
+import { CheckCircle2,ChevronLeft,ChevronRight,FileText,LockKeyhole } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { AssessmentCard } from '../../assessment-card'
 import { setModuleComplete } from '../../../actions'
@@ -15,7 +15,7 @@ export default async function LessonPage({params}:{params:Promise<{courseId:stri
   const {data:claims}=await supabase.auth.getClaims(),userId=claims?.claims?.sub
   if(!userId)redirect('/login')
   const [{data:course},{data:module},{data:enrollment},{data:modules},{data:assessments},{data:moduleProgress}]=await Promise.all([
-    supabase.from('courses').select('id,title,church_id,language_code,published').eq('id',courseId).eq('published',true).maybeSingle(),
+    supabase.from('courses').select('id,title,church_id,language_code,published,source_url,source_label').eq('id',courseId).eq('published',true).maybeSingle(),
     supabase.from('course_modules').select('*').eq('id',moduleId).eq('course_id',courseId).maybeSingle(),
     supabase.from('course_enrollments').select('course_id,user_id').eq('course_id',courseId).eq('user_id',userId).maybeSingle(),
     supabase.from('course_modules').select('id,title,position').eq('course_id',courseId).order('position'),
@@ -52,6 +52,7 @@ export default async function LessonPage({params}:{params:Promise<{courseId:stri
   const rows=(assessments??[]).map((a:any)=>({...a,questions:qBy.get(a.id)??[],attempts:aBy.get(a.id)??[]}))
   const passed=(a:any)=>a.attempts.some((x:any)=>x.passed)
   const sections=list(module.content?.sections)
+  const resources=list(module.content?.resources).filter((item:any)=>item?.audience!=='teacher')
   const checkpoints=rows.filter((a:any)=>a.checkpoint_section!=null)
   const endTests=rows.filter((a:any)=>a.checkpoint_section==null)
   const sectionUnlocked=(sectionNumber:number)=>checkpoints.filter((a:any)=>Number(a.checkpoint_section)<sectionNumber&&a.required).every(passed)
@@ -70,6 +71,8 @@ export default async function LessonPage({params}:{params:Promise<{courseId:stri
     <section className="card" style={{padding:22,marginBottom:18}}><div className="pill">{t(`LESSON ${module.position}`,`LECCIÓN ${module.position}`)}</div><h1 style={{margin:'9px 0 6px'}}>{module.title}</h1><p className="muted">{module.content?.summary||t('Work through each section in order. Short checkpoints unlock the next section when they are assigned.','Avanza por cada sección en orden. Los cuestionarios cortos desbloquean la siguiente sección cuando estén asignados.')}</p><div className="row" style={{gap:8,flexWrap:'wrap'}}><span className="pill">{sections.length} {t('SECTIONS','SECCIONES')}</span><span className="pill">{checkpoints.length} {t('SHORT QUIZZES','CUESTIONARIOS')}</span><span className="pill">{endTests.length} {t('LESSON TESTS','PRUEBAS')}</span>{lessonPassed&&<span className="complete-chip"><CheckCircle2 size={12}/> {t('Lesson passed','Lección aprobada')}</span>}</div></section>
 
     {list(module.content?.objectives).length>0&&<section className="card" style={{padding:18,marginBottom:14}}><div className="pill">{t('LEARNING GOALS','METAS DE APRENDIZAJE')}</div><ul>{list(module.content.objectives).map((x:any,i:number)=><li key={i}>{String(x)}</li>)}</ul></section>}
+
+    {resources.length>0&&<section className="card" style={{padding:18,marginBottom:16}}><div className="pill"><FileText size={12}/> {t('LESSON MATERIALS','MATERIALES DE LA LECCIÓN')}</div><div style={{display:'grid',gap:10,marginTop:12}}>{resources.map((resource:any,i:number)=>{const start=Number(resource?.page_start||0),end=Number(resource?.page_end||0),pages=start>0&&end>0?(start===end?t(`Page ${start}`,`Página ${start}`):t(`Pages ${start}–${end}`,`Páginas ${start}–${end}`)):'';return <div key={i} className="row" style={{justifyContent:'space-between',gap:12,alignItems:'center',flexWrap:'wrap'}}><div><strong>{String(resource?.label||t('Course material','Material del curso'))}</strong>{pages&&<div className="small muted">{pages}</div>}</div><Link className="ghost" href={`/learning/${courseId}/lesson/${moduleId}/source?resource=${i}`}>{t('Open in One Kingdom','Abrir en One Kingdom')} →</Link></div>})}</div></section>}
 
     <section style={{display:'grid',gap:16}}>{sections.map((section:any,i:number)=>{const n=i+1,unlocked=sectionUnlocked(n),sectionQuizzes=checkpoints.filter((a:any)=>Number(a.checkpoint_section)===n);return <div key={n} style={{display:'grid',gap:10}}>{unlocked?<><article className="card" style={{padding:20}}><div className="pill">{t(`SECTION ${n}`,`SECCIÓN ${n}`)}</div><h2 style={{margin:'9px 0 8px'}}>{String(section?.heading??t(`Section ${n}`,`Sección ${n}`))}</h2><div className="muted" style={{whiteSpace:'pre-wrap',lineHeight:1.75}}>{String(section?.body??'')}</div></article>{sectionQuizzes.map((a:any)=><section key={a.id}><div className="pill" style={{marginBottom:7}}>{t('QUICK CHECK','REPASO RÁPIDO')}</div><AssessmentCard assessment={a} courseId={courseId}/></section>)}{sectionQuizzes.length===0&&n<sections.length&&<div className="notice">{t('No short quiz is assigned after this section yet, so you may continue.','Todavía no hay un cuestionario corto después de esta sección, así que puedes continuar.')}</div>}</>:<article className="card" style={{padding:18}}><div className="row" style={{gap:10,alignItems:'flex-start'}}><LockKeyhole size={20}/><div><strong>{t(`Section ${n} is locked`,`La sección ${n} está bloqueada`)}</strong><p className="small muted" style={{marginBottom:0}}>{t('Pass the required quick check above to continue.','Aprueba el cuestionario requerido anterior para continuar.')}</p></div></div></article>}</div>})}</section>
 
