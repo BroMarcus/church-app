@@ -66,6 +66,7 @@ export default async function JourneyFollowupPage({searchParams}:{searchParams:P
         <form action={recordJourneyFollowup} style={{flex:'1 1 300px',display:'grid',gridTemplateColumns:'1fr auto',gap:9,alignItems:'end'}}>
           <input type="hidden" name="tracking_id" value={track.id}/><input type="hidden" name="lang" value={lang}/>
           <label className="field" style={{margin:0}}><span>{es?'Próxima fecha de seguimiento':'Next follow-up date'}</span><input type="date" name="next_due_on" defaultValue={track.due_on??''}/></label>
+          {step.completion_source==='manual'&&<label className="field" style={{margin:0}}><span>{es?'Estado del paso manual':'Manual step status'}</span><select name="manual_status" defaultValue={track.manual_status??'not_started'}><option value="not_started">{es?'No iniciado':'Not started'}</option><option value="in_progress">{es?'En progreso':'In progress'}</option><option value="completed">{es?'Completado':'Completed'}</option><option value="waived">{es?'Exento':'Waived'}</option></select></label>}
           <button className="btn"><CheckCircle2 size={14}/> {es?'Registrar seguimiento':'Record follow-up'}</button>
           <div className="small muted" style={{gridColumn:'1 / -1'}}>{track.due_on?<><Clock3 size={12} style={{verticalAlign:'middle'}}/> {overdue?(es?'Atrasado':'Overdue'):(es?'Vence':'Due')} {track.due_on}</>:(es?'Sin fecha establecida.':'No due date set.')}</div>
         </form>
