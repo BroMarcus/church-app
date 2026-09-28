@@ -44,11 +44,14 @@ export async function saveJourneyFollowup(formData:FormData){
   ])
   if(!target||!step)redirect('/church/leadership?error='+encodeURIComponent('Journey member or step was not found.'))
   if(leaderId){
-    const {data:leader}=await supabase.from('church_memberships').select('user_id').eq('church_id',churchId).eq('user_id',leaderId).eq('status','active').maybeSingle()
-    if(!leader)redirect('/church/leadership?error='+encodeURIComponent('Responsible leader must be active in this church.'))
+    const {data:leader}=await supabase.from('church_memberships').select('user_id,role').eq('church_id',churchId).eq('user_id',leaderId).eq('status','active').maybeSingle()
+    if(!leader||!['group_leader','ministry_leader','minister','pastor','church_admin'].includes(leader.role))redirect('/church/leadership?error='+encodeURIComponent('Responsible leader must have an active leadership role in this church.'))
   }
-  const payload={church_id:churchId,user_id:userId,step_id:stepId,responsible_leader_id:leaderId,due_on:dueOn,created_by:actorId,last_activity_at:new Date().toISOString(),updated_at:new Date().toISOString()}
-  const {error}=await supabase.from('member_journey_step_tracking').upsert(payload,{onConflict:'church_id,user_id,step_id'})
+  const now=new Date().toISOString()
+  const {data:existing}=await supabase.from('member_journey_step_tracking').select('id').eq('church_id',churchId).eq('user_id',userId).eq('step_id',stepId).maybeSingle()
+  const {error}=existing
+    ? await supabase.from('member_journey_step_tracking').update({responsible_leader_id:leaderId,due_on:dueOn,last_activity_at:now,updated_at:now}).eq('id',existing.id).eq('church_id',churchId)
+    : await supabase.from('member_journey_step_tracking').insert({church_id:churchId,user_id:userId,step_id:stepId,responsible_leader_id:leaderId,due_on:dueOn,created_by:actorId,last_activity_at:now,updated_at:now})
   if(error)redirect('/church/leadership?error='+encodeURIComponent(error.message))
   revalidatePath('/church/leadership');revalidatePath('/church/health');revalidatePath('/journey');revalidatePath('/today')
   redirect('/church/leadership?saved=journey')
