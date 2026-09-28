@@ -14,13 +14,16 @@ export function ResourceEngagement({
   const [error,setError]=useState('')
   const [busy,setBusy]=useState(false)
   const activeRef=useRef(true)
+  const busyRef=useRef(false)
+  const completedRef=useRef(false)
 
   useEffect(()=>{
     activeRef.current=true
     let timer:number|undefined
     const supabase=createClient()
     const record=async(delta:number)=>{
-      if(!activeRef.current||busy)return
+      if(!activeRef.current||busyRef.current||completedRef.current&&delta>0)return
+      busyRef.current=true
       setBusy(true)
       const {data,error}=await supabase.rpc('record_course_resource_engagement',{
         p_course_id:courseId,
@@ -29,14 +32,17 @@ export function ResourceEngagement({
         p_active_seconds:delta,
       })
       if(!activeRef.current)return
-      if(error){setError(error.message);setBusy(false);return}
+      if(error){setError(error.message);busyRef.current=false;setBusy(false);return}
+      const next=data as Progress
+      completedRef.current=Boolean(next?.completed)
       setError('')
-      setProgress(data as Progress)
+      setProgress(next)
+      busyRef.current=false
       setBusy(false)
     }
     void record(0)
     timer=window.setInterval(()=>{
-      if(document.visibilityState==='visible'&&document.hasFocus()&&!progress?.completed)void record(10)
+      if(document.visibilityState==='visible'&&document.hasFocus()&&!completedRef.current)void record(10)
     },10000)
     return()=>{activeRef.current=false;if(timer)window.clearInterval(timer)}
   },[courseId,moduleId,resourceIndex])
