@@ -113,3 +113,16 @@ test('Bible study and First Steps interest drive the recommended person next ste
   assert.match(detail,/contact\.first_steps_interest/)
   assert.match(detail,/Invite them to First Steps/)
 })
+
+
+test('Outreach forms expose a slow-network pending state',()=>{
+  const submit=fs.readFileSync(new URL('../src/app/outreach/outreach-submit-button.tsx', import.meta.url),'utf8')
+  const detail=fs.readFileSync(new URL('../src/app/outreach/[contactId]/page.tsx', import.meta.url),'utf8')
+  const history=fs.readFileSync(new URL('../src/app/outreach/outreach-history.tsx', import.meta.url),'utf8')
+  assert.match(submit,/useFormStatus/)
+  assert.match(submit,/disabled=\{isPending\}/)
+  assert.match(page,/pending=\{es\?'Agregando…':'Adding…'\}/)
+  assert.match(page,/pending=\{es\?'Guardando…':'Saving…'\}/)
+  assert.match(detail,/pending=\{t\('Saving…','Guardando…'\)\}/)
+  assert.match(history,/pending=\{es\?'Guardando…':'Saving…'\}/)
+})
