@@ -2,6 +2,7 @@ import Link from 'next/link'
 import {redirect} from 'next/navigation'
 import {ChevronLeft,FileText,ExternalLink} from 'lucide-react'
 import {createClient} from '@/lib/supabase/server'
+import {ResourceEngagement} from './resource-engagement'
 import '../../../../learning.css'
 
 const list=(value:any)=>Array.isArray(value)?value:[]
@@ -57,7 +58,7 @@ export default async function CourseSourceViewer({params,searchParams}:{params:P
   return <main className="shell">
     <header className="topbar"><div><Link className="brand" href="/">Kingdom <span>Network</span></Link><div className="small muted">{t('Course Viewer','Visor del Curso')} • {module.title}</div></div><Link className="ghost" href={`/learning/${courseId}/lesson/${moduleId}`}><ChevronLeft size={14}/> {t('Back to lesson','Volver a la lección')}</Link></header>
     <section className="card" style={{padding:18,marginBottom:14}}><div className="pill"><FileText size={12}/> {t('ONE KINGDOM VIEWER','VISOR ONE KINGDOM')}</div><h1 style={{margin:'8px 0 4px'}}>{label}</h1>{pageText&&<div className="small muted">{pageText}</div>}<p className="small muted" style={{marginBottom:0}}>{t('Stay here while you work through the assigned material. Return to the lesson when finished.','Permanece aquí mientras revisas el material asignado. Regresa a la lección cuando termines.')}</p></section>
-    {embed?<section className="card" style={{padding:8,overflow:'hidden'}}><iframe title={label} src={embed} style={{width:'100%',height:'76vh',minHeight:520,border:0,borderRadius:12}} allow="fullscreen" referrerPolicy="no-referrer" /></section>:<section className="card" style={{padding:20}}><h2>{t('Source not connected yet','La fuente aún no está conectada')}</h2><p className="muted">{t('A church leader still needs to connect a learner-safe link for this lesson or resource before it can open. The master course file is not exposed to learners automatically.','Un líder de la iglesia todavía necesita conectar un enlace seguro para alumnos para esta lección o recurso antes de que pueda abrirse. El archivo maestro del curso no se expone automáticamente a los alumnos.')}</p></section>}
+    {embed?<><ResourceEngagement courseId={courseId} moduleId={moduleId} resourceIndex={requested} lang={isEs?'es':'en'}/><section className="card" style={{padding:8,overflow:'hidden'}}><iframe title={label} src={embed} style={{width:'100%',height:'76vh',minHeight:520,border:0,borderRadius:12}} allow="fullscreen" referrerPolicy="no-referrer" /></section></>:<section className="card" style={{padding:20}}><h2>{t('Source not connected yet','La fuente aún no está conectada')}</h2><p className="muted">{t('A church leader still needs to connect a learner-safe link for this lesson or resource before it can open. The master course file is not exposed to learners automatically.','Un líder de la iglesia todavía necesita conectar un enlace seguro para alumnos para esta lección o recurso antes de que pueda abrirse. El archivo maestro del curso no se expone automáticamente a los alumnos.')}</p></section>}
     {source&&<div style={{marginTop:12,textAlign:'center'}}><a className="ghost" href={source.toString()} target="_blank" rel="noreferrer"><ExternalLink size={14}/> {t('Viewer not loading? Open the approved source','¿No carga el visor? Abre la fuente aprobada')}</a></div>}
   </main>
 }
