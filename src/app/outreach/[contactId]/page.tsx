@@ -24,14 +24,17 @@ export default async function OutreachContactPage({params,searchParams}:{params:
   const {data:claims}=await supabase.auth.getClaims()
   const userId=claims?.claims?.sub
   if(!userId)redirect('/login')
-  const {data:membership}=await supabase.from('church_memberships').select('church_id,role,churches(name,timezone)').eq('user_id',userId).eq('status','active').limit(1).single()
+  const {data:membership,error:membershipError}=await supabase.from('church_memberships').select('church_id,role,churches(name,timezone)').eq('user_id',userId).eq('status','active').limit(1).single()
+  if(membershipError)throw new Error('Outreach membership context could not load')
   if(!membership?.church_id)redirect('/')
-  const {data:contact}=await supabase.from('outreach_contacts').select('*').eq('id',contactId).eq('church_id',membership.church_id).maybeSingle()
+  const {data:contact,error:contactError}=await supabase.from('outreach_contacts').select('*').eq('id',contactId).eq('church_id',membership.church_id).maybeSingle()
+  if(contactError)throw new Error('Outreach person could not load')
   if(!contact)redirect('/outreach?error='+encodeURIComponent(t('Outreach contact not found or unavailable to you.','No se encontró el contacto de alcance o no está disponible para usted.')))
   const canInvite=['pastor','church_admin'].includes(membership.role)
   let linkedProfile:any=null
   if(contact.member_user_id){const r=await supabase.from('profiles').select('id,display_name,first_name,last_name').eq('id',contact.member_user_id).maybeSingle();linkedProfile=r.data??null}
-  const {data:interactions}=await supabase.from('outreach_interactions').select('id,contact_id,interaction_type,occurred_at,summary,bible_study_lesson,source_type,source_label,recorded_by,profiles:recorded_by(display_name,first_name,last_name)').eq('contact_id',contactId).order('occurred_at',{ascending:false})
+  const {data:interactions,error:interactionsError}=await supabase.from('outreach_interactions').select('id,contact_id,interaction_type,occurred_at,summary,bible_study_lesson,source_type,source_label,recorded_by,profiles:recorded_by(display_name,first_name,last_name)').eq('contact_id',contactId).order('occurred_at',{ascending:false})
+  if(interactionsError)throw new Error('Outreach follow-up history could not load')
   let openInvite:any=null
   if(canInvite&&!contact.member_user_id){const r=await supabase.from('church_invites').select('id,email,expires_at,created_at').eq('church_id',membership.church_id).eq('outreach_contact_id',contactId).is('redeemed_at',null).is('revoked_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false}).limit(1).maybeSingle();openInvite=r.data??null}
   const inviteId=query.invite||openInvite?.id||null
