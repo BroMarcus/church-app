@@ -9,12 +9,18 @@ const actions=read('src/app/learning/admin/course-builder/[courseId]/actions.ts'
 const page=read('src/app/learning/admin/course-builder/[courseId]/page.tsx')
 const lessonPage=read('src/app/learning/[courseId]/lesson/[moduleId]/page.tsx')
 const sourceViewer=read('src/app/learning/[courseId]/lesson/[moduleId]/source/page.tsx')
+const certificatePage=read('src/app/learning/[courseId]/certificate/page.tsx')
+const certificateButton=read('src/app/learning/[courseId]/certificate/print-button.tsx')
+const coursePage=read('src/app/learning/[courseId]/page.tsx')
+const learningCss=read('src/app/learning/learning.css')
 
 test('Effective Soul Winning package keeps the verified six-lesson mastery structure',()=>{
   assert.equal(pkg.one_kingdom_package_version,1)
   assert.equal(pkg.course.title,'Effective Soul Winning')
   assert.equal(pkg.course.progression_mode,'mastery')
   assert.equal(pkg.course.passing_score,80)
+  assert.equal(pkg.course.badge_name,'Effective Soul Winning — Certificate of Completion')
+  assert.equal(pkg.course.curriculum_version,'2024')
   assert.deepEqual(pkg.lessons.map((x)=>x.title),[
     'The Old and the New Testament',
     'What Is Repentance?',
@@ -86,4 +92,19 @@ test('ESW lesson resources stay inside the authenticated One Kingdom viewer',()=
   assert.match(sourceViewer,/const rawSource=resource\?\.source_url\|\|module\.source_url\|\|''/)
   assert.doesNotMatch(sourceViewer,/rawSource=resource\?\.source_url\|\|module\.source_url\|\|course\.source_url/)
   assert.match(sourceViewer,/master course file is not exposed to learners automatically/)
+})
+
+
+test('earned ESW credential unlocks a personalized printable One Kingdom certificate',()=>{
+  assert.match(coursePage,/View Certificate/)
+  assert.match(coursePage,/\/learning\/\$\{courseId\}\/certificate/)
+  assert.match(certificatePage,/credential_earned/)
+  assert.match(certificatePage,/completed_at/)
+  assert.match(certificatePage,/first_name,last_name,display_name/)
+  assert.match(certificatePage,/final_score/)
+  assert.match(certificatePage,/Print \/ Save PDF/)
+  assert.match(certificatePage,/Completion is verified from the learner/)
+  assert.match(certificateButton,/window\.print\(\)/)
+  assert.match(learningCss,/@media print/)
+  assert.match(learningCss,/\.learning-certificate/)
 })
