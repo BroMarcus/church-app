@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { BookOpen,Check,Church,Clock3,Compass,HandHeart,MessageSquareWarning,Sparkles,Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { addJourneyAttention,resolveJourneyStep,type JourneyStepDefinition,type JourneyStepTracking } from '@/lib/discipleship-pathway'
 import './journey.css'
 
 export default async function JourneyPage({searchParams}:{searchParams:Promise<{lang?:string}>}){
@@ -42,6 +43,42 @@ export default async function JourneyPage({searchParams}:{searchParams:Promise<{
   if(ministryIds.length){const r=await supabase.from('ministries').select('id,name').in('id',ministryIds);ministries=r.data??[]}
   const cm=new Map(courses.map((c:any)=>[c.id,c])),gm=new Map(groups.map((g:any)=>[g.id,g])),mm=new Map(ministries.map((m:any)=>[m.id,m]))
   const m:any=milestones??{}
+
+  // A church can define its own pathway. These reads intentionally fail soft until the
+  // corresponding migration is applied, so the existing My Journey experience remains safe.
+  let pathwayName:string|null=null
+  let configuredJourney:any[]=[]
+  let journeyLeaderNames=new Map<string,string>()
+  let activePathwayId:string|null=null
+  const {data:pathAssignment}=await supabase.from('member_journey_pathway_assignments').select('pathway_id').eq('church_id',churchId).eq('user_id',userId).eq('active',true).maybeSingle()
+  if(pathAssignment?.pathway_id)activePathwayId=pathAssignment.pathway_id
+  if(!activePathwayId){
+    const {data:defaultPath}=await supabase.from('discipleship_pathways').select('id,name').eq('church_id',churchId).eq('active',true).eq('is_default',true).limit(1).maybeSingle()
+    if(defaultPath?.id){activePathwayId=defaultPath.id;pathwayName=defaultPath.name}
+  }
+  if(activePathwayId){
+    const [{data:path},{data:stepRows},{data:trackingRows}]=await Promise.all([
+      supabase.from('discipleship_pathways').select('id,name').eq('church_id',churchId).eq('id',activePathwayId).maybeSingle(),
+      supabase.from('discipleship_pathway_steps').select('id,step_key,title,description,completion_source,completion_key,completion_value,suggested_href,sort_order,required').eq('church_id',churchId).eq('pathway_id',activePathwayId).eq('active',true).order('sort_order').order('id'),
+      supabase.from('member_journey_step_tracking').select('step_id,responsible_leader_id,due_at,manual_status,manual_completed_at,last_activity_at,updated_at').eq('church_id',churchId).eq('user_id',userId)
+    ])
+    pathwayName=path?.name??pathwayName
+    const tracking=new Map<string,JourneyStepTracking>((trackingRows??[]).map((row:any)=>[row.step_id,row]))
+    configuredJourney=addJourneyAttention((stepRows??[]).map((step:any)=>resolveJourneyStep(step as JourneyStepDefinition,{
+      milestones:m,
+      enrollments:enrollments??[],
+      groupCount:(groupMemberships??[]).length,
+      ministryApplicationCount:(applications??[]).filter((row:any)=>row.status==='accepted').length,
+      ministryAssignmentCount:(assignments??[]).length,
+      trackingByStep:tracking
+    })))
+    const leaderIds=Array.from(new Set(configuredJourney.map((step:any)=>step.responsibleLeaderId).filter(Boolean))) as string[]
+    if(leaderIds.length){
+      const {data:leaders}=await supabase.from('profiles').select('id,display_name,first_name,last_name').in('id',leaderIds)
+      journeyLeaderNames=new Map((leaders??[]).map((leader:any)=>[leader.id,leader.display_name||[leader.first_name,leader.last_name].filter(Boolean).join(' ')||t('Assigned leader','Líder asignado')]))
+    }
+  }
+
   const baptized=m.baptized===true
   const holyGhost=m.holy_ghost_received===true
   const foundation=m.first_steps_status==='completed'
@@ -70,16 +107,36 @@ export default async function JourneyPage({searchParams}:{searchParams:Promise<{
     serving:{title:t('Find a place to serve','Encuentra dónde servir'),body:t('Explore ministries and take the next step toward serving with your gifts.','Explora ministerios y da el siguiente paso para servir con tus dones.'),href:`/serve${lang}`,cta:t('Explore Serve','Explorar Servicio')}
   }
   const next=firstIncomplete>=0?nextByKey[stages[firstIncomplete].key]:{title:t('Keep growing and helping others','Sigue creciendo y ayudando a otros'),body:t('Your recorded journey areas are complete. Stay connected, keep learning and help someone else take a next step.','Tus áreas registradas están completas. Mantente conectado, sigue aprendiendo y ayuda a alguien más a dar un próximo paso.'),href:`/guide${lang}`,cta:t('Ask Kingdom Guide','Preguntar a Kingdom Guide')}
+  const configuredCurrent=configuredJourney.find((step:any)=>step.required&&!step.completed)??configuredJourney.find((step:any)=>!step.completed)
+  const configuredHref=(step:any)=>step?.suggested_href||(
+    step?.completion_source==='course'?'/learning':
+    step?.completion_source==='friendship_group'?'/groups':
+    step?.completion_source==='ministry_serving'?'/serve':'/journey'
+  )
+  const journeyNext=configuredCurrent?{
+    title:configuredCurrent.title,
+    body:configuredCurrent.description||t('This is the next configured step in your church pathway.','Este es el próximo paso configurado en el camino de tu iglesia.'),
+    href:`${configuredHref(configuredCurrent)}${configuredHref(configuredCurrent).includes('?')?'&':'?'}lang=${es?'es':'en'}`,
+    cta:t('Open next step','Abrir próximo paso')
+  }:configuredJourney.length?{
+    title:t('Keep growing and helping others','Sigue creciendo y ayudando a otros'),
+    body:t('You have completed the currently configured pathway. Stay connected, keep learning and help someone else take a next step.','Has completado el camino configurado actualmente. Mantente conectado, sigue aprendiendo y ayuda a alguien más a dar un próximo paso.'),
+    href:`/guide${lang}`,cta:t('Ask Kingdom Guide','Preguntar a Kingdom Guide')
+  }:next
+  const displayStages=configuredJourney.length?configuredJourney.map((step:any)=>({key:step.id,title:step.title,done:step.completed,status:step.status})):stages
+  const displayFirstIncomplete=displayStages.findIndex((step:any)=>!step.done)
+  const currentHelper=configuredCurrent?.responsibleLeaderId?journeyLeaderNames.get(configuredCurrent.responsibleLeaderId):null
+  const helperLabel=configuredJourney.length?(currentHelper||t('Not assigned yet','Aún no asignado')):t('Church leadership','Liderazgo de la iglesia')
   const milestone=(title:string,done:boolean,detail:string)=><div className={`milestone ${done?'done':''}`}><div className="milestone-main"><div className="milestone-icon">{done?<Check size={13}/>:<Compass size={13}/>}</div><div><strong>{title}</strong><span>{detail}</span></div></div><div className="milestone-status">{done?t('Verified / complete','Verificado / completo'):t('Not complete or not recorded','No completo o no registrado')}</div></div>
 
   return <main className="shell">
     <header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??t('Your Church','Tu Iglesia')} • {t('My Journey','Mi Camino')}</div></div><div className="row"><Link className="ghost" href={`/journey${es?'':'?lang=es'}`}>{es?'English':'Español'}</Link><Link className="ghost" href={`/today${lang}`}>{t('My Today','Mi Día')}</Link><Link className="ghost" href={`/feedback${lang}`}><MessageSquareWarning size={14}/> {t('Feedback','Comentarios')}</Link><Link className="ghost" href={`/${lang}`}>← {t('Home','Inicio')}</Link></div></header>
 
-    <section className="journey-hero card"><div><div className="pill">{t('MY JOURNEY','MI CAMINO')}</div><h1>{t('Where am I—and what is next?','¿Dónde estoy y qué sigue?')}</h1><p className="muted">{t('Your personal roadmap for spiritual milestones, discipleship, connection, outreach and serving.','Tu mapa personal de hitos espirituales, discipulado, conexión, evangelismo y servicio.')}</p></div><div className="hero-stat"><Sparkles size={23}/><span>{stages.filter(s=>s.done).length} {t('of','de')} {stages.length} {t('areas recorded','áreas registradas')}</span></div></section>
+    <section className="journey-hero card"><div><div className="pill">{t('MY JOURNEY','MI CAMINO')}</div><h1>{t('Where am I—and what is next?','¿Dónde estoy y qué sigue?')}</h1><p className="muted">{t('Your personal roadmap for spiritual milestones, discipleship, connection, outreach and serving.','Tu mapa personal de hitos espirituales, discipulado, conexión, evangelismo y servicio.')}</p></div><div className="hero-stat"><Sparkles size={23}/><span>{displayStages.filter((s:any)=>s.done).length} {t('of','de')} {displayStages.length} {configuredJourney.length?t('pathway steps complete','pasos del camino completos'):t('areas recorded','áreas registradas')}</span></div></section>
 
-    <section className="card" style={{marginTop:14,padding:22,border:'1px solid rgba(125,211,252,.34)'}}><div className="pill">{t('YOUR NEXT STEP','TU PRÓXIMO PASO')}</div><h2 style={{fontSize:'1.55rem',margin:'9px 0 6px'}}>{next.title}</h2><p className="muted" style={{marginTop:0,lineHeight:1.55,maxWidth:760}}>{next.body}</p><div className="row"><Link className="btn" href={next.href}>{next.cta} →</Link><Link className="ghost" href={`/guide${lang}`}>{t('Ask Kingdom Guide','Preguntar a Kingdom Guide')}</Link></div></section>
+    <section className="card" style={{marginTop:14,padding:22,border:'1px solid rgba(125,211,252,.34)'}}><div className="pill">{t('YOUR NEXT STEP','TU PRÓXIMO PASO')}</div>{pathwayName&&<div className="small muted" style={{marginTop:8}}>{t('Pathway','Camino')}: {pathwayName}</div>}<h2 style={{fontSize:'1.55rem',margin:'9px 0 6px'}}>{journeyNext.title}</h2><p className="muted" style={{marginTop:0,lineHeight:1.55,maxWidth:760}}>{journeyNext.body}</p><div className="small" style={{margin:'10px 0 14px'}}><strong>{t('Who is helping me?','¿Quién me está ayudando?')}</strong> {helperLabel}{configuredCurrent?.dueAt?` • ${t('Follow-up due','Seguimiento vence')}: ${formatDateTime(configuredCurrent.dueAt)}`:''}</div><div className="row"><Link className="btn" href={journeyNext.href}>{journeyNext.cta} →</Link><Link className="ghost" href={`/guide${lang}`}>{t('Ask Kingdom Guide','Preguntar a Kingdom Guide')}</Link></div></section>
 
-    <section style={{marginTop:22}}><div className="pill" style={{marginBottom:12}}>{t('MY PATH','MI CAMINO')}</div><section className="journey-rail">{stages.map((stage,index)=><div className={`card journey-step ${stageClass(index,stage.done)}`} key={stage.key}><div className="step-icon">{stage.done?<Check size={14}/>:index===firstIncomplete?<Compass size={14}/>:<span>{index+1}</span>}</div><strong>{stage.title}</strong><span>{stage.done?t('Recorded / connected','Registrado / conectado'):index===firstIncomplete?t('Current next area','Próxima área actual'):t('Later','Más adelante')}</span></div>)}</section></section>
+    <section style={{marginTop:22}}><div className="pill" style={{marginBottom:12}}>{t('MY PATH','MI CAMINO')}</div><section className="journey-rail">{displayStages.map((stage:any,index:number)=><div className={`card journey-step ${stageClass(index,stage.done)}`} key={stage.key}><div className="step-icon">{stage.done?<Check size={14}/>:index===displayFirstIncomplete?<Compass size={14}/>:<span>{index+1}</span>}</div><strong>{stage.title}</strong><span>{stage.done?t('Complete','Completado'):index===displayFirstIncomplete?t('Current next step','Próximo paso actual'):t('Later','Más adelante')}</span></div>)}</section></section>
 
     <details className="card" style={{padding:20,marginTop:22}}><summary style={{cursor:'pointer',fontWeight:800,fontSize:'1.08rem'}}>{t('View my detailed journey records','Ver mis registros detallados')}</summary><p className="small muted">{t('Open this when you want dates, course progress, group attendance, prayer history, connections and serving records.','Abre esto cuando quieras ver fechas, progreso de cursos, asistencia al grupo, historial de oración, conexiones y registros de servicio.')}</p>
       <section className="journey-grid" style={{marginTop:16}}><article className="card journey-card"><div className="pill">{t('NEW BIRTH','NUEVO NACIMIENTO')}</div><h2>{t('Verified milestones','Hitos verificados')}</h2><div className="milestone-list">{milestone(t('Baptism','Bautismo'),baptized,baptized?`${t('Recorded','Registrado')}${m.baptism_date?` • ${formatDate(m.baptism_date)}`:''}`:t('No verified baptism record yet.','Aún no hay registro de bautismo verificado.'))}{milestone(t('Holy Ghost','Espíritu Santo'),holyGhost,holyGhost?`${t('Recorded','Registrado')}${m.holy_ghost_date?` • ${formatDate(m.holy_ghost_date)}`:''}`:t('No verified Holy Ghost record yet.','Aún no hay registro verificado del Espíritu Santo.'))}</div></article>
