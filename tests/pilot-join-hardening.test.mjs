@@ -39,3 +39,27 @@ test('public join keeps low-tech password verification and existing-account path
   assert.match(page,/Usar mi cuenta existente/)
   assert.match(page,/joinExistingChurch/)
 })
+
+
+test('public onboarding links use the canonical One Kingdom domain helper',()=>{
+  const helper=read('src/lib/public-app-origin.ts')
+  const joinCenter=read('src/app/church/join-center/page.tsx')
+  const groupJoin=read('src/app/groups/[groupId]/join/page.tsx')
+  const callback=read('src/app/auth/callback/route.ts')
+  assert.match(helper,/https:\/\/one-kingdom\.com/)
+  assert.match(joinCenter,/PUBLIC_APP_ORIGIN/)
+  assert.match(groupJoin,/PUBLIC_APP_ORIGIN/)
+  assert.match(callback,/PUBLIC_APP_ORIGIN/)
+})
+
+test('existing accounts preserve invitation and Friendship Group join context',()=>{
+  const loginPage=read('src/app/login/page.tsx')
+  const loginActions=read('src/app/login/actions.ts')
+  const groupPage=read('src/app/join/[slug]/group/[groupId]/page.tsx')
+  const groupActions=read('src/app/join/[slug]/group/[groupId]/actions.ts')
+  assert.match(loginPage,/name="invite_id"/)
+  assert.match(loginActions,/redeem_invite_for_current_user/)
+  assert.match(loginActions,/invitePart/)
+  assert.match(groupPage,/mode=signin&next=/)
+  assert.match(groupActions,/mode=signin&next=/)
+})
