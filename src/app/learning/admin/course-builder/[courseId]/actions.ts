@@ -301,3 +301,32 @@ export async function saveLessonSourceLink(formData:FormData){
   if(error){console.error('lesson source link failed',{courseId,moduleId,message:error.message});safeError(courseId,language)}
   success(courseId,language,rawUrl?(language==='es'?'Fuente de la lección conectada.':'Lesson source connected.'):(language==='es'?'Fuente de la lección eliminada.':'Lesson source removed.'))
 }
+
+
+export async function registerCourseSourceUpload(payload:{courseId:string;fileName:string;storagePath:string;contentType?:string;sizeBytes:number}){
+  const courseId=String(payload.courseId||'').trim()
+  if(!courseId)return {ok:false,error:'Course not found.'}
+  const {supabase,userId,churchId}=await manager(courseId)
+  const storagePath=String(payload.storagePath||'').trim()
+  if(!storagePath.startsWith(`${churchId}/`))return {ok:false,error:'Invalid church storage path.'}
+  const fileName=String(payload.fileName||'').trim().slice(0,220)
+  if(!fileName)return {ok:false,error:'File name is required.'}
+  const {error}=await supabase.from('church_setup_uploads').insert({
+    church_id:churchId,
+    uploaded_by:userId,
+    file_name:fileName,
+    storage_path:storagePath,
+    content_type:String(payload.contentType||'').slice(0,160)||null,
+    size_bytes:Math.max(0,Number(payload.sizeBytes)||0),
+    category:'curriculum',
+    notes:'Added directly from Course Builder.',
+    suggested_destination:'Learning Center',
+    status:'ready',
+    approved_at:new Date().toISOString(),
+    created_record_id:courseId,
+    created_record_type:'course'
+  })
+  if(error){console.error('course source registration failed',{courseId,message:error.message});return {ok:false,error:'The file uploaded, but Kingdom Network could not attach it to this course.'}}
+  refresh(courseId)
+  return {ok:true}
+}
