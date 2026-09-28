@@ -316,6 +316,29 @@ export async function saveCourseSourceLink(formData:FormData){
   success(courseId,language,rawUrl?(language==='es'?'Fuente del curso conectada.':'Course source connected.'):(language==='es'?'Fuente del curso eliminada.':'Course source removed.'))
 }
 
+export async function saveResourceSourceLink(formData:FormData){
+  const courseId=text(formData,'course_id'),moduleId=text(formData,'module_id'),language=lang(formData)
+  const resourceIndex=integer(formData,'resource_index',-1),rawUrl=text(formData,'source_url'),label=text(formData,'source_label')
+  if(!courseId||!moduleId||resourceIndex<0)safeError(courseId||'missing',language)
+  const provider=sourceProvider(rawUrl)
+  if(rawUrl&&!provider)safeError(courseId,language,language==='es'?'Usa un enlace HTTPS válido para este material.':'Use a valid HTTPS link for this material.')
+  const {supabase}=await manager(courseId)
+  const {error}=await supabase.rpc('set_course_module_resource_link_builder',{
+    p_module_id:moduleId,
+    p_resource_index:resourceIndex,
+    p_source_provider:provider,
+    p_source_url:rawUrl||null,
+    p_source_label:label||null
+  })
+  if(error){
+    console.error('resource source link failed',{courseId,moduleId,resourceIndex,message:error.message})
+    safeError(courseId,language,error.message.includes('learner history')
+      ?(language==='es'?'Este material está bloqueado porque ya existe progreso de alumnos. Crea una nueva versión del curso.':'This material is locked because learner progress already exists. Create a new course version.')
+      :undefined)
+  }
+  success(courseId,language,rawUrl?(language==='es'?'Material conectado de forma segura.':'Learner material connected safely.'):(language==='es'?'Enlace del material eliminado.':'Material link removed.'))
+}
+
 export async function saveLessonSourceLink(formData:FormData){
   const courseId=text(formData,'course_id'),moduleId=text(formData,'module_id'),language=lang(formData),rawUrl=text(formData,'source_url'),label=text(formData,'source_label')
   if(!courseId||!moduleId)safeError(courseId||'missing',language)
