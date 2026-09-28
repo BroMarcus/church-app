@@ -86,6 +86,8 @@ This is a standing rule for every route-by-route acceptance pass so performance 
 
 ## P0 — Unified member record / My Journey
 
+> **2026-09-27 Journey workstream:** DONE — NEEDS VERIFICATION. A church-configurable discipleship pathway engine is staged with canonical progress projection from existing member milestones, Learning enrollments, Friendship Groups, and ministry/serving records; member next-step display; responsible-leader/follow-up tracking; leader-scoped follow-up; and stuck-person signals in Leadership Development, My Today, and Church Health. Database migration is staged only and has **not** been applied to production. Keep the checklist items below open until Marcus completes Preview/mobile/role acceptance.
+
 - [ ] Make the member profile the single source of truth for personal and ministry data.
 - [ ] Track name, phone, email, birthday, anniversary, household/family relationships, and membership status.
 - [ ] Track baptism status plus exact/approximate/unknown date.
