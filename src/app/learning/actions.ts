@@ -42,7 +42,7 @@ export async function setModuleComplete(formData:FormData){
 
   const [{data:course},{data:module}]=await Promise.all([
     supabase.from('courses').select('id,church_id,published,language_code').eq('id',courseId).maybeSingle(),
-    supabase.from('course_modules').select('id,course_id').eq('id',moduleId).maybeSingle()
+    supabase.from('course_modules').select('id,course_id,content').eq('id',moduleId).maybeSingle()
   ])
   const lang: 'en'|'es'=course?.language_code==='es'?'es':'en'
   if(!course?.published||module?.course_id!==courseId)redirect(learningUrl(lang,lang==='es'?'No encontramos esta lección en el curso.':'We could not find this lesson in the course.'))
@@ -54,6 +54,8 @@ export async function setModuleComplete(formData:FormData){
   if(!enrollment)redirect(courseUrl(courseId,lang,'error='+encodeURIComponent(lang==='es'?'Comienza el curso antes de guardar el progreso.':'Start the course before saving lesson progress.')))
 
   if(complete){
+    const trackedResources=Array.isArray(module?.content?.resources)?module.content.resources.filter((resource:any)=>resource?.audience!=='teacher'):[]
+    if(trackedResources.length>0)redirect(courseUrl(courseId,lang,'error='+encodeURIComponent(lang==='es'?'One Kingdom completa esta lección automáticamente después de verificar todos los materiales requeridos.':'One Kingdom completes this lesson automatically after all required materials are verified.')))
     const {count:requiredAssessmentCount,error:assessmentCheckError}=await supabase.from('course_assessments').select('*',{count:'exact',head:true}).eq('course_id',courseId).eq('module_id',moduleId).eq('required',true).eq('published',true)
     if(assessmentCheckError)redirect(courseUrl(courseId,lang,'error='+encodeURIComponent(lang==='es'?'No pudimos verificar los requisitos de esta lección. Inténtalo otra vez.':'We could not verify this lesson’s requirements. Please try again.')))
     if((requiredAssessmentCount??0)>0)redirect(courseUrl(courseId,lang,'error='+encodeURIComponent(lang==='es'?'Esta lección tiene una evaluación requerida. Apruébala para completar la lección.':'This lesson has a required assessment. Pass it to complete the lesson.')))
