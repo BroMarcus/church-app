@@ -51,7 +51,7 @@ export function ProphetCommandBox({lang,learningHref,learningLabel}:Props){
   const searchTrusted=()=>{if(text.trim())router.push(`/guide?q=${encodeURIComponent(text.trim())}${es?'&lang=es':''}`)}
   const reply=match?match.reply[es?1:0]:''
   return <section className="card" style={{padding:18,marginBottom:18}}>
-    <div className="pill">{es?'PREGÚNTALE AL PROFETA':'ASK THE PROPHET'}</div>
+    <div className="pill">{es?'PREGÚNTALE A KINGDOM GUIDE':'ASK KINGDOM GUIDE'}</div>
     <div className="row" style={{alignItems:'flex-start',marginTop:10}}><Sparkles size={22}/><div><h2 style={{margin:'0 0 5px'}}>{es?'Escribe como hablas normalmente.':'Type it the way you would normally say it.'}</h2><p className="small muted" style={{margin:0}}>{es?'Ejemplos: “¿Qué necesito hacer hoy?”, “Continuar mi clase”, “Muéstrame el QR de la iglesia”, o “Necesito reportar el grupo”.':'Examples: “What do I need to do today?”, “Continue my class,” “Show me the church QR,” or “I need to report my group.”'}</p></div></div>
     <div style={{display:'flex',gap:9,marginTop:14,alignItems:'stretch'}}><textarea value={text} onChange={e=>setText(e.target.value)} rows={3} style={{flex:1,background:'#0e0b13',border:'1px solid var(--line)',borderRadius:12,color:'white',padding:12,resize:'vertical'}} placeholder={es?'¿Qué necesitas hacer hoy?':'What do you need to do today?'}/><button className="ghost" type="button" onClick={startListening} title={es?'Voz opcional':'Optional voice'} style={{minWidth:54,opacity:listening ? .65 : 1}}><Mic/></button></div>
     {speechError&&<div className="notice error">{speechError}</div>}

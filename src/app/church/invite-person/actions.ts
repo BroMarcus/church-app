@@ -5,23 +5,64 @@ import { createClient } from '@/lib/supabase/server'
 
 const text=(f:FormData,k:string)=>String(f.get(k)??'').trim()
 const allowedInviteRoles=new Set(['member','group_leader','ministry_leader','minister'])
+const inviteIdPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const path=(lang:string,status?:string,created?:string)=>`/church/invite-person?lang=${lang==='es'?'es':'en'}${status?`&status=${encodeURIComponent(status)}`:''}${created?`&created=${encodeURIComponent(created)}`:''}`
+const boundedCode=(value:unknown)=>String(value??'unknown').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48)||'unknown'
+const validEmail=(value:string)=>value.length<=254&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+const validText=(value:string,max:number)=>value.length<=max
 
 export async function createKnownPersonInvite(formData:FormData){
   const lang=text(formData,'lang')==='es'?'es':'en'
-  const supabase=await createClient();const {data:claims}=await supabase.auth.getClaims();const userId=claims?.claims?.sub
-  if(!userId)redirect('/login')
-  const {data:membership}=await supabase.from('church_memberships').select('church_id,role').eq('user_id',userId).eq('status','active').limit(1).single()
-  if(!membership?.church_id)redirect('/')
-  const requestedRole=text(formData,'role')||'member'
-  if(!allowedInviteRoles.has(requestedRole)){
-    redirect(`/church/invite-person?lang=${lang}&error=${encodeURIComponent(lang==='es'?'Pastor y Administrador de iglesia se asignan después de que la persona tenga una cuenta verificada.':'Pastor and Church Admin are assigned only after the person has a verified account.')}`)
+  const supabase=await createClient()
+  const {data:claims,error:claimsError}=await supabase.auth.getClaims()
+  const userId=claims?.claims?.sub
+  if(claimsError){
+    console.error('known-person invite auth lookup failed',{errorCode:boundedCode(claimsError.code)})
+    redirect(path(lang,'access_unavailable'))
   }
-  const {data,error}=await supabase.rpc('create_known_person_invitation',{p_church_id:membership.church_id,p_email:text(formData,'email'),p_first_name:text(formData,'first_name')||null,p_last_name:text(formData,'last_name')||null,p_phone:text(formData,'phone')||null,p_role:requestedRole})
+  if(!userId)redirect(`/login?lang=${lang}&next=${encodeURIComponent(path(lang))}`)
+
+  const {data:membership,error:membershipError}=await supabase.from('church_memberships').select('church_id,role').eq('user_id',userId).eq('status','active').limit(1).maybeSingle()
+  if(membershipError){
+    console.error('known-person invite membership lookup failed',{errorCode:boundedCode(membershipError.code)})
+    redirect(path(lang,'access_unavailable'))
+  }
+  if(!membership?.church_id)redirect(path(lang,'not_authorized'))
+
+  const {data:custom,error:permissionError}=await supabase.rpc('current_user_has_church_permission',{p_church_id:membership.church_id,p_permission_key:'manage_members'})
+  if(permissionError){
+    console.error('known-person invite permission lookup failed',{errorCode:boundedCode(permissionError.code)})
+    redirect(path(lang,'access_unavailable'))
+  }
+  const isChurchAdmin=['pastor','church_admin'].includes(membership.role)
+  const canInvite=isChurchAdmin||Boolean(custom)
+  if(!canInvite)redirect(path(lang,'not_authorized'))
+
+  const requestedRole=text(formData,'role')||'member'
+  const email=text(formData,'email').toLowerCase()
+  const firstName=text(formData,'first_name')
+  const lastName=text(formData,'last_name')
+  const phone=text(formData,'phone')
+  if(!allowedInviteRoles.has(requestedRole))redirect(path(lang,'role_not_allowed'))
+  // `manage_members` can authorize inviting a person, but it must not become a way
+  // to preassign leadership authority. Elevated starting roles remain Pastor/Church Admin only,
+  // matching the role options rendered by the page.
+  if(requestedRole!=='member'&&!isChurchAdmin)redirect(path(lang,'role_not_allowed'))
+  if(!validEmail(email))redirect(path(lang,'invalid_email'))
+  if(!validText(firstName,80)||!validText(lastName,80)||!validText(phone,40))redirect(path(lang,'input_too_long'))
+
+  const {data,error}=await supabase.rpc('create_known_person_invitation',{p_church_id:membership.church_id,p_email:email,p_first_name:firstName||null,p_last_name:lastName||null,p_phone:phone||null,p_role:requestedRole})
   if(error){
-    console.error('createKnownPersonInvite failed',{message:error.message})
-    redirect(`/church/invite-person?lang=${lang}&error=${encodeURIComponent(lang==='es'?'No se pudo crear la invitación. Revisa la información e inténtalo otra vez.':'Invitation could not be created. Check the information and try again.')}`)
+    console.error('createKnownPersonInvite failed',{errorCode:boundedCode(error.code)})
+    redirect(path(lang,'create_failed'))
   }
   const row:any=Array.isArray(data)?data[0]:data
-  if(!row?.invite_id)redirect(`/church/invite-person?lang=${lang}&error=${encodeURIComponent(lang==='es'?'No se pudo crear la invitación.':'Invitation could not be created.')}`)
-  redirect(`/church/invite-person?lang=${lang}&created=${encodeURIComponent(row.invite_id)}`)
+  const inviteId=String(row?.invite_id??'').trim()
+  // Do not report success or reflect an unexpected RPC value into the URL. A valid
+  // invitation creation must return the UUID shape used by church_invites.
+  if(!inviteIdPattern.test(inviteId)){
+    console.error('createKnownPersonInvite returned invalid invite id',{resultCode:inviteId?'invalid_id':'missing_id'})
+    redirect(path(lang,'create_failed'))
+  }
+  redirect(path(lang,'created',inviteId))
 }
