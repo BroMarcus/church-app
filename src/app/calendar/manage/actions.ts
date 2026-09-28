@@ -137,7 +137,7 @@ export async function updateScheduleItem(formData:FormData){
   let startsAt:string|null=null,endsAt:string|null=null
   try{startsAt=await localToUtc(supabase,person.churchId,text(formData,'starts_at'));endsAt=await localToUtc(supabase,person.churchId,text(formData,'ends_at'))}catch(error:unknown){console.error('updateScheduleItem time conversion failed',{itemId,error});redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'Enter a valid date and time.','Ingresa una fecha y hora válidas.'))))}
   if(!startsAt||endsAt&&new Date(endsAt)<new Date(startsAt))redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'End time must be after the start time.','La hora final debe ser después de la hora inicial.'))))
-  const {error}=await supabase.from('schedule_items').update({title:title.slice(0,160),starts_at:startsAt,ends_at:endsAt,location:text(formData,'location')||null,notes:text(formData,'notes')||null,status,updated_at:new Date().toISOString()}).eq('id',itemId).eq('schedule_id',scheduleId).eq('church_id',person.churchId)
+  const {error}=await supabase.from('schedule_items').update({title:title.slice(0,160),starts_at:startsAt,ends_at:endsAt,location:text(formData,'location')||null,notes:text(formData,'notes')||null,status,series_detached:true,updated_at:new Date().toISOString()}).eq('id',itemId).eq('schedule_id',scheduleId).eq('church_id',person.churchId)
   if(error){
     console.error('updateScheduleItem failed',{itemId,code:error.code,message:error.message})
     redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'We could not save that schedule item.','No pudimos guardar ese elemento del horario.'))))
@@ -312,4 +312,71 @@ export async function addCleaningChecklistItem(formData:FormData){
     redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'We could not add that checklist item.','No pudimos agregar ese elemento a la lista.'))))
   }
   refresh();revalidatePath('/calendar/cleaning');redirect(manageUrl(lang,`&schedule=${scheduleId}&cleaning_saved=1`))
+}
+
+
+export async function createScheduleSeries(formData:FormData){
+  const lang=langOf(formData),{supabase,actor:person}=await actor(lang)
+  const scheduleId=text(formData,'schedule_id'),frequency=text(formData,'frequency'),title=text(formData,'title'),startDate=text(formData,'start_date'),endDate=text(formData,'end_date'),localStart=text(formData,'local_start_time')
+  if(!scheduleId||!title||!startDate||!localStart||!['weekly','monthly'].includes(frequency))redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'Complete the recurring schedule fields.','Completa los campos del horario recurrente.'))))
+  await requireSchedule(supabase,person,scheduleId,lang)
+
+  const intervalCount=Math.max(1,Math.min(12,Number(text(formData,'interval_count')||'1')||1))
+  const weekdayRaw=text(formData,'weekday'),monthDayRaw=text(formData,'month_day')
+  const weekday=frequency==='weekly'&&weekdayRaw!==''?Number(weekdayRaw):null
+  const monthDay=frequency==='monthly'&&monthDayRaw!==''?Number(monthDayRaw):null
+  if(frequency==='weekly'&&(weekday===null||!Number.isInteger(weekday)||weekday<0||weekday>6))redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'Choose a valid weekday.','Escoge un día de la semana válido.'))))
+  if(frequency==='monthly'&&(monthDay===null||!Number.isInteger(monthDay)||monthDay<1||monthDay>31))redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'Choose a valid day of month.','Escoge un día del mes válido.'))))
+  if(endDate&&endDate<startDate)redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'Recurring end date must be after the start date.','La fecha final recurrente debe ser después de la fecha inicial.'))))
+
+  const durationRaw=Number(text(formData,'duration_minutes')||'0')
+  const duration=Number.isFinite(durationRaw)&&durationRaw>0?Math.min(1440,Math.round(durationRaw)):null
+  const {data:series,error}=await supabase.from('schedule_series').insert({
+    schedule_id:scheduleId,church_id:person.churchId,title:title.slice(0,160),frequency,interval_count:intervalCount,
+    weekday,month_day:monthDay,start_date:startDate,end_date:endDate||null,local_start_time:localStart,
+    duration_minutes:duration,location:text(formData,'location')||null,notes:text(formData,'notes')||null,active:true,created_by:person.userId
+  }).select('id').single()
+  if(error||!series){
+    console.error('createScheduleSeries failed',{scheduleId,code:error?.code,message:error?.message})
+    redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'We could not create that recurring schedule.','No pudimos crear ese horario recurrente.'))))
+  }
+
+  const start=new Date(`${startDate}T12:00:00Z`)
+  const defaultThrough=new Date(Date.UTC(start.getUTCFullYear()+1,start.getUTCMonth(),start.getUTCDate()))
+  const through=endDate||defaultThrough.toISOString().slice(0,10)
+  const {error:generateError}=await supabase.rpc('generate_schedule_series',{p_series_id:series.id,p_through_date:through})
+  if(generateError){
+    console.error('generateScheduleSeries failed',{seriesId:series.id,code:generateError.code,message:generateError.message})
+    redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'The recurring rule was saved, but its dates could not be generated.','La regla recurrente se guardó, pero no se pudieron generar sus fechas.'))))
+  }
+  refresh();redirect(manageUrl(lang,`&schedule=${scheduleId}&series_saved=1`))
+}
+
+export async function extendScheduleSeries(formData:FormData){
+  const lang=langOf(formData),{supabase,actor:person}=await actor(lang)
+  const scheduleId=text(formData,'schedule_id'),seriesId=text(formData,'series_id'),through=text(formData,'through_date')
+  if(!scheduleId||!seriesId||!/^\d{4}-\d{2}-\d{2}$/.test(through))redirect(manageUrl(lang))
+  await requireSchedule(supabase,person,scheduleId,lang)
+  const {data:series}=await supabase.from('schedule_series').select('id,start_date,end_date').eq('id',seriesId).eq('schedule_id',scheduleId).eq('church_id',person.churchId).eq('active',true).maybeSingle()
+  if(!series)redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'Recurring series not found.','No se encontró la serie recurrente.'))))
+  if(through<series.start_date||(series.end_date&&through>series.end_date))redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'Choose a date inside the recurring series range.','Escoge una fecha dentro del rango de la serie recurrente.'))))
+  const {error}=await supabase.rpc('generate_schedule_series',{p_series_id:seriesId,p_through_date:through})
+  if(error){
+    console.error('extendScheduleSeries failed',{seriesId,code:error.code,message:error.message})
+    redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'We could not extend that recurring schedule.','No pudimos extender ese horario recurrente.'))))
+  }
+  refresh();redirect(manageUrl(lang,`&schedule=${scheduleId}&series_saved=1`))
+}
+
+export async function deactivateScheduleSeries(formData:FormData){
+  const lang=langOf(formData),{supabase,actor:person}=await actor(lang)
+  const scheduleId=text(formData,'schedule_id'),seriesId=text(formData,'series_id')
+  if(!scheduleId||!seriesId)redirect(manageUrl(lang))
+  await requireSchedule(supabase,person,scheduleId,lang)
+  const {error}=await supabase.from('schedule_series').update({active:false,updated_at:new Date().toISOString()}).eq('id',seriesId).eq('schedule_id',scheduleId).eq('church_id',person.churchId)
+  if(error){
+    console.error('deactivateScheduleSeries failed',{seriesId,code:error.code,message:error.message})
+    redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'We could not stop that recurring series.','No pudimos detener esa serie recurrente.'))))
+  }
+  refresh();redirect(manageUrl(lang,`&schedule=${scheduleId}&series_saved=1`))
 }
