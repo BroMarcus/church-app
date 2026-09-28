@@ -226,10 +226,27 @@ This is a standing rule for every route-by-route acceptance pass so performance 
 - [ ] Keep official pastoral/leadership updates separate from member Community feed.
 - [ ] Keep Community focused on testimonies, prayer, photos, fellowship, and church-family life rather than engagement-addiction mechanics.
 
+## P2 — Giving / Tithes & Offerings engine
+
+- [ ] Build one canonical Giving Ledger for cash, check, card, ACH, online/mobile giving, corrections, refunds, chargebacks, deposits, and reconciliation.
+- [ ] Reuse Person, Household, ChurchMembership, Event, and strict Finance permission boundaries; do not repurpose Church Office or fundraiser-planning records as the ledger.
+- [ ] Add configurable Giving Funds/categories with unrestricted/designated/restricted classification.
+- [ ] Add contribution headers plus allocation lines so one payment can split across multiple funds.
+- [ ] Add service/counting batches with counters, envelope/check/cash denomination totals, variance, review, deposit, and reconciliation.
+- [ ] Add anonymous giving without fake member records.
+- [ ] Add append-only correction/reversal behavior for posted financial history.
+- [ ] Add My Giving with self-only history, YTD totals, fund breakdown, and annual statements through guarded backend projections.
+- [ ] Keep Secretary/Pastor/Admin titles from granting Finance automatically; explicit Finance authorization remains required.
+- [ ] Add future processor-event idempotency so a webhook retry cannot create duplicate contributions.
+- [ ] Reconcile processor payment → canonical contribution → processor payout/bank deposit.
+- [ ] Distinguish donor contribution amount, processor fees, and deposited net amount.
+- [ ] Verify statement/tax wording and special contribution treatment before claiming tax compliance.
+- [ ] Do not mark GREEN until member privacy, finance permissions, batch accounting, corrections, reconciliation, statements, mobile/Spanish states, tenant isolation, and live Preview acceptance pass.
+
 ## P2 — Future integrations / later scope
 
 - [ ] Website, Facebook, Instagram, YouTube, livestream, sermon archive, and other media integrations.
-- [ ] Giving/fundraising integrations using established payment processors rather than building payment infrastructure from scratch.
+- [ ] Connect established payment processors into the canonical Giving Ledger rather than building separate payment infrastructure or a second giving ledger.
 - [ ] District/organization reporting exports once actual requirements/forms are supplied.
 - [ ] Multi-church/network features only after the local-church operating system is solid.
 
