@@ -114,7 +114,7 @@ create table if not exists public.member_journey_step_tracking(
   church_id uuid not null references public.churches(id) on delete cascade,
   user_id uuid not null references public.profiles(id) on delete cascade,
   step_id uuid not null,
-  responsible_leader_id uuid references public.profiles(id) on delete set null,
+  responsible_leader_id uuid,
   due_on date,
   manual_status text check(manual_status is null or manual_status in ('not_started','in_progress','completed','waived')),
   manual_completed_at timestamptz,
