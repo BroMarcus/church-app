@@ -231,13 +231,17 @@ export async function reviewFiveSpotRequest(formData:FormData){
   const scheduleId=text(formData,'schedule_id'),requestId=text(formData,'request_id'),status=text(formData,'status')
   if(!scheduleId||!requestId||!['submitted','coaching','ready_for_review','approved','completed'].includes(status))redirect(manageUrl(lang))
   await requireSchedule(supabase,person,scheduleId,lang)
+  const {data:request}=await supabase.from('five_spot_requests').select('status,scheduled_assignment_id').eq('id',requestId).eq('church_id',person.churchId).maybeSingle()
+  if(!request)redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'5 Spot request not found.','No se encontró la solicitud de 5 Spot.'))))
+  const allowed:Record<string,string[]>={submitted:['submitted','coaching'],coaching:['coaching','ready_for_review'],ready_for_review:['coaching','ready_for_review','approved'],approved:['coaching','ready_for_review','approved'],scheduled:['completed'],completed:['completed']}
+  if(!allowed[request.status]?.includes(status))redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'That 5 Spot status change is not allowed.','Ese cambio de estado de 5 Spot no está permitido.'))))
   const mentor=text(formData,'mentor_user_id')||null
   if(mentor){
     const {data:member}=await supabase.from('church_memberships').select('user_id').eq('church_id',person.churchId).eq('user_id',mentor).eq('status','active').maybeSingle()
     if(!member)redirect(manageUrl(lang,`&schedule=${scheduleId}&error=`+encodeURIComponent(safe(lang,'Choose an active church member as mentor.','Escoge un miembro activo como mentor.'))))
   }
   const updates:{status:string;mentor_user_id:string|null;leader_feedback:string|null;updated_at:string;scheduled_assignment_id?:null}={status,mentor_user_id:mentor,leader_feedback:text(formData,'leader_feedback')||null,updated_at:new Date().toISOString()}
-  if(status!=='completed')updates.scheduled_assignment_id=null
+  if(!['scheduled','completed'].includes(status))updates.scheduled_assignment_id=null
   const {error}=await supabase.from('five_spot_requests').update(updates).eq('id',requestId).eq('church_id',person.churchId)
   if(error){
     console.error('reviewFiveSpotRequest failed',{requestId,status,code:error.code,message:error.message})
