@@ -12,10 +12,19 @@ export default async function WeeklySeriesSetup({searchParams}:{searchParams:Pro
   const userId=claims?.claims?.sub
   if(!userId)redirect('/login')
   const {data:membership}=await supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).single()
-  if(!membership?.church_id||!['minister','pastor','church_admin'].includes(membership.role))redirect('/learning')
+  if(!membership?.church_id)redirect('/learning')
+  const {data:customLearningAccess}=await supabase.rpc('current_user_has_church_permission',{p_church_id:membership.church_id,p_permission_key:'manage_learning'})
+  if(!['minister','pastor','church_admin'].includes(membership.role)&&!customLearningAccess)redirect('/learning')
   const churchId=membership.church_id
   const church:any=Array.isArray(membership.churches)?membership.churches[0]:membership.churches
-  const {data:courses}=await supabase.from('courses').select('id,title,category,published').eq('church_id',churchId).order('pathway_order').order('title')
+  const [{data:courses},{data:activeMembers}]=await Promise.all([
+    supabase.from('courses').select('id,title,category,published').eq('church_id',churchId).order('pathway_order').order('title'),
+    supabase.from('church_memberships').select('user_id').eq('church_id',churchId).eq('status','active')
+  ])
+  const activeMemberIds=Array.from(new Set((activeMembers??[]).map((m:any)=>m.user_id).filter(Boolean)))
+  let teacherProfiles:any[]=[]
+  if(activeMemberIds.length){const r=await supabase.from('profiles').select('id,display_name,first_name,last_name').in('id',activeMemberIds);teacherProfiles=r.data??[]}
+  const teacherOptions=teacherProfiles.map((p:any)=>({id:p.id,name:p.display_name||[p.first_name,p.last_name].filter(Boolean).join(' ')||'Member'})).sort((a:any,b:any)=>a.name.localeCompare(b.name))
   const ids=(courses??[]).map((c:any)=>c.id)
   let modules:any[]=[];let sessions:any[]=[]
   if(ids.length){
@@ -41,6 +50,6 @@ export default async function WeeklySeriesSetup({searchParams}:{searchParams:Pro
 
     <section className="card" style={{padding:18,marginBottom:16}}><h2 style={{marginTop:0}}>Courses ready for a series</h2>{eligible.length?<div style={{display:'grid',gap:8}}>{eligible.map((course:any)=><Link href={`/learning/admin/weekly-series?course=${course.id}`} className="card" style={{padding:'12px 14px',display:'flex',justifyContent:'space-between',gap:12,alignItems:'center'}} key={course.id}><div><strong>{course.title}</strong><div className="small muted">{course.category||'Course'} • {moduleCount.get(course.id)??0} lessons</div></div>{selected?.id===course.id?<span className="pill"><CheckCircle2 size={11}/> SELECTED</span>:<span className="ghost">Choose</span>}</Link>)}</div>:<div className="empty"><h3>No unscheduled courses need a series right now.</h3><p className="muted">Courses with existing classroom sessions are protected from duplicate auto-scheduling. You can still add individual meetings from Learning Studio.</p></div>}</section>
 
-    {selected&&<section className="card" style={{padding:18}}><div className="row" style={{gap:10,alignItems:'center'}}><CalendarDays size={22}/><div><div className="pill">BUILD SERIES</div><h2 style={{margin:'6px 0 0'}}>{selected.title}</h2></div></div><p className="small muted">This will create {moduleCount.get(selected.id)??0} weekly meetings. Each meeting will automatically connect to its matching lesson.</p><form action={createWeeklyCourseSeries} className="studio-grid" style={{marginTop:12}}><input type="hidden" name="course_id" value={selected.id}/><label><span>First class date</span><input name="first_date" type="date" required/></label><label><span>Start time</span><input name="starts_at" type="time"/></label><label><span>Teacher</span><input name="instructor_name" placeholder="Teacher name"/></label><label className="wide"><span>Holiday / skip dates</span><textarea name="skip_dates" rows={4} placeholder={'One date per line, for example:\n2026-11-26\n2026-12-24\n2026-12-31'}/><small className="muted">Use YYYY-MM-DD. A skipped week pushes the remaining lessons forward automatically.</small></label><button className="btn wide"><CalendarDays size={14}/> Build {moduleCount.get(selected.id)??0}-week series</button></form></section>}
+    {selected&&<section className="card" style={{padding:18}}><div className="row" style={{gap:10,alignItems:'center'}}><CalendarDays size={22}/><div><div className="pill">BUILD SERIES</div><h2 style={{margin:'6px 0 0'}}>{selected.title}</h2></div></div><p className="small muted">This will create {moduleCount.get(selected.id)??0} weekly meetings. Each meeting will automatically connect to its matching lesson.</p><form action={createWeeklyCourseSeries} className="studio-grid" style={{marginTop:12}}><input type="hidden" name="course_id" value={selected.id}/><label><span>First class date</span><input name="first_date" type="date" required/></label><label><span>Start time</span><input name="starts_at" type="time"/></label><label><span>Teacher</span><select name="instructor_user_id" defaultValue=""><option value="">Choose teacher</option>{teacherOptions.map((p:any)=><option value={p.id} key={p.id}>{p.name}</option>)}</select><small className="muted">Choose any active person in this church. Every class in the series stays connected to that teacher.</small></label><label className="wide"><span>Holiday / skip dates</span><textarea name="skip_dates" rows={4} placeholder={'One date per line, for example:\n2026-11-26\n2026-12-24\n2026-12-31'}/><small className="muted">Use YYYY-MM-DD. A skipped week pushes the remaining lessons forward automatically.</small></label><button className="btn wide"><CalendarDays size={14}/> Build {moduleCount.get(selected.id)??0}-week series</button></form></section>}
   </main>
 }
