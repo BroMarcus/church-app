@@ -187,5 +187,7 @@ test('meaningful scheduling notifications avoid checklist tap noise',async()=>{
   assert.match(migration,/after insert or update of assigned_user_id,assignment_status,starts_at,call_time,role_label,title,notes/)
   assert.match(migration,/after update of status,leader_feedback,mentor_user_id/)
   assert.match(migration,/after insert or update of group_id/)
+  assert.match(migration,/after update of status,location,title,ends_at/)
+  assert.match(migration,/Scheduled service cancelled/)
   assert.doesNotMatch(migration,/cleaning_checklist_items/)
 })
