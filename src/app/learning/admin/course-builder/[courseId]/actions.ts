@@ -239,19 +239,19 @@ export async function setBuilderCourseArchived(formData:FormData){
 }
 
 export async function saveSourceText(formData:FormData){
-  const courseId=text(formData,'course_id'),sourceText=text(formData,'source_text').slice(0,200000),language=lang(formData)
-  if(!courseId||!sourceText)safeError(courseId||'missing',language)
+  const courseId=text(formData,'course_id'),sourceId=text(formData,'source_id'),sourceText=text(formData,'source_text').slice(0,200000),language=lang(formData)
+  if(!courseId||!sourceId||!sourceText)safeError(courseId||'missing',language)
   const {supabase,churchId}=await manager(courseId)
-  const {error}=await supabase.from('church_setup_uploads').update({source_text:sourceText,extraction_status:'source_ready'}).eq('church_id',churchId).eq('created_record_id',courseId)
+  const {error}=await supabase.from('church_setup_uploads').update({source_text:sourceText,extraction_status:'source_ready'}).eq('id',sourceId).eq('church_id',churchId).eq('created_record_id',courseId)
   if(error){console.error('course builder source save failed',{courseId,message:error.message});safeError(courseId,language)}
   success(courseId,language,language==='es'?'Texto fuente guardado.':'Source text saved.')
 }
 
 export async function generateExtractionPlan(formData:FormData){
-  const courseId=text(formData,'course_id'),language=lang(formData)
-  if(!courseId)safeError('missing',language)
+  const courseId=text(formData,'course_id'),sourceId=text(formData,'source_id'),language=lang(formData)
+  if(!courseId||!sourceId)safeError('missing',language)
   const {supabase,churchId}=await manager(courseId)
-  const {data:source}=await supabase.from('church_setup_uploads').select('id,source_text').eq('church_id',churchId).eq('created_record_id',courseId).maybeSingle()
+  const {data:source}=await supabase.from('church_setup_uploads').select('id,source_text').eq('id',sourceId).eq('church_id',churchId).eq('created_record_id',courseId).maybeSingle()
   if(!source?.source_text)safeError(courseId,language,language==='es'?'Guarda el texto fuente primero.':'Save source text first.')
   const plan=buildExtractionPlan(source!.source_text)
   const {error}=await supabase.from('church_setup_uploads').update({extraction_plan:plan,extraction_status:'proposal_ready',extraction_reviewed_at:new Date().toISOString()}).eq('id',source!.id)
@@ -260,10 +260,10 @@ export async function generateExtractionPlan(formData:FormData){
 }
 
 export async function applyExtractionPlan(formData:FormData){
-  const courseId=text(formData,'course_id'),language=lang(formData)
-  if(!courseId)safeError('missing',language)
+  const courseId=text(formData,'course_id'),sourceId=text(formData,'source_id'),language=lang(formData)
+  if(!courseId||!sourceId)safeError('missing',language)
   const {supabase,userId,churchId}=await manager(courseId)
-  const {data:source}=await supabase.from('church_setup_uploads').select('id,extraction_plan').eq('church_id',churchId).eq('created_record_id',courseId).maybeSingle()
+  const {data:source}=await supabase.from('church_setup_uploads').select('id,extraction_plan').eq('id',sourceId).eq('church_id',churchId).eq('created_record_id',courseId).maybeSingle()
   const plan:any=source?.extraction_plan
   if(!source||!plan?.lessons?.length)safeError(courseId,language,language==='es'?'No hay una propuesta lista para aplicar.':'No extraction proposal is ready to apply.')
   const {count}=await supabase.from('course_modules').select('*',{count:'exact',head:true}).eq('course_id',courseId)
