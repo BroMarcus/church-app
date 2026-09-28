@@ -30,3 +30,15 @@
   .schedule-month-nav{width:100%}
   .schedule-month-nav .ghost{flex:1;justify-content:center}
 }
+
+
+.year-plan-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:16px}
+.year-plan-month{border:1px solid var(--line);border-radius:12px;padding:12px;background:rgba(255,255,255,.015)}
+.year-plan-month>summary{cursor:pointer;font-weight:800;list-style:none}
+.year-plan-month>summary::-webkit-details-marker{display:none}
+.year-plan-month>summary div{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap}
+.year-plan-month>summary span{font-size:.7rem;color:var(--muted);font-weight:700}
+.year-plan-month form{margin-top:12px}
+
+@media (max-width:900px){.year-plan-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:620px){.year-plan-grid{grid-template-columns:1fr}}
