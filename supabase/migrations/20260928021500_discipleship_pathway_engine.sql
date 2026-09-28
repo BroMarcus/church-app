@@ -155,7 +155,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path=public,private,pg_temp
-as $
+as $$
 declare v_source text;
 begin
   select s.completion_source into v_source
@@ -184,7 +184,7 @@ begin
   new.updated_at=now();
   new.last_activity_at=coalesce(new.last_activity_at,now());
   return new;
-end $;
+end $$;
 
 drop trigger if exists member_journey_step_tracking_guard on public.member_journey_step_tracking;
 create trigger member_journey_step_tracking_guard
