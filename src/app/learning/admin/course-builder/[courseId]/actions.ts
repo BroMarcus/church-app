@@ -266,8 +266,16 @@ export async function setBuilderCoursePublished(formData:FormData){
   const {supabase,churchId}=await manager(courseId)
   const {data:course}=await supabase.from('courses').select('archived_at').eq('id',courseId).eq('church_id',churchId).single()
   if(published&&course?.archived_at)safeError(courseId,language,language==='es'?'Restaura el curso antes de publicarlo.':'Restore the course before publishing it.')
+  if(published){
+    const {data:readiness,error:readinessError}=await supabase.rpc('course_builder_readiness',{p_course_id:courseId})
+    if(readinessError){console.error('course builder readiness failed',{courseId,message:readinessError.message});safeError(courseId,language,language==='es'?'No se pudo verificar que el curso esté listo. Nada fue publicado.':'Course readiness could not be verified. Nothing was published.')}
+    if(!readiness?.ready){
+      const issues=Array.isArray(readiness?.issues)?readiness.issues.map(String).filter(Boolean):[]
+      safeError(courseId,language,issues.length?issues.join(' '):(language==='es'?'El curso todavía no está listo para publicarse.':'The course is not ready to publish yet.'))
+    }
+  }
   const {error}=await supabase.from('courses').update({published}).eq('id',courseId).eq('church_id',churchId)
-  if(error){console.error('course builder publish failed',{courseId,message:error.message});safeError(courseId,language,language==='es'?'El curso todavía no cumple todos los requisitos de publicación. Revisa lecciones, pruebas y cantidades de preguntas.':'The course is not ready to publish yet. Review lessons, assessments, and required question counts.')}
+  if(error){console.error('course builder publish failed',{courseId,message:error.message});safeError(courseId,language,language==='es'?'El curso todavía no cumple todos los requisitos de publicación. Revisa lecciones, pruebas y materiales.':'The course is not ready to publish yet. Review lessons, assessments, and materials.')}
   success(courseId,language,published?(language==='es'?'Curso publicado.':'Course published.'):(language==='es'?'Curso ocultado de los miembros.':'Course unpublished.'))
 }
 
