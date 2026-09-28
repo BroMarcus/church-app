@@ -14,23 +14,30 @@ export default async function JourneyFollowupPage({searchParams}:{searchParams:P
   if(!membership?.church_id)redirect('/')
   const churchId=membership.church_id
   const {data:trackingRows,error}=await supabase.from('member_journey_step_tracking')
-    .select('id,user_id,step_id,responsible_leader_id,due_on,manual_status,manual_completed_at,last_activity_at,updated_at,discipleship_pathway_steps(id,step_key,title,description,completion_source,completion_key,completion_value,suggested_href,sort_order,required)')
+    .select('id,user_id,step_id,responsible_leader_id,due_on,manual_status,manual_completed_at,last_activity_at,updated_at,discipleship_pathway_steps(id,pathway_id,active,step_key,title,description,completion_source,completion_key,completion_value,suggested_href,sort_order,required)')
     .eq('church_id',churchId).eq('responsible_leader_id',userId).order('due_on',{ascending:true,nullsFirst:false})
   if(error)throw new Error(error.message)
 
   const targetIds=Array.from(new Set((trackingRows??[]).map((row:any)=>row.user_id))) as string[]
   let profiles:any[]=[],milestones:any[]=[],enrollments:any[]=[],groups:any[]=[],applications:any[]=[],assignments:any[]=[]
   if(targetIds.length){
-    const [p,m,e,g,a,s]=await Promise.all([
+    const [p,m,e,g,a,s,pa,dp]=await Promise.all([
       supabase.from('profiles').select('id,display_name,first_name,last_name').in('id',targetIds),
       supabase.from('member_milestones').select('*').eq('church_id',churchId).in('user_id',targetIds),
       supabase.from('course_enrollments').select('user_id,course_id,credential_earned,progress_percent,completed_at,updated_at').in('user_id',targetIds),
       supabase.from('group_memberships').select('user_id,group_id,groups!inner(church_id,group_type)').in('user_id',targetIds).eq('groups.church_id',churchId).eq('groups.group_type','friendship'),
       supabase.from('ministry_applications').select('user_id,status').in('user_id',targetIds).eq('status','accepted'),
-      supabase.from('team_assignments').select('assigned_user_id').eq('church_id',churchId).in('assigned_user_id',targetIds)
+      supabase.from('team_assignments').select('assigned_user_id').eq('church_id',churchId).in('assigned_user_id',targetIds),
+      supabase.from('member_journey_pathway_assignments').select('user_id,pathway_id').eq('church_id',churchId).eq('active',true).in('user_id',targetIds),
+      supabase.from('discipleship_pathways').select('id').eq('church_id',churchId).eq('active',true).eq('is_default',true).limit(1).maybeSingle()
     ])
     profiles=p.data??[];milestones=m.data??[];enrollments=e.data??[];groups=g.data??[];applications=a.data??[];assignments=s.data??[]
+    ;(globalThis as any).__journeyPathAssignments=pa.data??[]
+    ;(globalThis as any).__journeyDefaultPath=dp.data?.id??null
   }
+  const pathAssignments:any[]=(globalThis as any).__journeyPathAssignments??[]
+  const defaultPathId:string|null=(globalThis as any).__journeyDefaultPath??null
+  const assignedPath=new Map(pathAssignments.map((row:any)=>[row.user_id,row.pathway_id]))
   const byUser=(rows:any[],key:string)=>{const map=new Map<string,any[]>();for(const row of rows){const id=row[key];const list=map.get(id)??[];list.push(row);map.set(id,list)}return map}
   const profileMap=new Map(profiles.map((row:any)=>[row.id,row]))
   const milestoneMap=new Map(milestones.map((row:any)=>[row.user_id,row]))
@@ -38,7 +45,9 @@ export default async function JourneyFollowupPage({searchParams}:{searchParams:P
   const now=Date.now()
   const rows=(trackingRows??[]).map((track:any)=>{
     const rawStep:any=Array.isArray(track.discipleship_pathway_steps)?track.discipleship_pathway_steps[0]:track.discipleship_pathway_steps
-    if(!rawStep)return null
+    if(!rawStep||rawStep.active!==true)return null
+    const effectivePathId=assignedPath.get(track.user_id)??defaultPathId
+    if(!effectivePathId||rawStep.pathway_id!==effectivePathId)return null
     const step=resolveJourneyStep(rawStep as JourneyStepDefinition,{
       milestones:milestoneMap.get(track.user_id)??{},
       enrollments:enrollmentMap.get(track.user_id)??[],
