@@ -14,6 +14,7 @@ const certificateButton=read('src/app/learning/[courseId]/certificate/print-butt
 const coursePage=read('src/app/learning/[courseId]/page.tsx')
 const learningCss=read('src/app/learning/learning.css')
 const bulkPublishMigration=read('supabase/migrations/20260928050000_learning_bulk_publish_ready_assessments.sql')
+const readinessMigration=read('supabase/migrations/20260928051500_learning_course_builder_readiness.sql')
 
 test('Effective Soul Winning package keeps the verified six-lesson mastery structure',()=>{
   assert.equal(pkg.one_kingdom_package_version,1)
@@ -123,4 +124,18 @@ test('required ESW assessments can be verified and published together without pa
   assert.match(bulkPublishMigration,/question_count<5 or q\.question_count>10/)
   assert.match(bulkPublishMigration,/Learner history exists/)
   assert.match(bulkPublishMigration,/update public\.course_assessments[\s\S]*set published=true/)
+})
+
+
+test('Course Builder Training Check blocks publish until ESW is truly ready',()=>{
+  assert.match(page,/TRAINING CHECK/)
+  assert.match(page,/Ready to publish/)
+  assert.match(page,/missing_material_link_count/)
+  assert.match(actions,/course_builder_readiness/)
+  assert.match(actions,/Course readiness could not be verified\. Nothing was published/)
+  assert.match(readinessMigration,/course_builder_readiness/)
+  assert.match(readinessMigration,/Connect %s learner-safe lesson material link/)
+  assert.match(readinessMigration,/Publish %s required assessment/)
+  assert.match(readinessMigration,/protected assessment answer keys/)
+  assert.match(readinessMigration,/Name the completion certificate \/ credential/)
 })
