@@ -40,7 +40,7 @@ export default async function LeadershipDevelopmentPage({searchParams}:{searchPa
     const [profileRows,enrollmentRows,groupRows,applicationRows,assignmentRows]=await Promise.all([
       supabase.from('profiles').select('id,display_name,first_name,last_name').in('id',ids),
       supabase.from('course_enrollments').select('user_id,course_id,progress_percent,credential_earned,completed_at,updated_at').in('user_id',ids),
-      supabase.from('group_memberships').select('user_id,group_id').in('user_id',ids),
+      supabase.from('group_memberships').select('user_id,group_id,groups!inner(church_id,group_type)').in('user_id',ids).eq('groups.church_id',churchId).eq('groups.group_type','friendship'),
       supabase.from('ministry_applications').select('id,user_id,status').in('user_id',ids).eq('status','accepted'),
       supabase.from('team_assignments').select('id,assigned_user_id').eq('church_id',churchId).in('assigned_user_id',ids)
     ])
