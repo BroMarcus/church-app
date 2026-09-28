@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { Archive,ArrowDown,ArrowUp,BookOpen,CheckCircle2,ClipboardCheck,Eye,EyeOff,FileText,GraduationCap,Languages,Pencil,Plus,RotateCcw,Sparkles,Trash2,WandSparkles } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { CourseSourceUploader } from './course-source-uploader'
 import {
  addBuilderLesson,addBuilderQuestion,applyExtractionPlan,createBuilderAssessment,createLessonShells,
  deleteBuilderAssessment,deleteBuilderLesson,deleteBuilderQuestion,generateExtractionPlan,moveBuilderLesson,
@@ -17,13 +18,15 @@ export default async function CourseBuilder({params,searchParams}:{params:Promis
  const {data:m}=await supabase.from('church_memberships').select('church_id,role,churches(name)').eq('user_id',userId).eq('status','active').limit(1).single();if(!m?.church_id)redirect('/learning')
  const {data:customLearningAccess}=await supabase.rpc('current_user_has_church_permission',{p_church_id:m.church_id,p_permission_key:'manage_learning'})
  if(!['minister','pastor','church_admin'].includes(m.role)&&!customLearningAccess)redirect('/learning')
- const [{data:course},{data:modules},{data:assessments},{data:source}]=await Promise.all([
+ const [{data:course},{data:modules},{data:assessments},{data:sourceRows}]=await Promise.all([
   supabase.from('courses').select('*').eq('id',courseId).eq('church_id',m.church_id).single(),
   supabase.from('course_modules').select('*').eq('course_id',courseId).order('position'),
   supabase.from('course_assessments').select('*').eq('course_id',courseId).order('created_at'),
-  supabase.from('church_setup_uploads').select('id,file_name,category,notes,review_plan,status,source_text,extraction_plan,extraction_status').eq('church_id',m.church_id).eq('created_record_id',courseId).maybeSingle()
+  supabase.from('church_setup_uploads').select('id,file_name,storage_path,content_type,size_bytes,category,notes,review_plan,status,source_text,extraction_plan,extraction_status,created_at').eq('church_id',m.church_id).eq('created_record_id',courseId).order('created_at',{ascending:true})
  ])
  if(!course)redirect('/learning/admin/course-builder')
+ const sourceFiles=await Promise.all((sourceRows??[]).map(async(row:any)=>{const signed=row.storage_path?await supabase.storage.from('church-setup').createSignedUrl(row.storage_path,900):null;return {...row,url:signed?.data?.signedUrl??null}}))
+ const source:any=sourceFiles.find((row:any)=>row.source_text||row.extraction_plan)||sourceFiles[0]||null
  const assessmentIds=(assessments??[]).map((a:any)=>a.id)
  let questions:any[]=[]
  if(assessmentIds.length){const r=await supabase.from('assessment_questions').select('id,assessment_id,position,question_type,prompt,options,points,explanation_after_submit').in('assessment_id',assessmentIds).order('position');questions=r.data??[]}
