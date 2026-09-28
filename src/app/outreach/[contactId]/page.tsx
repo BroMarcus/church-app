@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { BookOpen,Compass,Link2,Mail,Phone,ShieldCheck,UserCheck,Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { toChurchDateTimeLocal } from '@/lib/church-time'
+import { updateOutreachNextAction } from '../actions'
 import { OutreachHistory } from '../outreach-history'
 import { createOutreachMemberInvite } from './actions'
 import { OutreachInviteLink } from './invite-link'
@@ -12,7 +14,7 @@ const stageNames:Record<string,[string,string]>={
   new_contact:['New contact','Nuevo contacto'],invited:['Invited','Invitado'],guest:['Guest','Visita'],bible_study:['Bible study','Estudio bíblico'],regular_attendee:['Regular attendee','Asistente regular'],baptized:['Baptized','Bautizado'],holy_ghost:['Holy Ghost','Espíritu Santo'],first_steps:['First Steps','Primeros Pasos'],connected:['Connected','Conectado'],serving:['Serving','Sirviendo'],inactive:['Inactive','Inactivo']
 }
 
-export default async function OutreachContactPage({params,searchParams}:{params:Promise<{contactId:string}>;searchParams:Promise<{invite?:string;error?:string;lang?:string}>}){
+export default async function OutreachContactPage({params,searchParams}:{params:Promise<{contactId:string}>;searchParams:Promise<{invite?:string;error?:string;saved?:string;lang?:string}>}){
   const [{contactId},query]=await Promise.all([params,searchParams])
   const es=query.lang==='es'
   const t=(en:string,sp:string)=>es?sp:en
@@ -56,9 +58,9 @@ export default async function OutreachContactPage({params,searchParams}:{params:
   return <main className="shell">
     <header className="topbar"><div><Link href="/" className="brand">Kingdom <span>Network</span></Link><div className="small muted">{church?.name??t('Your Church','Su Iglesia')} • {t('Outreach','Alcance')}</div></div><div className="row"><Link className="ghost" href={withLang(`/outreach/${contactId}`)}>{es?'English':'Español'}</Link><Link className="ghost" href={withLang('/outreach')}>← {t('Outreach Pipeline','Seguimiento')}</Link><Link className="ghost" href="/">{t('Home','Inicio')}</Link></div></header>
     <section className="outreach-hero card"><div><div className="pill">{t('OUTREACH PERSON','PERSONA DE ALCANCE')}</div><h1>{name}</h1><p className="muted">{t('Follow-up history, the next relationship step, and the bridge into a real Kingdom Network member account.','Historial de seguimiento, el próximo paso de relación y el puente hacia una cuenta real de Kingdom Network.')}</p></div><div className="hero-stat"><strong>{stageLabel}</strong><span>{t('current stage','etapa actual')}</span></div></section>
-    {query.error&&<div className="notice error">{query.error}</div>}
+    {query.error&&<div className="notice error">{query.error}</div>}{query.saved&&<div className="notice success">{t('Next action saved.','Próxima acción guardada.')}</div>}
 
-    <section className="card" style={{marginBottom:18,display:'grid',gap:10}}><div className="pill">{t('RECOMMENDED NEXT STEP','SIGUIENTE PASO RECOMENDADO')}</div><div className="row" style={{alignItems:'flex-start'}}><div className="milestone-icon"><NextIcon size={15}/></div><div style={{flex:1}}><h2 style={{marginTop:0}}>{next.title[es?1:0]}</h2><p className="muted">{next.detail[es?1:0]}</p><Link className="btn" href={withLang(next.href)}>{t('Open next step','Abrir siguiente paso')} →</Link></div></div></section>
+    <section className="card" style={{marginBottom:18,display:'grid',gap:10}}><div className="pill">{t('WHAT HAPPENS NEXT','QUÉ SIGUE')}</div><form action={updateOutreachNextAction} className="contact-form" style={{marginTop:0}}><input type="hidden" name="contact_id" value={contactId}/><input type="hidden" name="lang" value={es?'es':'en'}/><label className="field wide"><span>{t('Next action','Próxima acción')}</span><input name="next_action" maxLength={500} defaultValue={contact.next_action??''} placeholder={t('Call, invite to Friendship Group, schedule Bible study…','Llamar, invitar al Grupo de Amistad, programar estudio bíblico…')}/></label><label className="field"><span>{t('Due date','Fecha límite')}</span><input type="datetime-local" name="follow_up_due_at" defaultValue={toChurchDateTimeLocal(contact.follow_up_due_at,timeZone)}/></label><div className="wide"><button className="btn">{t('Save next action','Guardar próxima acción')}</button></div></form><hr style={{border:0,borderTop:'1px solid var(--line)',width:'100%'}}/><div className="pill">{t('RECOMMENDED NEXT STEP','SIGUIENTE PASO RECOMENDADO')}</div><div className="row" style={{alignItems:'flex-start'}}><div className="milestone-icon"><NextIcon size={15}/></div><div style={{flex:1}}><h2 style={{marginTop:0}}>{next.title[es?1:0]}</h2><p className="muted">{next.detail[es?1:0]}</p><Link className="btn" href={withLang(next.href)}>{t('Open next step','Abrir siguiente paso')} →</Link></div></div></section>
 
     <div className="outreach-layout"><section className="contact-list"><article className="card contact-card"><div className="contact-head"><div className="contact-name"><div className="avatar">{name.slice(0,1).toUpperCase()}</div><div><strong>{name}</strong><div className="small muted">{contact.email||t('No email added','Sin correo agregado')}{contact.phone?` • ${contact.phone}`:''}</div></div></div><span className="stage-chip">{stageLabel}</span></div>
       {(contact.phone||contact.email)&&<div className="row" style={{margin:'12px 0'}}>{contact.phone&&<a className="ghost" href={`tel:${contact.phone}`}><Phone size={12}/> {t('Call','Llamar')}</a>}{contact.email&&<a className="ghost" href={`mailto:${contact.email}`}><Mail size={12}/> {t('Email','Correo')}</a>}</div>}
