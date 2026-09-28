@@ -53,6 +53,12 @@ export async function setModuleComplete(formData:FormData){
   const {data:enrollment}=await supabase.from('course_enrollments').select('course_id').eq('course_id',courseId).eq('user_id',userId).maybeSingle()
   if(!enrollment)redirect(courseUrl(courseId,lang,'error='+encodeURIComponent(lang==='es'?'Comienza el curso antes de guardar el progreso.':'Start the course before saving lesson progress.')))
 
+  if(complete){
+    const {count:requiredAssessmentCount,error:assessmentCheckError}=await supabase.from('course_assessments').select('*',{count:'exact',head:true}).eq('course_id',courseId).eq('module_id',moduleId).eq('required',true).eq('published',true)
+    if(assessmentCheckError)redirect(courseUrl(courseId,lang,'error='+encodeURIComponent(lang==='es'?'No pudimos verificar los requisitos de esta lección. Inténtalo otra vez.':'We could not verify this lesson’s requirements. Please try again.')))
+    if((requiredAssessmentCount??0)>0)redirect(courseUrl(courseId,lang,'error='+encodeURIComponent(lang==='es'?'Esta lección tiene una evaluación requerida. Apruébala para completar la lección.':'This lesson has a required assessment. Pass it to complete the lesson.')))
+  }
+
   const {error}=await supabase.from('course_module_progress').upsert({user_id:userId,course_id:courseId,module_id:moduleId,completed:complete,completed_at:complete?now:null,updated_at:now},{onConflict:'user_id,module_id'})
   if(error)redirect(courseUrl(courseId,lang,'error='+encodeURIComponent(lang==='es'?'No pudimos guardar tu progreso. Inténtalo otra vez.':'We could not save your progress. Please try again.')))
   const {error:refreshError}=await supabase.rpc('refresh_my_course_completion',{p_course_id:courseId})
