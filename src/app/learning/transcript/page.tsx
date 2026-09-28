@@ -34,16 +34,20 @@ export default async function LearningTranscriptPage(){
       supabase.from('course_assessments').select('id,module_id,title,assessment_type,passing_score,required').eq('course_id',firstSteps.id).eq('published',true)
     ])
     const ids=(assessments??[]).map((a:any)=>a.id)
-    let attempts:any[]=[]
-    if(ids.length){const r=await supabase.from('assessment_attempts').select('assessment_id,attempt_number,percentage,passed,submitted_at').eq('user_id',userId).in('assessment_id',ids).order('attempt_number');attempts=r.data??[]}
+    let attempts:any[]=[];let questionRows:any[]=[]
+    if(ids.length){const [attemptResult,questionResult]=await Promise.all([supabase.from('assessment_attempts').select('assessment_id,attempt_number,percentage,passed,submitted_at').eq('user_id',userId).in('assessment_id',ids).order('attempt_number'),supabase.from('assessment_questions').select('assessment_id').in('assessment_id',ids)]);attempts=attemptResult.data??[];questionRows=questionResult.data??[]}
     const byAssessment=new Map<string,any[]>();for(const a of attempts){const list=byAssessment.get(a.assessment_id)??[];list.push(a);byAssessment.set(a.assessment_id,list)}
+    const questionCount=new Map<string,number>();for(const q of questionRows)questionCount.set(q.assessment_id,(questionCount.get(q.assessment_id)??0)+1)
     const moduleAssessment=new Map<string,any>();for(const a of assessments??[]){if(a.module_id&&a.required)moduleAssessment.set(a.module_id,a)}
     firstStepsRows=(modules??[]).map((m:any)=>{const a=moduleAssessment.get(m.id);const tries=a?byAssessment.get(a.id)??[]:[];const passedTries=tries.filter((x:any)=>x.passed);const best=tries.length?Math.max(...tries.map((x:any)=>Number(x.percentage))):null;const passed=passedTries.length>0;return {...m,assessment:a,attempts:tries,best,passed,award:passed?tier(best):null}})
     const final=(assessments??[]).find((a:any)=>a.assessment_type==='final_exam')
-    if(final){const tries=byAssessment.get(final.id)??[];const best=tries.length?Math.max(...tries.map((x:any)=>Number(x.percentage))):null;finalRow={...final,attempts:tries,best,passed:tries.some((x:any)=>x.passed),award:tries.some((x:any)=>x.passed)?tier(best):null}}
+    if(final){const tries=byAssessment.get(final.id)??[];const best=tries.length?Math.max(...tries.map((x:any)=>Number(x.percentage))):null;finalRow={...final,attempts:tries,best,question_count:questionCount.get(final.id)??0,passed:tries.some((x:any)=>x.passed),award:tries.some((x:any)=>x.passed)?tier(best):null}}
   }
 
-  const passedClasses=firstStepsRows.filter(r=>r.passed).length
+  const requiredClassRows=firstStepsRows.filter(r=>r.assessment?.required)
+  const requiredClassCount=requiredClassRows.length
+  const passedClasses=requiredClassRows.filter(r=>r.passed).length
+  const allRequiredClassesPassed=requiredClassCount>0&&passedClasses===requiredClassCount
   const firstStepsEnrollment=rows.find((r:any)=>r.course_id===firstSteps?.id)
 
   return <main className="shell">
@@ -59,9 +63,9 @@ export default async function LearningTranscriptPage(){
       <div className="card" style={{padding:'14px 16px',minWidth:150}}><Trophy size={18}/><strong style={{display:'block',fontSize:24,marginTop:6}}>{platinum}</strong><span className="small muted">Platinum</span></div>
     </section>
 
-    {firstSteps&&<section className="card" style={{padding:18,marginBottom:18}}><div className="row" style={{justifyContent:'space-between',gap:12,flexWrap:'wrap'}}><div><div className="pill">FIRST STEPS</div><h2 style={{margin:'8px 0 5px'}}>Class-by-class record</h2><p className="muted" style={{margin:0}}>Each class requires 80% or higher. After all 17 classes are passed, the cumulative final unlocks.</p></div><div style={{textAlign:'right'}}><strong style={{fontSize:26}}>{passedClasses}/17</strong><div className="small muted">classes passed</div></div></div><div className="progress-track" style={{marginTop:14}}><div className="progress-fill" style={{width:`${Math.round((passedClasses/17)*100)}%`}}/></div>
+    {firstSteps&&<section className="card" style={{padding:18,marginBottom:18}}><div className="row" style={{justifyContent:'space-between',gap:12,flexWrap:'wrap'}}><div><div className="pill">FIRST STEPS</div><h2 style={{margin:'8px 0 5px'}}>Class-by-class record</h2><p className="muted" style={{margin:0}}>Each class requires 80% or higher. After all required class tests are passed, the cumulative final unlocks.</p></div><div style={{textAlign:'right'}}><strong style={{fontSize:26}}>{passedClasses}/{requiredClassCount}</strong><div className="small muted">classes passed</div></div></div><div className="progress-track" style={{marginTop:14}}><div className="progress-fill" style={{width:`${requiredClassCount?Math.round((passedClasses/requiredClassCount)*100):0}%`}}/></div>
       <div style={{display:'grid',gap:8,marginTop:16}}>{firstStepsRows.map((r:any)=><div className="card" style={{padding:'11px 13px',display:'flex',alignItems:'center',gap:12,justifyContent:'space-between'}} key={r.id}><div className="row" style={{gap:10}}><div className="lesson-number" style={{width:34,height:34}}>{r.position}</div><div><strong>{r.title}</strong><div className="small muted">{r.attempts.length?`${r.attempts.length} attempt${r.attempts.length===1?'':'s'}`:'Not tested yet'}</div></div></div><div style={{textAlign:'right'}}>{r.passed?<><span className="pill">{r.award?.toUpperCase()??'PASSED'}</span><div className="small" style={{marginTop:4}}>{Math.round(r.best)}%</div></>:<span className="small muted">Not passed</span>}</div></div>)}</div>
-      <div className="card" style={{padding:16,marginTop:14}}><div className="row" style={{gap:12,alignItems:'flex-start'}}>{passedClasses===17?<Trophy size={22}/>:<LockKeyhole size={22}/>}<div><div className="pill">CUMULATIVE FINAL</div><h3 style={{margin:'8px 0 5px'}}>First Steps Final Exam</h3>{finalRow?.passed?<p style={{margin:0}}><strong>{finalRow.award} • {Math.round(finalRow.best)}%</strong> — Final passed.</p>:passedClasses===17?<p className="muted" style={{margin:0}}>Unlocked. Open First Steps to take the 34-question final exam.</p>:<p className="muted" style={{margin:0}}>Locked until all 17 class tests are passed.</p>}</div></div></div>
+      <div className="card" style={{padding:16,marginTop:14}}><div className="row" style={{gap:12,alignItems:'flex-start'}}>{allRequiredClassesPassed?<Trophy size={22}/>:<LockKeyhole size={22}/>}<div><div className="pill">CUMULATIVE FINAL</div><h3 style={{margin:'8px 0 5px'}}>First Steps Final Exam</h3>{finalRow?.passed?<p style={{margin:0}}><strong>{finalRow.award} • {Math.round(finalRow.best)}%</strong> — Final passed.</p>:allRequiredClassesPassed?<p className="muted" style={{margin:0}}>Unlocked. Open First Steps to take the ${finalRow?.question_count||'required'}-question final exam.</p>:<p className="muted" style={{margin:0}}>Locked until all 17 class tests are passed.</p>}</div></div></div>
       {firstStepsEnrollment?.credential_earned&&<div className="notice success" style={{marginTop:14}}><strong>{tier(firstStepsEnrollment.final_score)} First Steps completion</strong> • Final score {firstStepsEnrollment.final_score}% • Completed {niceDate(firstStepsEnrollment.completed_at)}</div>}
     </section>}
 
