@@ -42,8 +42,15 @@ $$;
 
 revoke all on function private.validate_required_assessment_publish_ready() from public,anon,authenticated;
 
+drop trigger if exists trg_validate_required_assessment_publish_ready_insert on public.course_assessments;
+drop trigger if exists trg_validate_required_assessment_publish_ready_update on public.course_assessments;
 drop trigger if exists trg_validate_required_assessment_publish_ready on public.course_assessments;
-create trigger trg_validate_required_assessment_publish_ready
+
+create trigger trg_validate_required_assessment_publish_ready_insert
+before insert on public.course_assessments
+for each row execute function private.validate_required_assessment_publish_ready();
+
+create trigger trg_validate_required_assessment_publish_ready_update
 before update of published,required,passing_score on public.course_assessments
 for each row execute function private.validate_required_assessment_publish_ready();
 
