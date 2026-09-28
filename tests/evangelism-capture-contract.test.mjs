@@ -150,3 +150,13 @@ test('interaction history form stays usable on phone widths',()=>{
   assert.match(css,/@media\(max-width:800px\)/)
   assert.match(css,/@media\(max-width:500px\)/)
 })
+
+
+test('Outreach fails visibly instead of pretending missing data is an empty pipeline',()=>{
+  const detail=fs.readFileSync(new URL('../src/app/outreach/[contactId]/page.tsx', import.meta.url),'utf8')
+  assert.match(page,/if\(contactsError\)throw new Error\('Outreach follow-up records could not load'\)/)
+  assert.match(page,/if\(r\.error\)throw new Error\('Outreach follow-up history could not load'\)/)
+  assert.match(page,/failing closed/)
+  assert.match(detail,/if\(contactError\)throw new Error\('Outreach person could not load'\)/)
+  assert.match(detail,/if\(interactionsError\)throw new Error\('Outreach follow-up history could not load'\)/)
+})
