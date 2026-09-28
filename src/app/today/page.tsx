@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { ArrowRight,Bell,BookOpen,CalendarDays,CheckCircle2,Clock3,MessageSquareWarning,Sparkles } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getNextStep } from '@/lib/journey'
+import { addJourneyAttention,resolveJourneyStep,type JourneyStepDefinition,type JourneyStepTracking } from '@/lib/discipleship-pathway'
 import { formatChurchDay,formatChurchTime } from '@/lib/church-time'
 
 export default async function MyTodayPage({searchParams}:{searchParams:Promise<{lang?:string}>}){
@@ -22,7 +23,7 @@ export default async function MyTodayPage({searchParams}:{searchParams:Promise<{
     supabase.from('member_milestones').select('holy_ghost_received,baptized,first_steps_status,soul_winning_status,bible_study_teacher_status').eq('church_id',membership.church_id).eq('user_id',userId).maybeSingle(),
     supabase.from('group_memberships').select('*',{count:'exact',head:true}).eq('user_id',userId),
     supabase.from('team_assignments').select('id,title,starts_at,call_time,confirmation_required,ministries(name)').eq('church_id',membership.church_id).eq('assigned_user_id',userId).gte('starts_at',nowIso).lte('starts_at',weekIso).order('starts_at').limit(8),
-    supabase.from('course_enrollments').select('course_id,credential_earned').eq('user_id',userId),
+    supabase.from('course_enrollments').select('course_id,credential_earned,progress_percent,completed_at,updated_at').eq('user_id',userId),
     supabase.from('courses').select('id').eq('church_id',membership.church_id).eq('published',true).eq('pathway_stage','new_convert'),
     supabase.from('notifications').select('*',{count:'exact',head:true}).eq('user_id',userId).is('read_at',null),
     supabase.from('groups').select('id,name,active').eq('church_id',membership.church_id).eq('leader_id',userId).eq('active',true),
@@ -45,8 +46,42 @@ export default async function MyTodayPage({searchParams}:{searchParams:Promise<{
   const lastReportBy=new Map<string,string>();for(const r of reports){if(!lastReportBy.has(r.group_id))lastReportBy.set(r.group_id,r.meeting_date)}
   const overdueGroups=leaderGroups.filter((g:any)=>{const last=lastReportBy.get(g.id);return !last||Date.now()-new Date(`${last}T12:00:00`).getTime()>8*86400000})
   const newConvertIds=(newConvertCourses??[]).map((c:any)=>c.id),newConvertCompleted=(enrollments??[]).some((e:any)=>newConvertIds.includes(e.course_id)&&e.credential_earned)
-  const accepted=await supabase.from('ministry_applications').select('*',{count:'exact',head:true}).eq('user_id',userId).eq('status','accepted')
-  const m:any=milestones??{},nextStep=getNextStep({holyGhost:m.holy_ghost_received,baptized:m.baptized,newConvertAvailable:newConvertIds.length>0,newConvertCompleted,firstSteps:m.first_steps_status,soulWinning:m.soul_winning_status,bibleStudyTeacher:m.bible_study_teacher_status,groupCount:groupCount??0,serveCount:assignmentRows.length+(accepted.count??0)},es?'es':'en')
+  const [{count:acceptedCount},{count:serveAssignmentCount},{data:pathAssignment}]=await Promise.all([
+    supabase.from('ministry_applications').select('*',{count:'exact',head:true}).eq('user_id',userId).eq('status','accepted'),
+    supabase.from('team_assignments').select('*',{count:'exact',head:true}).eq('church_id',membership.church_id).eq('assigned_user_id',userId),
+    supabase.from('member_journey_pathway_assignments').select('pathway_id').eq('church_id',membership.church_id).eq('user_id',userId).eq('active',true).maybeSingle()
+  ])
+  const m:any=milestones??{},fallbackNextStep=getNextStep({holyGhost:m.holy_ghost_received,baptized:m.baptized,newConvertAvailable:newConvertIds.length>0,newConvertCompleted,firstSteps:m.first_steps_status,soulWinning:m.soul_winning_status,bibleStudyTeacher:m.bible_study_teacher_status,groupCount:groupCount??0,serveCount:(serveAssignmentCount??0)+(acceptedCount??0)},es?'es':'en')
+  let activePathId=pathAssignment?.pathway_id??null,pathwayName:string|null=null,configuredNext:any=null
+  if(!activePathId){
+    const {data:defaultPath}=await supabase.from('discipleship_pathways').select('id,name').eq('church_id',membership.church_id).eq('active',true).eq('is_default',true).limit(1).maybeSingle()
+    if(defaultPath?.id){activePathId=defaultPath.id;pathwayName=defaultPath.name}
+  }
+  if(activePathId){
+    const [{data:path},{data:pathSteps},{data:trackingRows}]=await Promise.all([
+      supabase.from('discipleship_pathways').select('id,name').eq('church_id',membership.church_id).eq('id',activePathId).maybeSingle(),
+      supabase.from('discipleship_pathway_steps').select('id,step_key,title,description,completion_source,completion_key,completion_value,suggested_href,sort_order,required').eq('church_id',membership.church_id).eq('pathway_id',activePathId).eq('active',true).order('sort_order').order('id'),
+      supabase.from('member_journey_step_tracking').select('step_id,responsible_leader_id,due_on,manual_status,manual_completed_at,last_activity_at,updated_at').eq('church_id',membership.church_id).eq('user_id',userId)
+    ])
+    pathwayName=path?.name??pathwayName
+    const tracking=new Map<string,JourneyStepTracking>((trackingRows??[]).map((row:any)=>[row.step_id,row]))
+    const resolved=addJourneyAttention((pathSteps??[]).map((step:any)=>resolveJourneyStep(step as JourneyStepDefinition,{
+      milestones:m,enrollments:enrollments??[],groupCount:groupCount??0,
+      ministryApplicationCount:acceptedCount??0,ministryAssignmentCount:serveAssignmentCount??0,trackingByStep:tracking
+    })))
+    configuredNext=resolved.find(step=>step.required&&!step.completed)??resolved.find(step=>!step.completed)??null
+  }
+  const nextStep=configuredNext?{
+    title:configuredNext.title,
+    body:configuredNext.description||(es?'Este es tu próximo paso en el camino de tu iglesia.':'This is your next step in your church pathway.'),
+    action:es?'Abrir próximo paso':'Open next step',
+    href:configuredNext.suggested_href||'/journey',
+    reason:pathwayName||(es?'Mi Camino':'My Journey')
+  }:activePathId?{
+    title:es?'Sigue creciendo y ayudando a otros':'Keep growing and helping others',
+    body:es?'Has completado el camino configurado actualmente.':'You have completed the currently configured pathway.',
+    action:es?'Ver Mi Camino':'View My Journey',href:'/journey',reason:pathwayName||(es?'Mi Camino':'My Journey')
+  }:fallbackNextStep
   const name=profile?.display_name||profile?.first_name||(es?'Miembro':'Member')
   const firstPending=pending[0],firstGroup=overdueGroups[0],firstOutreach=outreachRows[0],firstCommunication:any=communicationRows[0]
   const commContact:any=firstCommunication?(Array.isArray(firstCommunication.outreach_contacts)?firstCommunication.outreach_contacts[0]:firstCommunication.outreach_contacts):null
