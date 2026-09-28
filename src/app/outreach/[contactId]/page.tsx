@@ -30,7 +30,7 @@ export default async function OutreachContactPage({params,searchParams}:{params:
   const canInvite=['pastor','church_admin'].includes(membership.role)
   let linkedProfile:any=null
   if(contact.member_user_id){const r=await supabase.from('profiles').select('id,display_name,first_name,last_name').eq('id',contact.member_user_id).maybeSingle();linkedProfile=r.data??null}
-  const {data:interactions}=await supabase.from('outreach_interactions').select('id,contact_id,interaction_type,occurred_at,summary,bible_study_lesson,recorded_by,profiles:recorded_by(display_name,first_name,last_name)').eq('contact_id',contactId).order('occurred_at',{ascending:false})
+  const {data:interactions}=await supabase.from('outreach_interactions').select('id,contact_id,interaction_type,occurred_at,summary,bible_study_lesson,source_type,source_label,recorded_by,profiles:recorded_by(display_name,first_name,last_name)').eq('contact_id',contactId).order('occurred_at',{ascending:false})
   let openInvite:any=null
   if(canInvite&&!contact.member_user_id){const r=await supabase.from('church_invites').select('id,email,expires_at,created_at').eq('church_id',membership.church_id).eq('outreach_contact_id',contactId).is('redeemed_at',null).is('revoked_at',null).gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false}).limit(1).maybeSingle();openInvite=r.data??null}
   const inviteId=query.invite||openInvite?.id||null
