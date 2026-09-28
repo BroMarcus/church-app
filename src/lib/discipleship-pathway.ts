@@ -16,7 +16,7 @@ export type JourneyStepDefinition={
 export type JourneyStepTracking={
   step_id:string
   responsible_leader_id?:string|null
-  due_at?:string|null
+  due_on?:string|null
   manual_status?:JourneyStatus|null
   manual_completed_at?:string|null
   last_activity_at?:string|null
@@ -38,7 +38,7 @@ export type ResolvedJourneyStep=JourneyStepDefinition&{
   started:boolean
   lastActivityAt:string|null
   responsibleLeaderId:string|null
-  dueAt:string|null
+  dueOn:string|null
   attention:Array<'inactive'|'overdue'|'leader_missing'|'next_step_unstarted'>
 }
 
@@ -79,9 +79,9 @@ export function resolveJourneyStep(step:JourneyStepDefinition,ctx:JourneyResolut
   }
 
   const completed=status==='completed'||status==='waived'
-  const dueAt=tracking?.due_at??null
+  const dueOn=tracking?.due_on??null
   const now=Date.now()
-  const overdue=Boolean(dueAt&&new Date(dueAt).getTime()<now&&!completed)
+  const overdue=Boolean(dueOn&&new Date(`${dueOn}T23:59:59Z`).getTime()<now&&!completed)
   const inactive=Boolean(status==='in_progress'&&lastActivityAt&&now-new Date(lastActivityAt).getTime()>30*24*60*60*1000)
 
   return {
@@ -91,7 +91,7 @@ export function resolveJourneyStep(step:JourneyStepDefinition,ctx:JourneyResolut
     started:status!=='not_started',
     lastActivityAt,
     responsibleLeaderId:tracking?.responsible_leader_id??null,
-    dueAt,
+    dueOn,
     attention:[
       ...(inactive?['inactive' as const]:[]),
       ...(overdue?['overdue' as const]:[])
