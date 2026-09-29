@@ -57,6 +57,20 @@ function buildExtractionPlan(source:string){
   return {version:1,method:'source_text_structure',lessons,assessment:{title:'Course Final Review',passing_score:80,required:true},notes:'Draft structure only. Leadership must compare every lesson and assessment against the approved source before publishing.'}
 }
 
+
+function sourceProvider(raw:string){
+  if(!raw)return null
+  let url:URL
+  try{url=new URL(raw)}catch{return null}
+  if(url.protocol!=='https:')return null
+  const host=url.hostname.toLowerCase()
+  if(host==='dropbox.com'||host.endsWith('.dropbox.com'))return 'dropbox'
+  if(host==='drive.google.com'||host==='docs.google.com')return 'google_drive'
+  if(host==='1drv.ms'||host.endsWith('.onedrive.com'))return 'onedrive'
+  if(host.endsWith('.sharepoint.com'))return 'sharepoint'
+  return 'web'
+}
+
 function parseQuestion(formData:FormData){
   const type=text(formData,'question_type')||'multiple_choice'
   const prompt=text(formData,'prompt')
@@ -140,6 +154,22 @@ export async function createCourseAssessmentShell(formData:FormData){
   return createBuilderAssessment(formData)
 }
 
+export async function publishReadyRequiredAssessments(formData:FormData){
+  const courseId=text(formData,'course_id'),language=lang(formData)
+  if(!courseId)safeError('missing',language)
+  if(text(formData,'confirm_publish_ready')!=='yes')safeError(courseId,language,language==='es'?'Confirma la publicación de las pruebas listas.':'Confirm publishing the ready required tests.')
+  const {supabase}=await manager(courseId)
+  const {data,error}=await supabase.rpc('publish_ready_course_assessments',{p_course_id:courseId})
+  if(error){
+    console.error('bulk publish ready assessments failed',{courseId,message:error.message})
+    safeError(courseId,language,error.message)
+  }
+  const count=Number(data?.required_published??0)
+  success(courseId,language,language==='es'
+    ?`${count} prueba(s) requerida(s) publicadas después de la verificación del servidor. Ahora ejecuta la revisión final del curso.`
+    :`${count} required assessment(s) published after server verification. Now run the final course readiness review.`)
+}
+
 export async function updateBuilderAssessment(formData:FormData){
   const courseId=text(formData,'course_id'),assessmentId=text(formData,'assessment_id'),language=lang(formData)
   if(!courseId||!assessmentId)safeError(courseId||'missing',language)
@@ -197,6 +227,31 @@ export async function deleteBuilderQuestion(formData:FormData){
   success(courseId,language,language==='es'?'Pregunta eliminada.':'Question deleted.')
 }
 
+export async function importCoursePackage(formData:FormData){
+  const courseId=text(formData,'course_id'),language=lang(formData)
+  if(!courseId)safeError('missing',language)
+  const upload=formData.get('course_package')
+  if(!(upload instanceof File)||!upload.name)safeError(courseId,language,language==='es'?'Selecciona un paquete JSON de One Kingdom.':'Choose a One Kingdom JSON course package.')
+  if(upload.size>2_000_000)safeError(courseId,language,language==='es'?'El paquete es demasiado grande. Usa un archivo JSON menor de 2 MB.':'The package is too large. Use a JSON file smaller than 2 MB.')
+  let coursePackage:any
+  try{
+    coursePackage=JSON.parse(await upload.text())
+  }catch{
+    safeError(courseId,language,language==='es'?'Ese archivo no contiene JSON válido.':'That file does not contain valid JSON.')
+  }
+  if(Number(coursePackage?.one_kingdom_package_version)!==1)safeError(courseId,language,language==='es'?'Este paquete no usa One Kingdom Course Package v1.':'This package is not a One Kingdom Course Package v1 file.')
+  const {supabase}=await manager(courseId)
+  const {data,error}=await supabase.rpc('import_course_package_v1',{p_course_id:courseId,p_package:coursePackage})
+  if(error){
+    console.error('course package import failed',{courseId,file:upload.name,message:error.message})
+    safeError(courseId,language,error.message)
+  }
+  const lessons=Number(data?.lessons_created??0),tests=Number(data?.assessments_created??0),questions=Number(data?.questions_created??0)
+  success(courseId,language,language==='es'
+    ?`Paquete importado como borrador: ${lessons} lecciones, ${tests} pruebas y ${questions} preguntas. Revisa las pruebas antes de publicarlas.`
+    :`Package imported as a draft: ${lessons} lessons, ${tests} assessments, and ${questions} questions. Review the assessments before publishing them.`)
+}
+
 export async function saveBuilderCourse(formData:FormData){
   const courseId=text(formData,'course_id'),language=lang(formData)
   if(!courseId)safeError('missing',language)
@@ -211,8 +266,16 @@ export async function setBuilderCoursePublished(formData:FormData){
   const {supabase,churchId}=await manager(courseId)
   const {data:course}=await supabase.from('courses').select('archived_at').eq('id',courseId).eq('church_id',churchId).single()
   if(published&&course?.archived_at)safeError(courseId,language,language==='es'?'Restaura el curso antes de publicarlo.':'Restore the course before publishing it.')
+  if(published){
+    const {data:readiness,error:readinessError}=await supabase.rpc('course_builder_readiness',{p_course_id:courseId})
+    if(readinessError){console.error('course builder readiness failed',{courseId,message:readinessError.message});safeError(courseId,language,language==='es'?'No se pudo verificar que el curso esté listo. Nada fue publicado.':'Course readiness could not be verified. Nothing was published.')}
+    if(!readiness?.ready){
+      const issues=Array.isArray(readiness?.issues)?readiness.issues.map(String).filter(Boolean):[]
+      safeError(courseId,language,issues.length?issues.join(' '):(language==='es'?'El curso todavía no está listo para publicarse.':'The course is not ready to publish yet.'))
+    }
+  }
   const {error}=await supabase.from('courses').update({published}).eq('id',courseId).eq('church_id',churchId)
-  if(error){console.error('course builder publish failed',{courseId,message:error.message});safeError(courseId,language,language==='es'?'El curso todavía no cumple todos los requisitos de publicación. Revisa lecciones, pruebas y cantidades de preguntas.':'The course is not ready to publish yet. Review lessons, assessments, and required question counts.')}
+  if(error){console.error('course builder publish failed',{courseId,message:error.message});safeError(courseId,language,language==='es'?'El curso todavía no cumple todos los requisitos de publicación. Revisa lecciones, pruebas y materiales.':'The course is not ready to publish yet. Review lessons, assessments, and materials.')}
   success(courseId,language,published?(language==='es'?'Curso publicado.':'Course published.'):(language==='es'?'Curso ocultado de los miembros.':'Course unpublished.'))
 }
 
@@ -264,4 +327,49 @@ export async function applyExtractionPlan(formData:FormData){
   }
   await supabase.from('church_setup_uploads').update({extraction_status:'applied',extraction_applied_at:new Date().toISOString()}).eq('id',source!.id)
   success(courseId,language,language==='es'?'Propuesta aplicada como borrador.':'Proposal applied as drafts.')
+}
+
+export async function saveCourseSourceLink(formData:FormData){
+  const courseId=text(formData,'course_id'),language=lang(formData),rawUrl=text(formData,'source_url'),label=text(formData,'source_label')
+  if(!courseId)safeError('missing',language)
+  const provider=sourceProvider(rawUrl)
+  if(rawUrl&&!provider)safeError(courseId,language,language==='es'?'Usa un enlace HTTPS válido de Dropbox, Google Drive, OneDrive, SharePoint u otro sitio web.':'Use a valid HTTPS link from Dropbox, Google Drive, OneDrive, SharePoint, or another website.')
+  const {supabase}=await manager(courseId)
+  const {error}=await supabase.rpc('set_course_source_link_builder',{p_course_id:courseId,p_source_provider:provider,p_source_url:rawUrl||null,p_source_label:label||null})
+  if(error){console.error('course builder source link failed',{courseId,message:error.message});safeError(courseId,language)}
+  success(courseId,language,rawUrl?(language==='es'?'Fuente del curso conectada.':'Course source connected.'):(language==='es'?'Fuente del curso eliminada.':'Course source removed.'))
+}
+
+export async function saveResourceSourceLink(formData:FormData){
+  const courseId=text(formData,'course_id'),moduleId=text(formData,'module_id'),language=lang(formData)
+  const resourceIndex=integer(formData,'resource_index',-1),rawUrl=text(formData,'source_url'),label=text(formData,'source_label')
+  if(!courseId||!moduleId||resourceIndex<0)safeError(courseId||'missing',language)
+  const provider=sourceProvider(rawUrl)
+  if(rawUrl&&!provider)safeError(courseId,language,language==='es'?'Usa un enlace HTTPS válido para este material.':'Use a valid HTTPS link for this material.')
+  const {supabase}=await manager(courseId)
+  const {error}=await supabase.rpc('set_course_module_resource_link_builder',{
+    p_module_id:moduleId,
+    p_resource_index:resourceIndex,
+    p_source_provider:provider,
+    p_source_url:rawUrl||null,
+    p_source_label:label||null
+  })
+  if(error){
+    console.error('resource source link failed',{courseId,moduleId,resourceIndex,message:error.message})
+    safeError(courseId,language,error.message.includes('learner history')
+      ?(language==='es'?'Este material está bloqueado porque ya existe progreso de alumnos. Crea una nueva versión del curso.':'This material is locked because learner progress already exists. Create a new course version.')
+      :undefined)
+  }
+  success(courseId,language,rawUrl?(language==='es'?'Material conectado de forma segura.':'Learner material connected safely.'):(language==='es'?'Enlace del material eliminado.':'Material link removed.'))
+}
+
+export async function saveLessonSourceLink(formData:FormData){
+  const courseId=text(formData,'course_id'),moduleId=text(formData,'module_id'),language=lang(formData),rawUrl=text(formData,'source_url'),label=text(formData,'source_label')
+  if(!courseId||!moduleId)safeError(courseId||'missing',language)
+  const provider=sourceProvider(rawUrl)
+  if(rawUrl&&!provider)safeError(courseId,language,language==='es'?'Usa un enlace HTTPS válido para la fuente de esta lección.':'Use a valid HTTPS source link for this lesson.')
+  const {supabase}=await manager(courseId)
+  const {error}=await supabase.rpc('set_course_module_source_link_builder',{p_module_id:moduleId,p_source_provider:provider,p_source_url:rawUrl||null,p_source_label:label||null})
+  if(error){console.error('lesson source link failed',{courseId,moduleId,message:error.message});safeError(courseId,language)}
+  success(courseId,language,rawUrl?(language==='es'?'Fuente de la lección conectada.':'Lesson source connected.'):(language==='es'?'Fuente de la lección eliminada.':'Lesson source removed.'))
 }

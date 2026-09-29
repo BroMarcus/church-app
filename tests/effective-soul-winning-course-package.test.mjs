@@ -1,0 +1,162 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import {readFileSync} from 'node:fs'
+
+const read=(path)=>readFileSync(new URL(`../${path}`,import.meta.url),'utf8')
+const pkg=JSON.parse(read('docs/curriculum/effective-soul-winning/course-package-v1.json'))
+const migration=read('supabase/migrations/20260928043000_learning_course_package_import.sql')
+const actions=read('src/app/learning/admin/course-builder/[courseId]/actions.ts')
+const page=read('src/app/learning/admin/course-builder/[courseId]/page.tsx')
+const lessonPage=read('src/app/learning/[courseId]/lesson/[moduleId]/page.tsx')
+const sourceViewer=read('src/app/learning/[courseId]/lesson/[moduleId]/source/page.tsx')
+const certificatePage=read('src/app/learning/[courseId]/certificate/page.tsx')
+const certificateButton=read('src/app/learning/[courseId]/certificate/print-button.tsx')
+const coursePage=read('src/app/learning/[courseId]/page.tsx')
+const learningCss=read('src/app/learning/learning.css')
+const bulkPublishMigration=read('supabase/migrations/20260928050000_learning_bulk_publish_ready_assessments.sql')
+const readinessMigration=read('supabase/migrations/20260928051500_learning_course_builder_readiness.sql')
+const engagementMigration=read('supabase/migrations/20260928053000_learning_resource_engagement.sql')
+const resourceEngagement=read('src/app/learning/[courseId]/lesson/[moduleId]/source/resource-engagement.tsx')
+const learningActions=read('src/app/learning/actions.ts')
+
+test('Effective Soul Winning package keeps the verified six-lesson mastery structure',()=>{
+  assert.equal(pkg.one_kingdom_package_version,1)
+  assert.equal(pkg.course.title,'Effective Soul Winning')
+  assert.equal(pkg.course.progression_mode,'mastery')
+  assert.equal(pkg.course.passing_score,80)
+  assert.equal(pkg.course.badge_name,'Effective Soul Winning — Certificate of Completion')
+  assert.equal(pkg.course.curriculum_version,'2024')
+  assert.deepEqual(pkg.lessons.map((x)=>x.title),[
+    'The Old and the New Testament',
+    'What Is Repentance?',
+    'There Is Only One God',
+    'Man of Sorrows',
+    'Apostolic Authority',
+    'The New Birth',
+  ])
+})
+
+test('Effective Soul Winning uses three valid checkpoints and a 20-question final',()=>{
+  const checkpoints=pkg.assessments.filter((a)=>(a.type??a.assessment_type)==='checkpoint')
+  const finals=pkg.assessments.filter((a)=>(a.type??a.assessment_type)==='final')
+  assert.equal(checkpoints.length,3)
+  assert.deepEqual(checkpoints.map((a)=>a.questions.length),[6,6,6])
+  assert.equal(finals.length,1)
+  assert.equal(finals[0].questions.length,20)
+  for(const assessment of [...checkpoints,...finals]){
+    assert.equal(assessment.required,true)
+    assert.equal(assessment.passing_score,80)
+    for(const question of assessment.questions){
+      assert.ok(question.question_id)
+      assert.ok(question.prompt)
+      assert.ok(Array.isArray(question.options)&&question.options.length>=2)
+      assert.ok(question.options.includes(question.answer))
+      assert.ok(question.source_ref)
+    }
+  }
+})
+
+test('Course Package import is empty-draft-only, atomic, and never auto-publishes',()=>{
+  assert.match(migration,/import_course_package_v1/)
+  assert.match(migration,/Import is allowed only on a private Draft course/)
+  assert.match(migration,/already has learner history/)
+  assert.match(migration,/requires an empty Draft/)
+  assert.match(migration,/perform public\.create_assessment_question/)
+  assert.match(migration,/published,false/)
+  assert.match(migration,/'assessments_published',false/)
+  assert.match(actions,/importCoursePackage/)
+  assert.match(actions,/2_000_000/)
+  assert.match(actions,/import_course_package_v1/)
+  assert.match(page,/COURSE PACKAGE/)
+  assert.match(page,/Import into Draft/)
+  assert.match(page,/whole import rolls back/)
+})
+
+test('database publish readiness enforces real checkpoint and final counts',()=>{
+  assert.match(migration,/trg_learning_course_publish_readiness/)
+  assert.match(migration,/Tested courses require exactly one required final exam/)
+  assert.match(migration,/Publish every required assessment before publishing the course/)
+  assert.match(migration,/Required checkpoint tests need 5-10 questions and final exams need 20-25 questions/)
+  assert.match(migration,/Tested courses require a passing score of at least 80/)
+})
+
+
+test('ESW lesson resources stay inside the authenticated One Kingdom viewer',()=>{
+  assert.match(lessonPage,/LESSON MATERIALS/)
+  assert.match(lessonPage,/Open in One Kingdom/)
+  assert.match(lessonPage,/module\.content\?\.resources/)
+  assert.match(sourceViewer,/getClaims/)
+  assert.match(sourceViewer,/course_enrollments/)
+  assert.match(sourceViewer,/church_memberships/)
+  assert.match(sourceViewer,/ONE KINGDOM VIEWER/)
+  assert.match(sourceViewer,/drive\.google\.com/)
+  assert.match(sourceViewer,/docs\.google\.com/)
+  assert.match(sourceViewer,/dropbox\.com/)
+  assert.match(sourceViewer,/raw','1'/)
+  assert.match(sourceViewer,/resource\?\.page_start/)
+  assert.match(sourceViewer,/const rawSource=resource\?\.source_url\|\|module\.source_url\|\|''/)
+  assert.doesNotMatch(sourceViewer,/rawSource=resource\?\.source_url\|\|module\.source_url\|\|course\.source_url/)
+  assert.match(sourceViewer,/master course file is not exposed to learners automatically/)
+})
+
+
+test('earned ESW credential unlocks a personalized printable One Kingdom certificate',()=>{
+  assert.match(coursePage,/View Certificate/)
+  assert.match(coursePage,/\/learning\/\$\{courseId\}\/certificate/)
+  assert.match(certificatePage,/credential_earned/)
+  assert.match(certificatePage,/completed_at/)
+  assert.match(certificatePage,/first_name,last_name,display_name/)
+  assert.match(certificatePage,/final_score/)
+  assert.match(certificatePage,/Print \/ Save PDF/)
+  assert.match(certificatePage,/Completion is verified from the learner/)
+  assert.match(certificateButton,/window\.print\(\)/)
+  assert.match(learningCss,/@media print/)
+  assert.match(learningCss,/\.learning-certificate/)
+})
+
+
+test('required ESW assessments can be verified and published together without partial state',()=>{
+  assert.match(actions,/publishReadyRequiredAssessments/)
+  assert.match(actions,/publish_ready_course_assessments/)
+  assert.match(page,/Publish Ready Required Tests/)
+  assert.match(page,/If one fails, none are published/)
+  assert.match(bulkPublishMigration,/publish_ready_course_assessments/)
+  assert.match(bulkPublishMigration,/Required tests are not ready/)
+  assert.match(bulkPublishMigration,/protected answer key/)
+  assert.match(bulkPublishMigration,/question_count<20 or q\.question_count>25/)
+  assert.match(bulkPublishMigration,/question_count<5 or q\.question_count>10/)
+  assert.match(bulkPublishMigration,/Learner history exists/)
+  assert.match(bulkPublishMigration,/update public\.course_assessments[\s\S]*set published=true/)
+})
+
+
+test('Course Builder Training Check blocks publish until ESW is truly ready',()=>{
+  assert.match(page,/TRAINING CHECK/)
+  assert.match(page,/Ready to publish/)
+  assert.match(page,/missing_material_link_count/)
+  assert.match(actions,/course_builder_readiness/)
+  assert.match(actions,/Course readiness could not be verified\. Nothing was published/)
+  assert.match(readinessMigration,/course_builder_readiness/)
+  assert.match(readinessMigration,/Connect %s learner-safe lesson material link/)
+  assert.match(readinessMigration,/Publish %s required assessment/)
+  assert.match(readinessMigration,/protected assessment answer keys/)
+  assert.match(readinessMigration,/Name the completion certificate \/ credential/)
+})
+
+
+test('resource-backed ESW lessons use verified active reading time instead of self-completion',()=>{
+  assert.match(engagementMigration,/course_resource_engagement/)
+  assert.match(engagementMigration,/least\(15,coalesce\(p_active_seconds,0\)\)/)
+  assert.match(engagementMigration,/page_count.*\*30/s)
+  assert.match(engagementMigration,/Learner-safe resource link is not connected/)
+  assert.match(engagementMigration,/course_module_progress/)
+  assert.match(engagementMigration,/refresh_my_course_completion/)
+  assert.match(resourceEngagement,/document\.visibilityState==='visible'/)
+  assert.match(resourceEngagement,/document\.hasFocus\(\)/)
+  assert.match(resourceEngagement,/p_active_seconds:delta/)
+  assert.match(resourceEngagement,/Timer pauses if this tab is hidden/)
+  assert.match(lessonPage,/hasTrackedResources/)
+  assert.match(lessonPage,/One Kingdom will complete this lesson automatically/)
+  assert.match(learningActions,/trackedResources/)
+  assert.match(learningActions,/One Kingdom completes this lesson automatically after all required materials are verified/)
+})
