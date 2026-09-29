@@ -69,7 +69,7 @@ export async function addPathwayStep(formData:FormData){
   const {data:path}=await supabase.from('discipleship_pathways').select('id').eq('id',pathwayId).eq('church_id',churchId).eq('active',true).maybeSingle()
   if(!path)redirect(route(lang)+'&error='+encodeURIComponent(lang==='es'?'Camino no encontrado.':'Pathway not found.'))
 
-  let title=preset.title,completionKey:string|null=preset.key,completionValue:string|null=preset.completion,href:string=preset.href
+  let title:string=preset.title,completionKey:string|null=preset.key,completionValue:string|null=preset.completion,href:string=preset.href
   if(presetKey==='course'){
     const courseId=value(formData,'course_id')
     const {data:course}=await supabase.from('courses').select('id,title').eq('id',courseId).eq('church_id',churchId).maybeSingle()

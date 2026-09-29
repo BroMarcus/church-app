@@ -38,7 +38,6 @@ export default async function JourneyFollowupPage({searchParams}:{searchParams:P
   const profileMap=new Map(profiles.map((row:any)=>[row.id,row]))
   const milestoneMap=new Map(milestones.map((row:any)=>[row.user_id,row]))
   const enrollmentMap=byUser(enrollments,'user_id'),groupMap=byUser(groups,'user_id'),applicationMap=byUser(applications,'user_id'),assignmentMap=byUser(assignments,'assigned_user_id')
-  const now=Date.now()
   const rows=(trackingRows??[]).map((track:any)=>{
     const rawStep:any=Array.isArray(track.discipleship_pathway_steps)?track.discipleship_pathway_steps[0]:track.discipleship_pathway_steps
     if(!rawStep||rawStep.active!==true)return null
@@ -55,7 +54,7 @@ export default async function JourneyFollowupPage({searchParams}:{searchParams:P
     if(step.completed)return null
     const p=profileMap.get(track.user_id)
     const name=p?.display_name||[p?.first_name,p?.last_name].filter(Boolean).join(' ')||(es?'Miembro':'Member')
-    const overdue=Boolean(track.due_on&&new Date(`${track.due_on}T23:59:59Z`).getTime()<now)
+    const overdue=step.attention.includes('overdue')
     return {track,step,name,overdue}
   }).filter(Boolean) as any[]
   rows.sort((a,b)=>Number(b.overdue)-Number(a.overdue)||String(a.track.due_on||'9999').localeCompare(String(b.track.due_on||'9999'))||a.name.localeCompare(b.name))
