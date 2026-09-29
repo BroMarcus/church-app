@@ -57,6 +57,20 @@ function buildExtractionPlan(source:string){
   return {version:1,method:'source_text_structure',lessons,assessment:{title:'Course Final Review',passing_score:80,required:true},notes:'Draft structure only. Leadership must compare every lesson and assessment against the approved source before publishing.'}
 }
 
+
+function sourceProvider(raw:string){
+  if(!raw)return null
+  let url:URL
+  try{url=new URL(raw)}catch{return null}
+  if(url.protocol!=='https:')return null
+  const host=url.hostname.toLowerCase()
+  if(host==='dropbox.com'||host.endsWith('.dropbox.com'))return 'dropbox'
+  if(host==='drive.google.com'||host==='docs.google.com')return 'google_drive'
+  if(host==='1drv.ms'||host.endsWith('.onedrive.com'))return 'onedrive'
+  if(host.endsWith('.sharepoint.com'))return 'sharepoint'
+  return 'web'
+}
+
 function parseQuestion(formData:FormData){
   const type=text(formData,'question_type')||'multiple_choice'
   const prompt=text(formData,'prompt')
@@ -225,19 +239,19 @@ export async function setBuilderCourseArchived(formData:FormData){
 }
 
 export async function saveSourceText(formData:FormData){
-  const courseId=text(formData,'course_id'),sourceText=text(formData,'source_text').slice(0,200000),language=lang(formData)
-  if(!courseId||!sourceText)safeError(courseId||'missing',language)
+  const courseId=text(formData,'course_id'),sourceId=text(formData,'source_id'),sourceText=text(formData,'source_text').slice(0,200000),language=lang(formData)
+  if(!courseId||!sourceId||!sourceText)safeError(courseId||'missing',language)
   const {supabase,churchId}=await manager(courseId)
-  const {error}=await supabase.from('church_setup_uploads').update({source_text:sourceText,extraction_status:'source_ready'}).eq('church_id',churchId).eq('created_record_id',courseId)
+  const {error}=await supabase.from('church_setup_uploads').update({source_text:sourceText,extraction_status:'source_ready'}).eq('id',sourceId).eq('church_id',churchId).eq('created_record_id',courseId)
   if(error){console.error('course builder source save failed',{courseId,message:error.message});safeError(courseId,language)}
   success(courseId,language,language==='es'?'Texto fuente guardado.':'Source text saved.')
 }
 
 export async function generateExtractionPlan(formData:FormData){
-  const courseId=text(formData,'course_id'),language=lang(formData)
-  if(!courseId)safeError('missing',language)
+  const courseId=text(formData,'course_id'),sourceId=text(formData,'source_id'),language=lang(formData)
+  if(!courseId||!sourceId)safeError('missing',language)
   const {supabase,churchId}=await manager(courseId)
-  const {data:source}=await supabase.from('church_setup_uploads').select('id,source_text').eq('church_id',churchId).eq('created_record_id',courseId).maybeSingle()
+  const {data:source}=await supabase.from('church_setup_uploads').select('id,source_text').eq('id',sourceId).eq('church_id',churchId).eq('created_record_id',courseId).maybeSingle()
   if(!source?.source_text)safeError(courseId,language,language==='es'?'Guarda el texto fuente primero.':'Save source text first.')
   const plan=buildExtractionPlan(source!.source_text)
   const {error}=await supabase.from('church_setup_uploads').update({extraction_plan:plan,extraction_status:'proposal_ready',extraction_reviewed_at:new Date().toISOString()}).eq('id',source!.id)
@@ -246,10 +260,10 @@ export async function generateExtractionPlan(formData:FormData){
 }
 
 export async function applyExtractionPlan(formData:FormData){
-  const courseId=text(formData,'course_id'),language=lang(formData)
-  if(!courseId)safeError('missing',language)
+  const courseId=text(formData,'course_id'),sourceId=text(formData,'source_id'),language=lang(formData)
+  if(!courseId||!sourceId)safeError('missing',language)
   const {supabase,userId,churchId}=await manager(courseId)
-  const {data:source}=await supabase.from('church_setup_uploads').select('id,extraction_plan').eq('church_id',churchId).eq('created_record_id',courseId).maybeSingle()
+  const {data:source}=await supabase.from('church_setup_uploads').select('id,extraction_plan').eq('id',sourceId).eq('church_id',churchId).eq('created_record_id',courseId).maybeSingle()
   const plan:any=source?.extraction_plan
   if(!source||!plan?.lessons?.length)safeError(courseId,language,language==='es'?'No hay una propuesta lista para aplicar.':'No extraction proposal is ready to apply.')
   const {count}=await supabase.from('course_modules').select('*',{count:'exact',head:true}).eq('course_id',courseId)
@@ -264,4 +278,55 @@ export async function applyExtractionPlan(formData:FormData){
   }
   await supabase.from('church_setup_uploads').update({extraction_status:'applied',extraction_applied_at:new Date().toISOString()}).eq('id',source!.id)
   success(courseId,language,language==='es'?'Propuesta aplicada como borrador.':'Proposal applied as drafts.')
+}
+
+export async function saveCourseSourceLink(formData:FormData){
+  const courseId=text(formData,'course_id'),language=lang(formData),rawUrl=text(formData,'source_url'),label=text(formData,'source_label')
+  if(!courseId)safeError('missing',language)
+  const provider=sourceProvider(rawUrl)
+  if(rawUrl&&!provider)safeError(courseId,language,language==='es'?'Usa un enlace HTTPS válido de Dropbox, Google Drive, OneDrive, SharePoint u otro sitio web.':'Use a valid HTTPS link from Dropbox, Google Drive, OneDrive, SharePoint, or another website.')
+  const {supabase}=await manager(courseId)
+  const {error}=await supabase.rpc('set_course_source_link_builder',{p_course_id:courseId,p_source_provider:provider,p_source_url:rawUrl||null,p_source_label:label||null})
+  if(error){console.error('course builder source link failed',{courseId,message:error.message});safeError(courseId,language)}
+  success(courseId,language,rawUrl?(language==='es'?'Fuente del curso conectada.':'Course source connected.'):(language==='es'?'Fuente del curso eliminada.':'Course source removed.'))
+}
+
+export async function saveLessonSourceLink(formData:FormData){
+  const courseId=text(formData,'course_id'),moduleId=text(formData,'module_id'),language=lang(formData),rawUrl=text(formData,'source_url'),label=text(formData,'source_label')
+  if(!courseId||!moduleId)safeError(courseId||'missing',language)
+  const provider=sourceProvider(rawUrl)
+  if(rawUrl&&!provider)safeError(courseId,language,language==='es'?'Usa un enlace HTTPS válido para la fuente de esta lección.':'Use a valid HTTPS source link for this lesson.')
+  const {supabase}=await manager(courseId)
+  const {error}=await supabase.rpc('set_course_module_source_link_builder',{p_module_id:moduleId,p_source_provider:provider,p_source_url:rawUrl||null,p_source_label:label||null})
+  if(error){console.error('lesson source link failed',{courseId,moduleId,message:error.message});safeError(courseId,language)}
+  success(courseId,language,rawUrl?(language==='es'?'Fuente de la lección conectada.':'Lesson source connected.'):(language==='es'?'Fuente de la lección eliminada.':'Lesson source removed.'))
+}
+
+
+export async function registerCourseSourceUpload(payload:{courseId:string;fileName:string;storagePath:string;contentType?:string;sizeBytes:number}){
+  const courseId=String(payload.courseId||'').trim()
+  if(!courseId)return {ok:false,error:'Course not found.'}
+  const {supabase,userId,churchId}=await manager(courseId)
+  const storagePath=String(payload.storagePath||'').trim()
+  if(!storagePath.startsWith(`${churchId}/`))return {ok:false,error:'Invalid church storage path.'}
+  const fileName=String(payload.fileName||'').trim().slice(0,220)
+  if(!fileName)return {ok:false,error:'File name is required.'}
+  const {error}=await supabase.from('church_setup_uploads').insert({
+    church_id:churchId,
+    uploaded_by:userId,
+    file_name:fileName,
+    storage_path:storagePath,
+    content_type:String(payload.contentType||'').slice(0,160)||null,
+    size_bytes:Math.max(0,Number(payload.sizeBytes)||0),
+    category:'curriculum',
+    notes:'Added directly from Course Builder.',
+    suggested_destination:'Learning Center',
+    status:'ready',
+    approved_at:new Date().toISOString(),
+    created_record_id:courseId,
+    created_record_type:'course'
+  })
+  if(error){console.error('course source registration failed',{courseId,message:error.message});return {ok:false,error:'The file uploaded, but Kingdom Network could not attach it to this course.'}}
+  refresh(courseId)
+  return {ok:true}
 }

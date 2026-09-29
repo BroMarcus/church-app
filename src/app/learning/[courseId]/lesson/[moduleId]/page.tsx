@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { CheckCircle2,ChevronLeft,ChevronRight,LockKeyhole } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { AssessmentCard } from '../../assessment-card'
+import { setModuleComplete } from '../../../actions'
 import '../../../learning.css'
 import '../../assessment.css'
 
@@ -13,28 +14,38 @@ export default async function LessonPage({params}:{params:Promise<{courseId:stri
   const supabase=await createClient()
   const {data:claims}=await supabase.auth.getClaims(),userId=claims?.claims?.sub
   if(!userId)redirect('/login')
-  const [{data:course},{data:module},{data:enrollment},{data:modules},{data:assessments}]=await Promise.all([
+  const [{data:course},{data:module},{data:enrollment},{data:modules},{data:assessments},{data:moduleProgress}]=await Promise.all([
     supabase.from('courses').select('id,title,church_id,language_code,published').eq('id',courseId).eq('published',true).maybeSingle(),
     supabase.from('course_modules').select('*').eq('id',moduleId).eq('course_id',courseId).maybeSingle(),
     supabase.from('course_enrollments').select('course_id,user_id').eq('course_id',courseId).eq('user_id',userId).maybeSingle(),
     supabase.from('course_modules').select('id,title,position').eq('course_id',courseId).order('position'),
-    supabase.from('course_assessments').select('id,title,assessment_type,passing_score,max_attempts,module_id,required,checkpoint_section').eq('course_id',courseId).eq('module_id',moduleId).eq('published',true).order('checkpoint_section',{ascending:true,nullsFirst:false}).order('created_at')
+    supabase.from('course_assessments').select('id,title,assessment_type,passing_score,max_attempts,module_id,required,checkpoint_section').eq('course_id',courseId).eq('module_id',moduleId).eq('published',true).order('checkpoint_section',{ascending:true,nullsFirst:false}).order('created_at'),
+    supabase.from('course_module_progress').select('completed,completed_at').eq('course_id',courseId).eq('module_id',moduleId).eq('user_id',userId).maybeSingle()
   ])
   if(!course||!module)redirect(`/learning/${courseId}`)
   if(!enrollment)redirect(`/learning/${courseId}?error=${encodeURIComponent('Start the course before opening a lesson.')}`)
 
+  const {data:assetRows}=await supabase.from('course_module_assets').select('id,title,asset_type,storage_path,position').eq('module_id',moduleId).order('position')
+  const learnerAssets=await Promise.all((assetRows??[]).map(async(asset:any)=>{const signed=await supabase.storage.from('learning-assets').createSignedUrl(asset.storage_path,900);return {...asset,url:signed.data?.signedUrl??null}}))
+
   const currentPosition=Number(module.position??0)
   const priorModuleIds=(modules??[]).filter((m:any)=>Number(m.position)<currentPosition).map((m:any)=>m.id)
   if(priorModuleIds.length){
-    const {data:priorRequired}=await supabase.from('course_assessments').select('id').eq('course_id',courseId).eq('required',true).eq('published',true).in('module_id',priorModuleIds)
+    const [{data:priorRequired},{data:priorProgress}]=await Promise.all([
+      supabase.from('course_assessments').select('id,module_id').eq('course_id',courseId).eq('required',true).eq('published',true).in('module_id',priorModuleIds),
+      supabase.from('course_module_progress').select('module_id,completed').eq('course_id',courseId).eq('user_id',userId).in('module_id',priorModuleIds)
+    ])
     const priorAssessmentIds=(priorRequired??[]).map((a:any)=>a.id)
-    if(priorAssessmentIds.length){
-      const {data:priorPassed}=await supabase.from('assessment_attempts').select('assessment_id').eq('user_id',userId).eq('passed',true).in('assessment_id',priorAssessmentIds)
-      const passedIds=new Set((priorPassed??[]).map((a:any)=>a.assessment_id))
-      if(priorAssessmentIds.some((id:string)=>!passedIds.has(id))){
-        const message=(course.language_code??'en')==='es'?'Completa primero las evaluaciones requeridas de las lecciones anteriores.':'Complete the required tests in earlier lessons before opening this lesson.'
-        redirect(`/learning/${courseId}?error=${encodeURIComponent(message)}`)
-      }
+    let priorPassed:any[]=[]
+    if(priorAssessmentIds.length){const result=await supabase.from('assessment_attempts').select('assessment_id').eq('user_id',userId).eq('passed',true).in('assessment_id',priorAssessmentIds);priorPassed=result.data??[]}
+    const passedIds=new Set(priorPassed.map((a:any)=>a.assessment_id))
+    const completedPriorModules=new Set((priorProgress??[]).filter((p:any)=>p.completed).map((p:any)=>p.module_id))
+    const requiredByModule=new Map<string,string[]>()
+    for(const a of priorRequired??[]){const ids=requiredByModule.get(a.module_id)??[];ids.push(a.id);requiredByModule.set(a.module_id,ids)}
+    const blocked=priorModuleIds.some((id:string)=>{const required=requiredByModule.get(id)??[];return required.length?required.some(assessmentId=>!passedIds.has(assessmentId)):!completedPriorModules.has(id)})
+    if(blocked){
+      const message=(course.language_code??'en')==='es'?'Completa primero las lecciones y evaluaciones requeridas anteriores.':'Complete the earlier required lessons and tests before opening this lesson.'
+      redirect(`/learning/${courseId}?error=${encodeURIComponent(message)}`)
     }
   }
 
@@ -53,9 +64,12 @@ export default async function LessonPage({params}:{params:Promise<{courseId:stri
   const checkpoints=rows.filter((a:any)=>a.checkpoint_section!=null)
   const endTests=rows.filter((a:any)=>a.checkpoint_section==null)
   const sectionUnlocked=(sectionNumber:number)=>checkpoints.filter((a:any)=>Number(a.checkpoint_section)<sectionNumber&&a.required).every(passed)
-  const allSectionCheckpointsPassed=checkpoints.filter((a:any)=>a.required).every(passed)
-  const allEndTestsPassed=endTests.filter((a:any)=>a.required).every(passed)
-  const lessonPassed=allSectionCheckpointsPassed&&allEndTestsPassed
+  const requiredCheckpoints=checkpoints.filter((a:any)=>a.required)
+  const requiredEndTests=endTests.filter((a:any)=>a.required)
+  const hasRequiredAssessment=requiredCheckpoints.length+requiredEndTests.length>0
+  const allSectionCheckpointsPassed=requiredCheckpoints.every(passed)
+  const allEndTestsPassed=requiredEndTests.every(passed)
+  const lessonPassed=hasRequiredAssessment?(allSectionCheckpointsPassed&&allEndTestsPassed):Boolean(moduleProgress?.completed)
   const index=(modules??[]).findIndex((m:any)=>m.id===moduleId),prev=index>0?(modules??[])[index-1]:null,next=index>=0&&index<(modules??[]).length-1?(modules??[])[index+1]:null
   const isEs=(course.language_code??'en')==='es',t=(en:string,es:string)=>isEs?es:en
 
@@ -66,9 +80,15 @@ export default async function LessonPage({params}:{params:Promise<{courseId:stri
 
     {list(module.content?.objectives).length>0&&<section className="card" style={{padding:18,marginBottom:14}}><div className="pill">{t('LEARNING GOALS','METAS DE APRENDIZAJE')}</div><ul>{list(module.content.objectives).map((x:any,i:number)=><li key={i}>{String(x)}</li>)}</ul></section>}
 
+    {String(module.content?.body??'').trim()&&<section className="card" style={{padding:20,marginBottom:16}}><div className="pill">{t('LESSON MATERIAL','MATERIAL DE LA LECCIÓN')}</div><div className="muted" style={{whiteSpace:'pre-wrap',lineHeight:1.75,marginTop:10}}>{String(module.content.body)}</div></section>}
+
+    {learnerAssets.length>0&&<section className="card" style={{padding:18,marginBottom:16}}><div className="pill">{t('LESSON FILES','ARCHIVOS DE LA LECCIÓN')}</div><h2 style={{margin:'8px 0 10px'}}>{t('Materials for this lesson','Materiales para esta lección')}</h2><div style={{display:'grid',gap:8}}>{learnerAssets.map((asset:any)=><div className="row" style={{justifyContent:'space-between',gap:10,flexWrap:'wrap'}} key={asset.id}><div><strong>{asset.title}</strong><div className="small muted">{String(asset.asset_type??'resource').replaceAll('_',' ')}</div></div>{asset.url?<a className="ghost" href={asset.url} target="_blank" rel="noreferrer">{t('Open material','Abrir material')}</a>:<span className="small muted">{t('File unavailable','Archivo no disponible')}</span>}</div>)}</div></section>}
+
     <section style={{display:'grid',gap:16}}>{sections.map((section:any,i:number)=>{const n=i+1,unlocked=sectionUnlocked(n),sectionQuizzes=checkpoints.filter((a:any)=>Number(a.checkpoint_section)===n);return <div key={n} style={{display:'grid',gap:10}}>{unlocked?<><article className="card" style={{padding:20}}><div className="pill">{t(`SECTION ${n}`,`SECCIÓN ${n}`)}</div><h2 style={{margin:'9px 0 8px'}}>{String(section?.heading??t(`Section ${n}`,`Sección ${n}`))}</h2><div className="muted" style={{whiteSpace:'pre-wrap',lineHeight:1.75}}>{String(section?.body??'')}</div></article>{sectionQuizzes.map((a:any)=><section key={a.id}><div className="pill" style={{marginBottom:7}}>{t('QUICK CHECK','REPASO RÁPIDO')}</div><AssessmentCard assessment={a} courseId={courseId}/></section>)}{sectionQuizzes.length===0&&n<sections.length&&<div className="notice">{t('No short quiz is assigned after this section yet, so you may continue.','Todavía no hay un cuestionario corto después de esta sección, así que puedes continuar.')}</div>}</>:<article className="card" style={{padding:18}}><div className="row" style={{gap:10,alignItems:'flex-start'}}><LockKeyhole size={20}/><div><strong>{t(`Section ${n} is locked`,`La sección ${n} está bloqueada`)}</strong><p className="small muted" style={{marginBottom:0}}>{t('Pass the required quick check above to continue.','Aprueba el cuestionario requerido anterior para continuar.')}</p></div></div></article>}</div>})}</section>
 
     {allSectionCheckpointsPassed&&<section style={{marginTop:22}}><div className="pill">{t('LESSON CHECKPOINT','EVALUACIÓN DE LA LECCIÓN')}</div><h2>{t('Finish this lesson','Termina esta lección')}</h2>{endTests.length?endTests.map((a:any)=><AssessmentCard assessment={a} courseId={courseId} key={a.id}/>):<div className="card" style={{padding:18}}><p className="muted">{t('No end-of-lesson test is assigned yet.','Todavía no hay una prueba final de esta lección.')}</p></div>}</section>}
+
+    {!hasRequiredAssessment&&<section className="card" style={{padding:18,marginTop:22}}><div className="pill">{t('NO REQUIRED ASSESSMENT','SIN EVALUACIÓN REQUERIDA')}</div><h2>{lessonPassed?t('Lesson complete','Lección completada'):t('Finish this lesson','Termina esta lección')}</h2><p className="muted">{lessonPassed?t('No required test was provided for this lesson. Your completion is saved.','No se proporcionó una prueba requerida para esta lección. Tu finalización está guardada.'):t('No required test is provided for this lesson. When you have finished the lesson material, mark it complete to save your place.','No se proporciona una prueba requerida para esta lección. Cuando termines el material, marca la lección como completada para guardar tu lugar.')}</p>{!lessonPassed&&<form action={setModuleComplete}><input type="hidden" name="course_id" value={courseId}/><input type="hidden" name="module_id" value={moduleId}/><input type="hidden" name="complete" value="1"/><button className="btn">{t('Mark lesson complete','Marcar lección como completada')}</button></form>}</section>}
 
     {list(module.content?.scripture_refs).length>0&&<section className="card" style={{padding:18,marginTop:18}}><div className="pill">{t('KEY SCRIPTURES','ESCRITURAS CLAVE')}</div><p>{list(module.content.scripture_refs).map(String).join(' • ')}</p></section>}
     {list(module.content?.review_points).length>0&&<section className="card" style={{padding:18,marginTop:14}}><div className="pill">{t('REVIEW','REPASO')}</div><ul>{list(module.content.review_points).map((x:any,i:number)=><li key={i}>{String(x)}</li>)}</ul></section>}
